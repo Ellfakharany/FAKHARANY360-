@@ -3622,6 +3622,18 @@ function qcBuildSelectors() {
   var mwrap = document.getElementById('qc-month-wrap');
   if (mwrap) mwrap.style.display = type === 'month' ? 'none' : 'block';
 
+  // Partner filter: hide when the comparison itself is Partner vs Partner
+  var pwrap = document.getElementById('qc-partner-wrap');
+  if (pwrap) pwrap.style.display = type === 'partner' ? 'none' : 'block';
+  var pSel = document.getElementById('qc-partner');
+  if (pSel && !pSel.dataset.filled) {
+    var seenPt={}, partnersList=[];
+    RAW_DATA.forEach(function(r){ if (r.partner && !seenPt[r.partner]) { seenPt[r.partner]=1; partnersList.push(r.partner); } });
+    partnersList.sort();
+    partnersList.forEach(function(p){ var o=document.createElement('option'); o.value=p; o.textContent=p; pSel.appendChild(o); });
+    pSel.dataset.filled='1';
+  }
+
   // Single pass: collect unique values + months
   var seen={}, vals=[], mSeen={}, months=[];
   for (var i=0; i<RAW_DATA.length; i++) {
@@ -3675,6 +3687,8 @@ function qcRun() {
   var moFilter = (msel && type!=='month') ? msel.value : '';
   var rsel  = document.getElementById('qc-region');
   var regionFilter = rsel ? rsel.value : '';
+  var ptsel = document.getElementById('qc-partner');
+  var partnerFilter = (ptsel && type!=='partner') ? ptsel.value : '';
   var ZONE_LABELS = {'Ahmed Elananey':'East (Cairo)','Mohamed ElSisiy':'West (Cairo)','Mamdouh Farag':'Canal'};
 
   if (!valA||!valB) { alert('اختار الطرفين'); return; }
@@ -3695,6 +3709,8 @@ function qcRun() {
       if (moFilter && r.month !== moFilter) continue;
       // Optional region filter (based on regionalManager for East/West/Canal split)
       if (regionFilter && r.regionalManager !== regionFilter) continue;
+      // Optional partner filter (additive filter, independent of comparison type)
+      if (partnerFilter && r.partner !== partnerFilter) continue;
       // Optional classification filter
       if (typeof activeClass!=='undefined' && activeClass!=='all' && r.classification!==activeClass) continue;
       var v = r[field];
@@ -3709,6 +3725,7 @@ function qcRun() {
     var labelB = type==='month' ? ((MONTH_LABELS[valB]||valB)+' '+valB.split('-')[1]) : valB;
     var moLabel = moFilter ? ' · '+(MONTH_LABELS[moFilter]||moFilter)+' '+moFilter.split('-')[1] : ' · All Months';
     var rgLabel = regionFilter ? ' · '+(ZONE_LABELS[regionFilter]||regionFilter) : ' · All Zones';
+    if (partnerFilter) rgLabel += ' · Partner: '+partnerFilter;
 
     var html = qcBuildHTML(kA, kB, labelA, labelB, rA.length, rB.length, moLabel, rgLabel);
     document.getElementById('qc-results').innerHTML = html;
@@ -3798,10 +3815,26 @@ function qcBuildHTML(kA, kB, labelA, labelB, cntA, cntB, moLabel, rgLabel) {
     '<table style="width:100%;border-collapse:collapse">',
     '<thead><tr style="background:#f9fafb">',th('Tier'),th(labelA,'#5E2D91'),th(labelB,'#e91e8c'),th('Δ'),'</tr></thead>',
     '<tbody>',
-    row('🔴 Low Tier (25,29,32,37)',  kA.lowT||0,  kB.lowT||0,  null, false),
-    row('🟡 Mid Tier (40,45,46,52)',  kA.midT||0,  kB.midT||0,  null, false),
-    row('🟢 High Tier (50+)',        kA.highT||0, kB.highT||0, null, false),
-    row('🟣 12 PT (12-month plan)',  kA.pt12||0,  kB.pt12||0,  null, false),
+    (function(){
+      var totA = (kA.lowT||0)+(kA.midT||0)+(kA.highT||0)+(kA.pt12||0);
+      var totB = (kB.lowT||0)+(kB.midT||0)+(kB.highT||0)+(kB.pt12||0);
+      function tRow(label, va, vb) {
+        var pA = totA>0 ? (va/totA*100).toFixed(1) : '0.0';
+        var pB = totB>0 ? (vb/totB*100).toFixed(1) : '0.0';
+        var d = (parseFloat(pB)-parseFloat(pA)).toFixed(1);
+        var dNum = parseFloat(d);
+        return '<tr style="border-bottom:1px solid #f3f4f6">'+
+          '<td style="padding:7px 10px;font-size:11px;font-weight:600;color:#6b7280">'+label+'</td>'+
+          '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#5E2D91;text-align:right">'+fmtN(va)+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+pA+'%)</span></td>'+
+          '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#e91e8c;text-align:right">'+fmtN(vb)+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+pB+'%)</span></td>'+
+          '<td style="padding:7px 10px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+(dNum>0?'#dcfce7':dNum<0?'#fee2e2':'#f3f4f6')+';color:'+(dNum>0?'#15803d':dNum<0?'#dc2626':'#6b7280')+'">'+(dNum>0?'▲':dNum<0?'▼':'=')+' '+(dNum>0?'+':'')+d+'pp</span></td>'+
+        '</tr>';
+      }
+      return tRow('🔴 Low Tier (25,29,32,37)',  kA.lowT||0,  kB.lowT||0) +
+             tRow('🟡 Mid Tier (40,45,46,52)',  kA.midT||0,  kB.midT||0) +
+             tRow('🟢 High Tier (50+)',        kA.highT||0, kB.highT||0) +
+             tRow('🟣 12 PT (12-month plan)',  kA.pt12||0,  kB.pt12||0);
+    })(),
     '</tbody></table></div>',
 
     // Insights
@@ -4895,6 +4928,53 @@ function mtdQcBuildSelectors() {
     });
   }
 
+  // Partner filter: hide when the comparison itself is Partner vs Partner
+  var partnerWrap = document.getElementById('mtd-qc-partner-wrap');
+  if (type === 'partner' || type === 'day') {
+    partnerWrap.style.display = 'none';
+  } else {
+    partnerWrap.style.display = '';
+    var pSel = document.getElementById('mtd-qc-partner');
+    if (!pSel.dataset.filled) {
+      var seenP={}, partners=[];
+      getMTDActiveDataset().forEach(function(r){
+        if (r.partner && !seenP[r.partner]) { seenP[r.partner]=1; partners.push(r.partner); }
+      });
+      partners.sort();
+      partners.forEach(function(p){ var o=document.createElement('option'); o.value=p; o.textContent=p; pSel.appendChild(o); });
+      pSel.dataset.filled = '1';
+    }
+  }
+
+  // "vs Closed Month" toggle — only meaningful for entity types (not Day vs Day)
+  var vsWrap = document.getElementById('mtd-qc-vsmonth-wrap');
+  vsWrap.style.display = (type === 'day') ? 'none' : '';
+  var vsChecked = document.getElementById('mtd-qc-vsmonth').checked && type !== 'day';
+
+  var closedWrap = document.getElementById('mtd-qc-closedmonth-wrap');
+  var selBWrap   = document.getElementById('mtd-qc-sel-b-wrap');
+  if (vsChecked) {
+    closedWrap.style.display = '';
+    selBWrap.style.display = 'none';
+    document.getElementById('mtd-qc-vs-label').textContent = 'vs (نفس العنصر)';
+    var cmSel = document.getElementById('mtd-qc-closedmonth');
+    if (!cmSel.dataset.filled) {
+      var months = Array.from(new Set(RAW_DATA.map(function(r){ return r.month; }))).filter(Boolean);
+      months.sort(function(a,b){ return MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b); });
+      months.forEach(function(m,i){
+        var o=document.createElement('option');
+        o.value = m; o.textContent = MONTH_LABELS[m] || m;
+        if (i===months.length-1) o.selected = true;
+        cmSel.appendChild(o);
+      });
+      cmSel.dataset.filled = '1';
+    }
+  } else {
+    closedWrap.style.display = 'none';
+    selBWrap.style.display = '';
+    document.getElementById('mtd-qc-vs-label').textContent = 'vs';
+  }
+
   if (type === 'day') {
     var days = (MTD_DAILY && MTD_DAILY.dayCols) ? MTD_DAILY.dayCols.slice() : [];
     var opts = days.map(function(d){ return { value:d, label:'Day '+d }; });
@@ -4945,6 +5025,20 @@ function computeMTDTariffTiers(codesSet) {
     });
   });
   return out;
+}
+
+// Build an MTD-shaped group object from RAW_DATA (closed-month, main
+// dashboard) rows, so a live MTD group can be compared against a closed
+// month using the exact same rendering functions (mtdQcBuildEntityHTML etc).
+function mtdQcCalcGroupFromRaw(rows) {
+  var g = { storeCount: new Set(rows.map(function(r){ return r.store; })).size };
+  Object.keys(MTD_PRODS).forEach(function(key){
+    var p = MTD_PRODS[key];
+    g[key] = { tgt: sum(rows, p.tKey), act: sum(rows, p.aKey) };
+  });
+  g.wallet = { tgt: sum(rows,'walletTarget'), act: sum(rows,'walletSales') };
+  g.lowT = sum(rows,'lowT'); g.midT = sum(rows,'midT'); g.highT = sum(rows,'highT'); g.pt12 = sum(rows,'pt12');
+  return g;
 }
 
 function mtdQcCalcGroup(rows) {
@@ -5067,9 +5161,13 @@ function renderMTDQcProductChart(kA, kB, labelA, labelB) {
 function mtdQcRun() {
   var type = document.getElementById('mtd-qc-type').value;
   var valA = document.getElementById('mtd-qc-sel-a').value;
-  var valB = document.getElementById('mtd-qc-sel-b').value;
-  if (!valA || !valB) { alert('اختار الطرفين'); return; }
-  if (valA === valB)  { alert('اختار عنصرين مختلفين'); return; }
+  var partnerFilter = (type !== 'partner' && type !== 'day') ? document.getElementById('mtd-qc-partner').value : '';
+  var vsMonthChecked = type !== 'day' && document.getElementById('mtd-qc-vsmonth').checked;
+  var valB = vsMonthChecked ? valA : document.getElementById('mtd-qc-sel-b').value;
+
+  if (!valA || (!vsMonthChecked && !valB)) { alert('اختار الطرفين'); return; }
+  if (!vsMonthChecked && valA === valB)  { alert('اختار عنصرين مختلفين'); return; }
+  if (vsMonthChecked && !document.getElementById('mtd-qc-closedmonth').value) { alert('اختار الشهر المقفول'); return; }
 
   var btn = document.getElementById('mtd-qc-run-btn');
   btn.disabled = true; btn.innerHTML = '⏳';
@@ -5096,17 +5194,30 @@ function mtdQcRun() {
     } else {
       var field = MTD_QC_FIELDS[type];
       var pool = getMTDActiveDataset();
-      var rA=[], rB=[];
-      pool.forEach(function(r){
-        var v = r[field];
-        if (v === valA) rA.push(r);
-        else if (v === valB) rB.push(r);
-      });
-      var kA = mtdQcCalcGroup(rA), kB = mtdQcCalcGroup(rB);
-      labelA = valA; labelB = valB;
+      var kA, kB;
+      if (vsMonthChecked) {
+        var closedMonth = document.getElementById('mtd-qc-closedmonth').value;
+        var rA = pool.filter(function(r){ return r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
+        var rB = RAW_DATA.filter(function(r){ return r.month === closedMonth && r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
+        kA = mtdQcCalcGroup(rA);
+        kB = mtdQcCalcGroupFromRaw(rB);
+        labelA = valA + ' (Live MTD)';
+        labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' (مقفول)';
+      } else {
+        var rA=[], rB=[];
+        pool.forEach(function(r){
+          if (partnerFilter && r.partner !== partnerFilter) return;
+          var v = r[field];
+          if (v === valA) rA.push(r);
+          else if (v === valB) rB.push(r);
+        });
+        kA = mtdQcCalcGroup(rA); kB = mtdQcCalcGroup(rB);
+        labelA = valA; labelB = valB;
+      }
       scoreA = mtdQcWeightedScore(kA);
       scoreB = mtdQcWeightedScore(kB);
-      html = mtdQcWinnerBanner(labelA, labelB, scoreA, scoreB) +
+      var partnerNote = partnerFilter ? '<div style="text-align:center;font-size:11px;color:#6b7280;margin-bottom:8px">Partner filter: <strong>'+partnerFilter+'</strong></div>' : '';
+      html = partnerNote + mtdQcWinnerBanner(labelA, labelB, scoreA, scoreB) +
              mtdQcBuildEntityHTML(kA, kB, labelA, labelB) +
              '<div style="margin-top:14px;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:8px">Ach% by Product — '+labelA+' vs '+labelB+'</div><canvas id="mtd-qc-chart" height="200"></canvas></div>';
       chartFn = function(){ renderMTDQcProductChart(kA, kB, labelA, labelB); };
@@ -5177,12 +5288,16 @@ function mtdQcBuildEntityHTML(kA, kB, labelA, labelB) {
 
   var th = function(t,c){ return '<th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:'+(c||'#6b7280')+'">'+t+'</th>'; };
 
+  var tierTotA = (kA.lowT||0)+(kA.midT||0)+(kA.highT||0)+(kA.pt12||0);
+  var tierTotB = (kB.lowT||0)+(kB.midT||0)+(kB.highT||0)+(kB.pt12||0);
   function tierRow(label, va, vb) {
     var d = vb - va;
+    var pA = tierTotA>0 ? (va/tierTotA*100).toFixed(1) : '0.0';
+    var pB = tierTotB>0 ? (vb/tierTotB*100).toFixed(1) : '0.0';
     return '<tr style="border-bottom:1px solid #f3f4f6">'+
       '<td style="padding:7px 10px;font-size:11px;font-weight:600;color:#6b7280">'+label+'</td>'+
-      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#5E2D91;text-align:right">'+fmtN(va)+'</td>'+
-      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#e91e8c;text-align:right">'+fmtN(vb)+'</td>'+
+      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#5E2D91;text-align:right">'+fmtN(va)+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+pA+'%)</span></td>'+
+      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#e91e8c;text-align:right">'+fmtN(vb)+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+pB+'%)</span></td>'+
       '<td style="padding:7px 10px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+(d>0?'#dcfce7':d<0?'#fee2e2':'#f3f4f6')+';color:'+(d>0?'#15803d':d<0?'#dc2626':'#6b7280')+'">'+(d>0?'▲':d<0?'▼':'=')+' '+fmtN(Math.abs(d))+'</span></td>'+
     '</tr>';
   }
@@ -6352,6 +6467,14 @@ function renderMTDTable() {
       </select>
     </div>
 
+    <!-- Partner filter (additional filter, not the comparison axis) -->
+    <div id="qc-partner-wrap">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:4px">Partner</div>
+      <select id="qc-partner" style="padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:600;min-width:130px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e;background:white">
+        <option value="">All Partners</option>
+      </select>
+    </div>
+
     <!-- Run -->
     <button onclick="qcRun()" id="qc-run-btn" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;touch-action:manipulation;-webkit-appearance:none;height:36px">
       <i class="fas fa-play mr-1"></i>Compare
@@ -6402,8 +6525,22 @@ function renderMTDTable() {
     <div id="mtd-qc-vsmonth-wrap" style="display:none">
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#5E2D91;cursor:pointer;padding-bottom:8px">
         <input type="checkbox" id="mtd-qc-vsmonth" onchange="mtdQcBuildSelectors()">
-        قارن بشهر سابق مقفول
+        قارن بشهر سابق مقفول (Dashboard الرئيسي)
       </label>
+    </div>
+
+    <!-- Closed month picker (shown only when vsmonth is checked) -->
+    <div id="mtd-qc-closedmonth-wrap" style="display:none">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:4px">الشهر المقفول</div>
+      <select id="mtd-qc-closedmonth" onchange="mtdQcBuildSelectors()" style="padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:600;min-width:120px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e;background:white"></select>
+    </div>
+
+    <!-- Partner filter -->
+    <div id="mtd-qc-partner-wrap">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:4px">Partner</div>
+      <select id="mtd-qc-partner" style="padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:600;min-width:130px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e;background:white">
+        <option value="">All Partners</option>
+      </select>
     </div>
 
     <!-- Side A -->
@@ -6412,10 +6549,10 @@ function renderMTDTable() {
       <select id="mtd-qc-sel-a" style="padding:7px 10px;border:2px solid #5E2D91;border-radius:8px;font-size:12px;font-weight:600;min-width:150px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e"></select>
     </div>
 
-    <div style="font-weight:900;color:#d1d5db;padding-bottom:4px;font-size:14px">vs</div>
+    <div id="mtd-qc-vs-label" style="font-weight:900;color:#d1d5db;padding-bottom:4px;font-size:14px">vs</div>
 
     <!-- Side B -->
-    <div>
+    <div id="mtd-qc-sel-b-wrap">
       <div id="mtd-qc-lbl-b" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#e91e8c;margin-bottom:4px">B</div>
       <select id="mtd-qc-sel-b" style="padding:7px 10px;border:2px solid #e91e8c;border-radius:8px;font-size:12px;font-weight:600;min-width:150px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e"></select>
     </div>
