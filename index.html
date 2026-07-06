@@ -1689,7 +1689,7 @@ function calcGroup(rows) {
   const totalT = PRODUCTS.reduce((s, p) => s + (t[p.tKey]||0), 0);
   const totalA = PRODUCTS.reduce((s, p) => s + (a[p.aKey]||0), 0);
   const uniqueStores = new Set(rows.map(function(r){ return r.store; })).size;
-  return { ...t, ...a, totalTarget: totalT, totalAch: totalA, pct: pct(totalA, totalT), gap: totalA - totalT, lowT: sum(rows,'lowT'), midT: sum(rows,'midT'), highT: sum(rows,'highT'), storeCount: uniqueStores };
+  return { ...t, ...a, totalTarget: totalT, totalAch: totalA, pct: pct(totalA, totalT), gap: totalA - totalT, lowT: sum(rows,'lowT'), midT: sum(rows,'midT'), highT: sum(rows,'highT'), pt12: sum(rows,'pt12'), storeCount: uniqueStores };
 }
 
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
@@ -3792,6 +3792,18 @@ function qcBuildHTML(kA, kB, labelA, labelB, cntA, cntB, moLabel, rgLabel) {
     '<thead><tr style="background:#f9fafb">',th('Product'),th(labelA,'#5E2D91'),th(labelB,'#e91e8c'),th('Δ pp'),'</tr></thead>',
     '<tbody>'+prodRows+'</tbody></table></div>',
 
+    // Tariff Mix breakdown (Low/Mid/High/12PT)
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:6px">Tariff Mix (Low / Mid / High / 12PT)</div>',
+    '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px">',
+    '<table style="width:100%;border-collapse:collapse">',
+    '<thead><tr style="background:#f9fafb">',th('Tier'),th(labelA,'#5E2D91'),th(labelB,'#e91e8c'),th('Δ'),'</tr></thead>',
+    '<tbody>',
+    row('🔴 Low Tier (25,29,32,37)',  kA.lowT||0,  kB.lowT||0,  null, false),
+    row('🟡 Mid Tier (40,45,46,52)',  kA.midT||0,  kB.midT||0,  null, false),
+    row('🟢 High Tier (50+)',        kA.highT||0, kB.highT||0, null, false),
+    row('🟣 12 PT (12-month plan)',  kA.pt12||0,  kB.pt12||0,  null, false),
+    '</tbody></table></div>',
+
     // Insights
     insights.length ? '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:6px">Insights</div><div>'+insights.join('')+'</div>' : '',
   ].join('');
@@ -4906,6 +4918,35 @@ function mtdQcBuildSelectors() {
   document.getElementById('mtd-qc-results').innerHTML         = '';
 }
 
+// Reusable: compute Low/Mid/High/12PT totals for any set of storeCodes,
+// using the same classification as the Tariff Mix section (a package's
+// price-point number decides its tier; PAYG/"12 PT" is its own bucket).
+function computeMTDTariffTiers(codesSet) {
+  var out = { low:0, mid:0, high:0, pt12:0 };
+  if (!MTD_PKGMIX) return out;
+  var LOW_SET=[25,29,32,37], MID_SET=[40,45,46,52];
+  function classifyCol(c) {
+    if (c.cat === 'payg') return 'pt12';
+    if (c.cat !== 'kix' && c.cat !== 'tazbeet') return null;
+    var m = c.label.match(/(\d+)(?!.*\d)/);
+    if (!m) return null;
+    var n = +m[1];
+    if (LOW_SET.indexOf(n) !== -1) return 'low';
+    if (MID_SET.indexOf(n) !== -1) return 'mid';
+    return 'high';
+  }
+  var pkgRows = MTD_PKGMIX.rows.filter(function(r){ return codesSet[r.storeCode]; });
+  pkgRows.forEach(function(r){
+    MTD_PKGMIX.cols.forEach(function(c){
+      var v = r.vals[c.ci] || 0;
+      if (!v) return;
+      var tier = classifyCol(c);
+      if (tier) out[tier] += v;
+    });
+  });
+  return out;
+}
+
 function mtdQcCalcGroup(rows) {
   var g = { storeCount: rows.length };
   Object.keys(MTD_PRODS).forEach(function(key){
@@ -4921,6 +4962,13 @@ function mtdQcCalcGroup(rows) {
     wAct += Number(w.walletSales)||0;
   });
   g.wallet = { tgt: wTgt, act: wAct };
+
+  // Tariff tiers (Low/Mid/High/12PT), scoped to this group's stores
+  var codes = {};
+  rows.forEach(function(r){ codes[String(r.storeCode||'').trim().toUpperCase()] = true; });
+  var tiers = computeMTDTariffTiers(codes);
+  g.lowT = tiers.low; g.midT = tiers.mid; g.highT = tiers.high; g.pt12 = tiers.pt12;
+
   return g;
 }
 
@@ -5129,6 +5177,16 @@ function mtdQcBuildEntityHTML(kA, kB, labelA, labelB) {
 
   var th = function(t,c){ return '<th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:'+(c||'#6b7280')+'">'+t+'</th>'; };
 
+  function tierRow(label, va, vb) {
+    var d = vb - va;
+    return '<tr style="border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:7px 10px;font-size:11px;font-weight:600;color:#6b7280">'+label+'</td>'+
+      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#5E2D91;text-align:right">'+fmtN(va)+'</td>'+
+      '<td style="padding:7px 10px;font-size:13px;font-weight:800;color:#e91e8c;text-align:right">'+fmtN(vb)+'</td>'+
+      '<td style="padding:7px 10px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+(d>0?'#dcfce7':d<0?'#fee2e2':'#f3f4f6')+';color:'+(d>0?'#15803d':d<0?'#dc2626':'#6b7280')+'">'+(d>0?'▲':d<0?'▼':'=')+' '+fmtN(Math.abs(d))+'</span></td>'+
+    '</tr>';
+  }
+
   return [
     '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px;padding:10px 12px;background:#f5f0ff;border-radius:10px;flex-wrap:wrap">',
       '<span style="font-size:12px;font-weight:800;color:#5E2D91">● '+labelA+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+kA.storeCount+' stores)</span></span>',
@@ -5136,10 +5194,21 @@ function mtdQcBuildEntityHTML(kA, kB, labelA, labelB) {
       '<span style="font-size:12px;font-weight:800;color:#e91e8c">● '+labelB+'<span style="font-weight:400;font-size:10px;color:#9ca3af"> ('+kB.storeCount+' stores)</span></span>',
     '</div>',
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:6px">Product Performance (Actual · Ach%)</div>',
-    '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">',
+    '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:14px">',
     '<table style="width:100%;border-collapse:collapse">',
     '<thead><tr style="background:#f9fafb">',th('Product'),th(labelA,'#5E2D91'),th(labelB,'#e91e8c'),th('Δ Ach%'),'</tr></thead>',
-    '<tbody>', prodRows, '</tbody></table></div>'
+    '<tbody>', prodRows, '</tbody></table></div>',
+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:6px">Tariff Mix (Low / Mid / High / 12PT)</div>',
+    '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">',
+    '<table style="width:100%;border-collapse:collapse">',
+    '<thead><tr style="background:#f9fafb">',th('Tier'),th(labelA,'#5E2D91'),th(labelB,'#e91e8c'),th('Δ'),'</tr></thead>',
+    '<tbody>',
+    tierRow('🔴 Low Tier (25,29,32,37)', kA.lowT||0, kB.lowT||0),
+    tierRow('🟡 Mid Tier (40,45,46,52)', kA.midT||0, kB.midT||0),
+    tierRow('🟢 High Tier (50+)',        kA.highT||0, kB.highT||0),
+    tierRow('🟣 12 PT (12-month plan)',  kA.pt12||0, kB.pt12||0),
+    '</tbody></table></div>'
   ].join('');
 }
 
@@ -6327,6 +6396,14 @@ function renderMTDTable() {
         <option value="partner">Partner vs Partner</option>
         <option value="store">Store vs Store</option>
       </select>
+    </div>
+
+    <!-- vs Closed Month toggle -->
+    <div id="mtd-qc-vsmonth-wrap" style="display:none">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#5E2D91;cursor:pointer;padding-bottom:8px">
+        <input type="checkbox" id="mtd-qc-vsmonth" onchange="mtdQcBuildSelectors()">
+        قارن بشهر سابق مقفول
+      </label>
     </div>
 
     <!-- Side A -->
