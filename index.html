@@ -3597,6 +3597,7 @@ var QC_FIELDS = {
   regionalManager:'regionalManager', classification:'classification',
   accountManager:'accountManager'
 };
+var QC_LAST_COMPARE = null; // { rA, rB, labelA, labelB, moLabel, rgLabel } — for Export
 
 function openQuickCompare() {
   document.getElementById('qcmp-overlay').style.display = 'block';
@@ -3727,6 +3728,8 @@ function qcRun() {
     var rgLabel = regionFilter ? ' · '+(ZONE_LABELS[regionFilter]||regionFilter) : ' · All Zones';
     if (partnerFilter) rgLabel += ' · Partner: '+partnerFilter;
 
+    QC_LAST_COMPARE = { rA: rA, rB: rB, labelA: labelA, labelB: labelB, moLabel: moLabel, rgLabel: rgLabel };
+
     var html = qcBuildHTML(kA, kB, labelA, labelB, rA.length, rB.length, moLabel, rgLabel);
     document.getElementById('qc-results').innerHTML = html;
     document.getElementById('qc-placeholder').style.display = 'none';
@@ -3735,6 +3738,44 @@ function qcRun() {
     btn.disabled=false;
     btn.innerHTML='<i class="fas fa-play mr-1"></i>Compare';
   }, 20);
+}
+
+// ── Export the exact store-level rows used in the last Quick Compare run ──
+function qcRowToExportObj(r) {
+  var o = {
+    'Store': r.store || '', 'Store Code': r.storeCode || '',
+    'Region': r.region || '', 'Regional Manager': r.regionalManager || '',
+    'Supervisor': r.supervisor || '', 'Area Manager': r.areaManager || '',
+    'Account Manager': r.accountManager || '', 'Classification': r.classification || '',
+    'Partner': r.partner || '', 'Month': (MONTH_LABELS[r.month]||r.month||'')
+  };
+  PRODUCTS.forEach(function(p){
+    o[p.label+' Target'] = r[p.tKey] || 0;
+    o[p.label+' Actual'] = r[p.aKey] || 0;
+  });
+  o['Low Tier'] = r.lowT || 0; o['Mid Tier'] = r.midT || 0; o['High Tier'] = r.highT || 0; o['12 PT'] = r.pt12 || 0;
+  return o;
+}
+
+function qcExportCompare() {
+  if (!QC_LAST_COMPARE || (!QC_LAST_COMPARE.rA.length && !QC_LAST_COMPARE.rB.length)) {
+    alert('⚠️ شغّل مقارنة الأول قبل الـ Export'); return;
+  }
+  var c = QC_LAST_COMPARE;
+  var dataA = c.rA.map(qcRowToExportObj);
+  var dataB = c.rB.map(qcRowToExportObj);
+  var wb2 = XLSX.utils.book_new();
+  var wsA = XLSX.utils.json_to_sheet(dataA.length ? dataA : [{'Info':'No rows'}]);
+  var wsB = XLSX.utils.json_to_sheet(dataB.length ? dataB : [{'Info':'No rows'}]);
+  XLSX.utils.book_append_sheet(wb2, wsA, ('A - '+c.labelA).slice(0,31));
+  XLSX.utils.book_append_sheet(wb2, wsB, ('B - '+c.labelB).slice(0,31));
+  var summary = [{
+    'Side A': c.labelA, 'A Stores': dataA.length,
+    'Side B': c.labelB, 'B Stores': dataB.length,
+    'Filters': (c.moLabel||'') + (c.rgLabel||'')
+  }];
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(summary), 'Summary');
+  exportWithPassword(wb2, 'Compare_'+c.labelA.replace(/\s+/g,'')+'_vs_'+c.labelB.replace(/\s+/g,''));
 }
 
 function qcBuildHTML(kA, kB, labelA, labelB, cntA, cntB, moLabel, rgLabel) {
@@ -4898,6 +4939,7 @@ var MTD_QC_FIELDS = {
   areaManager:'areaManager', classification:'classification',
   accountManager:'accountManager', partner:'partner', store:'store'
 };
+var MTD_QC_LAST_COMPARE = null; // { rA, rB, labelA, labelB, isClosedMonth } — for Export
 
 function mtdQcOpen() {
   document.getElementById('mtd-qcmp-overlay').style.display = 'block';
@@ -5175,6 +5217,7 @@ function mtdQcRun() {
   setTimeout(function() {
     var html, scoreA, scoreB, labelA, labelB, chartFn;
     if (type === 'day') {
+      MTD_QC_LAST_COMPARE = null;
       var dayA = Number(valA), dayB = Number(valB);
       var pool = getMTDActiveDataset();
       var codeSet = {}; pool.forEach(function(r){ codeSet[String(r.storeCode||'').trim().toUpperCase()] = true; });
@@ -5194,17 +5237,17 @@ function mtdQcRun() {
     } else {
       var field = MTD_QC_FIELDS[type];
       var pool = getMTDActiveDataset();
-      var kA, kB;
+      var kA, kB, rA, rB;
       if (vsMonthChecked) {
         var closedMonth = document.getElementById('mtd-qc-closedmonth').value;
-        var rA = pool.filter(function(r){ return r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
-        var rB = RAW_DATA.filter(function(r){ return r.month === closedMonth && r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
+        rA = pool.filter(function(r){ return r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
+        rB = RAW_DATA.filter(function(r){ return r.month === closedMonth && r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
         kA = mtdQcCalcGroup(rA);
         kB = mtdQcCalcGroupFromRaw(rB);
         labelA = valA + ' (Live MTD)';
         labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' (مقفول)';
       } else {
-        var rA=[], rB=[];
+        rA=[]; rB=[];
         pool.forEach(function(r){
           if (partnerFilter && r.partner !== partnerFilter) return;
           var v = r[field];
@@ -5214,6 +5257,7 @@ function mtdQcRun() {
         kA = mtdQcCalcGroup(rA); kB = mtdQcCalcGroup(rB);
         labelA = valA; labelB = valB;
       }
+      MTD_QC_LAST_COMPARE = { rA: rA, rB: rB, labelA: labelA, labelB: labelB, isClosedMonth: vsMonthChecked };
       scoreA = mtdQcWeightedScore(kA);
       scoreB = mtdQcWeightedScore(kB);
       var partnerNote = partnerFilter ? '<div style="text-align:center;font-size:11px;color:#6b7280;margin-bottom:8px">Partner filter: <strong>'+partnerFilter+'</strong></div>' : '';
@@ -5229,6 +5273,53 @@ function mtdQcRun() {
     btn.disabled=false;
     btn.innerHTML = '<i class="fas fa-play mr-1"></i>Compare';
   }, 20);
+}
+
+// ── Export the exact store-level rows used in the last MTD Quick Compare run ──
+// Handles both live-MTD rows (pool rows, wallet joined via WALLET_DATA by
+// storeCode) and closed-month rows (plain RAW_DATA rows, wallet embedded).
+function mtdQcRowToExportObj(r, isClosed) {
+  var o = {
+    'Store': r.store || '', 'Store Code': r.storeCode || '',
+    'Region': r.region || '', 'Regional Manager': r.regionalManager || '',
+    'Supervisor': r.supervisor || '', 'Area Manager': r.areaManager || '',
+    'Account Manager': r.accountManager || '', 'Classification': r.classification || '',
+    'Partner': r.partner || '', 'Month': isClosed ? (MONTH_LABELS[r.month]||r.month||'') : 'Live MTD'
+  };
+  Object.keys(MTD_PRODS).forEach(function(key){
+    var p = MTD_PRODS[key];
+    o[p.label+' Target'] = r[p.tKey] || 0;
+    o[p.label+' Actual'] = r[p.aKey] || 0;
+  });
+  if (isClosed) {
+    o['Wallet Target'] = r.walletTarget || 0; o['Wallet Actual'] = r.walletSales || 0;
+    o['Low Tier'] = r.lowT || 0; o['Mid Tier'] = r.midT || 0; o['High Tier'] = r.highT || 0; o['12 PT'] = r.pt12 || 0;
+  } else {
+    var wk = String(r.storeCode||'').trim().toUpperCase();
+    var w = (typeof WALLET_DATA!=='undefined' && WALLET_DATA[wk]) || {};
+    o['Wallet Target'] = Number(w.walletTarget)||0; o['Wallet Actual'] = Number(w.walletSales)||0;
+    // Low/Mid/High/12PT are only available aggregated at the group level for live
+    // MTD data (via MTD_PKGMIX), not per-store here — left blank to avoid mislabeling.
+    o['Low Tier'] = ''; o['Mid Tier'] = ''; o['High Tier'] = ''; o['12 PT'] = '';
+  }
+  return o;
+}
+
+function mtdQcExportCompare() {
+  if (!MTD_QC_LAST_COMPARE || (!MTD_QC_LAST_COMPARE.rA.length && !MTD_QC_LAST_COMPARE.rB.length)) {
+    alert('⚠️ شغّل مقارنة الأول قبل الـ Export (Export غير متاح لمقارنة Day vs Day)'); return;
+  }
+  var c = MTD_QC_LAST_COMPARE;
+  var dataA = c.rA.map(function(r){ return mtdQcRowToExportObj(r, false); });
+  var dataB = c.rB.map(function(r){ return mtdQcRowToExportObj(r, c.isClosedMonth); });
+  var wb2 = XLSX.utils.book_new();
+  var wsA = XLSX.utils.json_to_sheet(dataA.length ? dataA : [{'Info':'No rows'}]);
+  var wsB = XLSX.utils.json_to_sheet(dataB.length ? dataB : [{'Info':'No rows'}]);
+  XLSX.utils.book_append_sheet(wb2, wsA, ('A - '+c.labelA).slice(0,31));
+  XLSX.utils.book_append_sheet(wb2, wsB, ('B - '+c.labelB).slice(0,31));
+  var summary = [{ 'Side A': c.labelA, 'A Stores': dataA.length, 'Side B': c.labelB, 'B Stores': dataB.length }];
+  XLSX.utils.book_append_sheet(wb2, XLSX.utils.json_to_sheet(summary), 'Summary');
+  exportWithPassword(wb2, 'MTDCompare_'+c.labelA.replace(/\s+/g,'')+'_vs_'+c.labelB.replace(/[\s()]+/g,''));
 }
 
 function mtdQcBuildDayHTML(labelA, labelB, actA, actB, activeA, activeB, totalStores) {
@@ -6480,6 +6571,11 @@ function renderMTDTable() {
       <i class="fas fa-play mr-1"></i>Compare
     </button>
 
+    <!-- Export selected comparison data -->
+    <button onclick="qcExportCompare()" id="qc-export-btn" style="padding:8px 16px;background:white;color:#5E2D91;border:1.5px solid #5E2D91;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;touch-action:manipulation;-webkit-appearance:none;height:36px">
+      <i class="fas fa-file-export mr-1"></i>Export
+    </button>
+
   </div>
 
   <!-- Results body -->
@@ -6560,6 +6656,11 @@ function renderMTDTable() {
     <!-- Run -->
     <button onclick="mtdQcRun()" id="mtd-qc-run-btn" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;touch-action:manipulation;-webkit-appearance:none;height:36px">
       <i class="fas fa-play mr-1"></i>Compare
+    </button>
+
+    <!-- Export selected comparison data -->
+    <button onclick="mtdQcExportCompare()" id="mtd-qc-export-btn" style="padding:8px 16px;background:white;color:#5E2D91;border:1.5px solid #5E2D91;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;touch-action:manipulation;-webkit-appearance:none;height:36px">
+      <i class="fas fa-file-export mr-1"></i>Export
     </button>
 
   </div>
