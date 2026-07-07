@@ -49,9 +49,47 @@ def normalize_name(s):
     s = re.sub(r'\s+', ' ', s)
     return s.strip()
 
+def find_total_col(header_row, product_label, field_label):
+    """Locate a 'grand total' column (e.g. 'FBB Target') by its exact header
+    text in the given header row, instead of a hardcoded column index.
+    Package columns get added/removed over time (e.g. WE added a batch of
+    new FBB speed tiers in June-2026), which shifts every column after them —
+    a fixed index silently starts reading the wrong package's numbers. Since
+    the WORKBOOK ALWAYS repeats the product name in the total's header
+    (e.g. 'FBB Target', 'FBB Subscriptions', 'FBB %'), searching by that text
+    is immune to columns moving around.
+    """
+    target_text = f'{product_label} {field_label}'.strip().lower()
+    for j, label in header_row.items():
+        if pd.isna(label):
+            continue
+        if str(label).strip().lower() == target_text:
+            return j
+    raise ValueError(
+        f"Could not find column '{target_text}' in the Database sheet header row — "
+        f"the workbook layout may have changed again. Check row 5 of the 'Database' sheet."
+    )
+
+
 def parse_database_sheet(path):
-    """Database sheet: header row is row index 7 (0-based), data starts row 8."""
+    """Database sheet: header row is row index 7 (0-based) for per-store
+    columns, and row index 5 holds the repeated 'X Target'/'X Subscriptions'/
+    'X %' labels for each product's grand-total triple. Data starts row 8."""
     df = pd.read_excel(path, sheet_name='Database', engine='pyxlsb', header=None)
+    total_header = df.iloc[5]
+
+    # Resolve each product's grand-total columns by header text (see
+    # find_total_col docstring) — NOT by a fixed column index, since new
+    # package/tariff columns inserted upstream shift everything after them.
+    mobile_t_col = find_total_col(total_header, 'Mobile', 'Target')
+    mobile_a_col = find_total_col(total_header, 'Mobile', 'Subscriptions')
+    fwa_t_col    = find_total_col(total_header, 'FWA', 'Target')
+    fwa_a_col    = find_total_col(total_header, 'FWA', 'Subscriptions')
+    fixed_t_col  = find_total_col(total_header, 'Fixed', 'Target')
+    fixed_a_col  = find_total_col(total_header, 'Fixed', 'Subscriptions')
+    fbb_t_col    = find_total_col(total_header, 'FBB', 'Target')
+    fbb_a_col    = find_total_col(total_header, 'FBB', 'Subscriptions')
+
     rows = {}
     for i in range(8, len(df)):
         r = df.iloc[i]
@@ -80,7 +118,10 @@ def parse_database_sheet(path):
             'areaManager': r[7],
             'supervisor': r[8],
             'regionalManager': r[10],
-            # Sub-product families (Database columns, 0-indexed)
+            # Sub-product families (Database columns, 0-indexed) — these are
+            # near the front of the sheet and haven't moved historically, but
+            # if WE ever restructures Mobile's own package breakdown too,
+            # these should get the same header-lookup treatment.
             'kixTarget': num(12), 'kixSubs': num(13),
             'tazbeetTarget': num(15), 'tazbeetSubs': num(16),
             'dataSimMifiTarget': num(18), 'dataSimMifiSubs': num(19),
@@ -89,13 +130,55 @@ def parse_database_sheet(path):
             'weClubTarget': num(27), 'weClubSubs': num(28),
             'goldTarget': num(30), 'goldSubs': num(31),
             'weMixTarget': num(33), 'weMixSubs': num(34),
-            # Aggregate totals
-            'mobileTarget': num(36), 'mobileSubs': num(37),
-            'fwaTarget': num(42), 'fwaSubs': num(43),
-            'fixedTarget': num(48), 'fixedSubs': num(49),
-            'fbbTarget': num(54), 'fbbSubs': num(55),
+            # Aggregate totals — located by header text, see above
+            'mobileTarget': num(mobile_t_col), 'mobileSubs': num(mobile_a_col),
+            'fwaTarget': num(fwa_t_col), 'fwaSubs': num(fwa_a_col),
+            'fixedTarget': num(fixed_t_col), 'fixedSubs': num(fixed_a_col),
+            'fbbTarget': num(fbb_t_col), 'fbbSubs': num(fbb_a_col),
         }
     return rows
+
+def parse_idle_sheet(path):
+    """IDLE sheet: holds a separate Activation-vs-Sales split for Mobile,
+    Fixed and FBB ('<Product> All Sales' / '<Product> All Activation'),
+    same header-name-lookup approach as the Database totals — columns move
+    around whenever WE adds/removes package columns upstream. Returns {} on
+    any problem (missing sheet, missing columns, etc.) so older workbooks
+    without this split just fall back to Sales-only everywhere, instead of
+    breaking the whole conversion.
+    """
+    try:
+        df = pd.read_excel(path, sheet_name='IDLE', engine='pyxlsb', header=None)
+    except Exception:
+        return {}
+
+    header = df.iloc[5]
+    cols = {}
+    try:
+        for prod in ('Mobile', 'Fixed', 'FBB'):
+            cols[prod+'Sales'] = find_total_col(header, prod, 'All Sales')
+            cols[prod+'Act']   = find_total_col(header, prod, 'All Activation')
+    except ValueError:
+        return {}  # this month's IDLE sheet doesn't have the split — skip quietly
+
+    out = {}
+    for i in range(8, len(df)):
+        r = df.iloc[i]
+        code = r[0]
+        if pd.isna(code) or pd.isna(r[1]): continue
+        code = norm_code(code)
+
+        def num(col):
+            v = r[col]
+            return 0 if pd.isna(v) else float(v)
+
+        out[code] = {
+            'mobileSubsAct': num(cols['MobileAct']),
+            'fixedSubsAct':  num(cols['FixedAct']),
+            'fbbSubsAct':    num(cols['FBBAct']),
+        }
+    return out
+
 
 def parse_tariffs_sheet(path):
     """Tariffs Per Stoers sheet: header row index 6, data from row 7."""
@@ -259,11 +342,13 @@ def build_month(mobile_path, wepay_path, month_str):
     db = parse_database_sheet(mobile_path)
     tariffs = parse_tariffs_sheet(mobile_path)
     wallet = parse_wallet_sheet(wepay_path)
+    idle = parse_idle_sheet(mobile_path)
 
     rows = []
     for code, base in db.items():
         t = tariffs.get(code, {})
         w = wallet.get(code, {'walletTarget': 0, 'walletSales': 0})
+        idl = idle.get(code, {})
         row = {
             'month': month_str, 'month2': month2,
             'store': base['store'], 'partner': base['partner'],
@@ -286,6 +371,13 @@ def build_month(mobile_path, wepay_path, month_str):
             'weClubTarget': base['weClubTarget'], 'weClubSubs': base['weClubSubs'],
             'paygTarget': base['paygTarget'], 'paygSubs': base['paygSubs'],
         }
+        # Activation figures (Mobile/Fixed/FBB only) — omitted entirely for
+        # months whose IDLE sheet didn't have a usable split, so the frontend
+        # cleanly falls back to Sales for those months.
+        if idl:
+            row['mobileSubsAct'] = idl['mobileSubsAct']
+            row['fixedSubsAct']  = idl['fixedSubsAct']
+            row['fbbSubsAct']    = idl['fbbSubsAct']
         for k, v in t.items():
             if k.startswith('kix') or k.startswith('taz'):
                 row[k] = v
