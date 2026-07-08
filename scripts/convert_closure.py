@@ -49,7 +49,7 @@ def normalize_name(s):
     s = re.sub(r'\s+', ' ', s)
     return s.strip()
 
-def find_total_col(header_row, product_label, field_label):
+def find_total_col(header_row, product_label, field_label, required=True):
     """Locate a 'grand total' column (e.g. 'FBB Target') by its exact header
     text in the given header row, instead of a hardcoded column index.
     Package columns get added/removed over time (e.g. WE added a batch of
@@ -58,6 +58,12 @@ def find_total_col(header_row, product_label, field_label):
     the WORKBOOK ALWAYS repeats the product name in the total's header
     (e.g. 'FBB Target', 'FBB Subscriptions', 'FBB %'), searching by that text
     is immune to columns moving around.
+
+    Some products (e.g. FWA) simply didn't exist yet in older months' workbooks,
+    so their columns are legitimately absent — not a layout error. When
+    required=False, a missing column just returns None (with a warning printed)
+    instead of raising, so the caller can treat that product as 0/unavailable
+    for that month rather than failing the whole conversion.
     """
     target_text = f'{product_label} {field_label}'.strip().lower()
     for j, label in header_row.items():
@@ -65,6 +71,9 @@ def find_total_col(header_row, product_label, field_label):
             continue
         if str(label).strip().lower() == target_text:
             return j
+    if not required:
+        print(f"  ⚠️  Column '{target_text}' not found — treating as unavailable for this month.")
+        return None
     raise ValueError(
         f"Could not find column '{target_text}' in the Database sheet header row — "
         f"the workbook layout may have changed again. Check row 5 of the 'Database' sheet."
@@ -81,14 +90,18 @@ def parse_database_sheet(path):
     # Resolve each product's grand-total columns by header text (see
     # find_total_col docstring) — NOT by a fixed column index, since new
     # package/tariff columns inserted upstream shift everything after them.
-    mobile_t_col = find_total_col(total_header, 'Mobile', 'Target')
-    mobile_a_col = find_total_col(total_header, 'Mobile', 'Subscriptions')
-    fwa_t_col    = find_total_col(total_header, 'FWA', 'Target')
-    fwa_a_col    = find_total_col(total_header, 'FWA', 'Subscriptions')
-    fixed_t_col  = find_total_col(total_header, 'Fixed', 'Target')
-    fixed_a_col  = find_total_col(total_header, 'Fixed', 'Subscriptions')
-    fbb_t_col    = find_total_col(total_header, 'FBB', 'Target')
-    fbb_a_col    = find_total_col(total_header, 'FBB', 'Subscriptions')
+    # required=False everywhere: a product that hasn't launched yet in an
+    # older month (e.g. FWA before it existed) just means that column is
+    # absent from the sheet — not a broken layout — so we tolerate it and
+    # fall back to 0 for that product/month instead of aborting the whole run.
+    mobile_t_col = find_total_col(total_header, 'Mobile', 'Target', required=False)
+    mobile_a_col = find_total_col(total_header, 'Mobile', 'Subscriptions', required=False)
+    fwa_t_col    = find_total_col(total_header, 'FWA', 'Target', required=False)
+    fwa_a_col    = find_total_col(total_header, 'FWA', 'Subscriptions', required=False)
+    fixed_t_col  = find_total_col(total_header, 'Fixed', 'Target', required=False)
+    fixed_a_col  = find_total_col(total_header, 'Fixed', 'Subscriptions', required=False)
+    fbb_t_col    = find_total_col(total_header, 'FBB', 'Target', required=False)
+    fbb_a_col    = find_total_col(total_header, 'FBB', 'Subscriptions', required=False)
 
     rows = {}
     for i in range(8, len(df)):
@@ -104,6 +117,8 @@ def parse_database_sheet(path):
             continue
 
         def num(col):
+            if col is None:
+                return 0  # this product's column didn't exist in this month's workbook
             v = r[col]
             return 0 if pd.isna(v) else float(v)
 
@@ -304,11 +319,16 @@ def scan_and_convert(raw_dir, data_dir):
         yyyy, mm = month_str.split('-')[1], month_str.split('-')[0]
         out_name = f'{yyyy}-{mm}.json'
         out_path = os.path.join(data_dir, out_name)
-        rows = build_month(pair['mobile'], pair['wallet'], month_str)
-        with open(out_path, 'w', encoding='utf-8') as fh:
-            json.dump(sanitize_rows(rows), fh, ensure_ascii=False, allow_nan=False)
-        print(f'  ✅ {month_str} → {out_name} ({len(rows)} stores)')
-        processed.append(f'{yyyy}-{mm}')
+        try:
+            rows = build_month(pair['mobile'], pair['wallet'], month_str)
+            with open(out_path, 'w', encoding='utf-8') as fh:
+                json.dump(sanitize_rows(rows), fh, ensure_ascii=False, allow_nan=False)
+            print(f'  ✅ {month_str} → {out_name} ({len(rows)} stores)')
+            processed.append(f'{yyyy}-{mm}')
+        except Exception as e:
+            # One month's workbook having an unexpected/broken layout shouldn't
+            # stop every other month from being processed and committed.
+            print(f'  ❌ {month_str}: failed to convert ({e}) — skipped, other months continue.')
 
     # Refresh manifest.json with every JSON file present in data_dir
     all_months = sorted(set(
