@@ -952,7 +952,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <button onclick="toggleDarkMode()" class="header-btn" title="Dark Mode"><i class="fas fa-moon"></i></button>
         <button onclick="toggleFullscreen()" class="header-btn" title="Fullscreen"><i class="fas fa-expand"></i></button>
         <a href="https://www.linkedin.com/in/m-elfakharany" target="_blank" rel="noopener" class="header-btn" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><i class="fab fa-linkedin" style="color:#0077B5"></i></a>
-        <button onclick="exportPDF()" class="header-btn-accent export-restricted" title="Export PDF"><i class="fas fa-file-pdf mr-1"></i><span class="hidden sm:inline">PDF</span></button>
+        <button onclick="generateExecutiveReport()" class="header-btn-accent export-restricted" title="Executive Report" style="background:linear-gradient(135deg,#5E2D91,#e91e8c)"><i class="fas fa-crown mr-1"></i><span class="hidden sm:inline">Exec Report</span></button>
+        <button onclick="exportPDF()" class="header-btn-accent export-restricted" title="Full Page Snapshot (PDF)"><i class="fas fa-file-pdf mr-1"></i><span class="hidden sm:inline">Snapshot</span></button>
         <button onclick="exportExcel()" class="header-btn-accent export-restricted" title="Export Excel"><i class="fas fa-file-excel mr-1"></i><span class="hidden sm:inline">Excel</span></button>
         <button onclick="window.print()" class="header-btn-accent export-restricted" title="Print"><i class="fas fa-print mr-1"></i><span class="hidden sm:inline">Print</span></button>
       </div>
@@ -1452,6 +1453,9 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
 
       <div id="mtd-store-overlay" class="hidden fixed inset-0 z-20" onclick="closeMTDStoreDropdown()"></div>
+
+      <!-- ── Projected Month-End Forecast (run-rate) ── -->
+      <div id="mtd-forecast-banner" class="mb-5"></div>
 
       <!-- ── MTD KPI Cards ── -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5" id="mtd-kpi-row">
@@ -2895,7 +2899,195 @@ async function exportPDF() {
   pdf.save('WE_Performance_Hub_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
-// ── Export Excel ──────────────────────────────────────────────────────────────
+// ── Executive Report (real designed PDF — vector-drawn, not a screenshot) ──
+function tpTopBottomEntities(data, key, n) {
+  var groups = groupBy(data, key);
+  var list = Object.keys(groups).map(function(name){
+    var g = calcGroup(groups[name]);
+    return { name: name, pct: g.pct, target: g.totalTarget, ach: g.totalAch, gap: g.gap, stores: g.storeCount };
+  }).filter(function(e){ return e.target > 0; });
+  var top = list.slice().sort(function(a,b){ return b.pct - a.pct; }).slice(0, n);
+  var bottom = list.slice().sort(function(a,b){ return a.pct - b.pct; }).slice(0, n);
+  return { top: top, bottom: bottom };
+}
+
+function buildExecNarrative(data) {
+  var overall = calcGroup(data);
+  var prodStats = PRODUCTS.map(function(p){
+    var t = sum(data, p.tKey), a = sum(data, p.aKey);
+    return { label: p.label, pct: t>0 ? (a/t*100) : 0 };
+  });
+  var best = prodStats.slice().sort(function(a,b){ return b.pct - a.pct; })[0];
+  var worst = prodStats.slice().sort(function(a,b){ return a.pct - b.pct; })[0];
+  var byRM = tpTopBottomEntities(data, 'regionalManager', 1);
+  var sentence1 = 'Overall achievement stands at ' + overall.pct + '% (' + fmtN(overall.totalAch) + ' vs target ' + fmtN(overall.totalTarget) + '), a ' +
+    (overall.gap>=0 ? 'surplus' : 'gap') + ' of ' + fmtN(Math.abs(overall.gap)) + ' units across ' + overall.storeCount + ' branches.';
+  var sentence2 = best.label + ' is the strongest performer at ' + best.pct.toFixed(0) + '% of target, while ' + worst.label + ' trails at ' + worst.pct.toFixed(0) + '%' +
+    (worst.pct < 90 ? ' and needs focused attention.' : '.');
+  var sentence3 = byRM.top.length ? (byRM.top[0].name + ' leads all Regional Managers at ' + byRM.top[0].pct + '% achievement.') : '';
+  return [sentence1, sentence2, sentence3].filter(Boolean).join(' ');
+}
+
+function generateExecutiveReport() {
+  var { jsPDF } = window.jspdf;
+  var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+  var purple = [94, 45, 145], pink = [233, 30, 140], dark = [26, 26, 46], green = [22, 163, 74], amber = [217, 119, 6], red = [220, 38, 38], gray = [107, 114, 128];
+  var data = filteredData;
+  if (!data.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتقرير'); return; }
+  var k = calcGroup(data);
+  var monthLabel = (document.getElementById('f-month') && document.getElementById('f-month').selectedOptions[0]) ? document.getElementById('f-month').selectedOptions[0].text : '';
+  var genDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+  function headerBand(subtitle) {
+    pdf.setFillColor.apply(pdf, purple); pdf.rect(0, 0, W, 24, 'F');
+    pdf.setFillColor(255,255,255); pdf.roundedRect(10, 5, 16, 14, 2, 2, 'F');
+    pdf.setTextColor.apply(pdf, purple); pdf.setFont('helvetica','bold'); pdf.setFontSize(11);
+    pdf.text('WE', 18, 14.5, { align:'center' });
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(15);
+    pdf.text('FAKHARANY360 — Executive Performance Report', 32, 11);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+    pdf.text(subtitle, 32, 17);
+    pdf.setFontSize(8); pdf.text('Generated ' + genDate, W-10, 8, { align:'right' });
+    pdf.text('East Cairo Team · Mohamed Elfakharany', W-10, 13, { align:'right' });
+    pdf.text('CONFIDENTIAL', W-10, 18, { align:'right' });
+  }
+  function footer(pageNum) {
+    pdf.setDrawColor(220,220,225); pdf.line(10, H-8, W-10, H-8);
+    pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','normal');
+    pdf.text('FAKHARANY360 Performance Intelligence Platform · Internal Use Only', 10, H-4);
+    pdf.text('Page ' + pageNum, W-10, H-4, { align:'right' });
+  }
+  function achColor(pct) { return pct>=100?green:pct>=80?amber:red; }
+
+  // ── PAGE 1: Executive Summary ──────────────────────────────────
+  headerBand((monthLabel||'All Months') + ' · ' + data.length + ' store records');
+  var y = 32;
+  pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica','bold'); pdf.setFontSize(11);
+  pdf.text('EXECUTIVE SUMMARY', 10, y); y += 4;
+  pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.5); pdf.line(10, y, 45, y); y += 8;
+
+  var kpis = [
+    { label:'TOTAL TARGET', val: fmtN(k.totalTarget), color: dark },
+    { label:'TOTAL ACHIEVEMENT', val: fmtN(k.totalAch), color: dark },
+    { label:'ACHIEVEMENT %', val: k.pct+'%', color: achColor(k.pct) },
+    { label: k.gap>=0?'SURPLUS':'GAP', val: (k.gap>=0?'+':'')+fmtN(k.gap), color: k.gap>=0?green:red }
+  ];
+  var cw = (W-20-3*4)/4;
+  kpis.forEach(function(card, i){
+    var x = 10 + i*(cw+4);
+    pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(x, y, cw, 22, 2, 2, 'FD');
+    pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','bold');
+    pdf.text(card.label, x+4, y+7);
+    pdf.setFontSize(16); pdf.setTextColor.apply(pdf, card.color); pdf.setFont('helvetica','bold');
+    pdf.text(String(card.val), x+4, y+17);
+  });
+  y += 30;
+
+  // Narrative box
+  pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
+  var narrative = buildExecNarrative(data);
+  var narrLines = pdf.splitTextToSize(narrative, W-24);
+  var narrH = 8 + narrLines.length*4.2;
+  pdf.roundedRect(10, y, W-20, narrH, 2, 2, 'FD');
+  pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
+  pdf.text('KEY TAKEAWAY', 14, y+6);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
+  pdf.text(narrLines, 14, y+11.5);
+  y += narrH + 8;
+
+  // Product performance table
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
+  pdf.text('PRODUCT PERFORMANCE', 10, y); y += 4;
+  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 55, y); y += 6;
+
+  var tblX = 10, tblW = W-20;
+  var colW = [tblW*0.30, tblW*0.20, tblW*0.20, tblW*0.15, tblW*0.15];
+  var heads = ['Product','Target','Achievement','Ach %','Gap'];
+  pdf.setFillColor.apply(pdf, dark); pdf.rect(tblX, y, tblW, 7, 'F');
+  pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
+  var cx = tblX;
+  heads.forEach(function(h, i){ pdf.text(h, cx+3, y+4.8); cx += colW[i]; });
+  y += 7;
+  PRODUCTS.forEach(function(p, idx){
+    var t = sum(data, p.tKey), a = sum(data, p.aKey), pp = t>0?(a/t*100):0, gap = a-t;
+    if (idx % 2 === 1) { pdf.setFillColor(248,247,252); pdf.rect(tblX, y, tblW, 7, 'F'); }
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, dark);
+    cx = tblX;
+    pdf.text(p.label, cx+3, y+4.8); cx += colW[0];
+    pdf.text(fmtN(t), cx+3, y+4.8); cx += colW[1];
+    pdf.text(fmtN(a), cx+3, y+4.8); cx += colW[2];
+    pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(pp));
+    pdf.text(pp.toFixed(1)+'%', cx+3, y+4.8); cx += colW[3];
+    pdf.setTextColor.apply(pdf, gap>=0?green:red);
+    pdf.text((gap>=0?'+':'')+fmtN(gap), cx+3, y+4.8);
+    y += 7;
+  });
+  footer(1);
+
+  // ── PAGE 2: Team Leaderboard ──────────────────────────────────
+  pdf.addPage();
+  headerBand('Team Leaderboard — Regional Managers');
+  y = 32;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
+  pdf.text('TOP & BOTTOM PERFORMING TEAMS (by Regional Manager)', 10, y); y += 4;
+  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 100, y); y += 8;
+
+  var rm5 = tpTopBottomEntities(data, 'regionalManager', 5);
+  function leaderTable(title, list, color, x, w) {
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, color);
+    pdf.text(title, x, y);
+    var ty = y + 6;
+    pdf.setFillColor.apply(pdf, dark); pdf.rect(x, ty, w, 6, 'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(7.5);
+    pdf.text('Regional Manager', x+3, ty+4); pdf.text('Ach%', x+w-14, ty+4);
+    ty += 6;
+    list.forEach(function(e, i){
+      if (i%2===1) { pdf.setFillColor(248,247,252); pdf.rect(x, ty, w, 6.5, 'F'); }
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, dark);
+      pdf.text(String(e.name).slice(0,26), x+3, ty+4.5);
+      pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(e.pct));
+      pdf.text(e.pct+'%', x+w-14, ty+4.5);
+      ty += 6.5;
+    });
+    return ty;
+  }
+  var halfW = (W-30)/2;
+  var endY1 = leaderTable('▲ TOP PERFORMERS', rm5.top, green, 10, halfW);
+  var endY2 = leaderTable('▼ NEEDS ATTENTION', rm5.bottom, red, 10+halfW+10, halfW);
+  y = Math.max(endY1, endY2) + 12;
+
+  // Best-in-class highlight cards
+  var bestSv = getBestEntity(data, 'supervisor');
+  var bestAm = getBestEntity(data, 'areaManager');
+  var bestPt = getBestEntity(data, 'partner');
+  var bestStores = tpTopBottomEntities(data, 'store', 1).top[0] || { name:'—', pct:0 };
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
+  pdf.text('BEST IN CLASS', 10, y); y += 4;
+  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 55, y); y += 6;
+  var highlights = [
+    { role:'BEST SUPERVISOR', name: bestSv.name, pct: bestSv.pct },
+    { role:'BEST AREA MANAGER', name: bestAm.name, pct: bestAm.pct },
+    { role:'BEST PARTNER', name: bestPt.name, pct: bestPt.pct },
+    { role:'BEST STORE', name: bestStores.name, pct: bestStores.pct }
+  ];
+  var hw = (W-20-3*4)/4;
+  highlights.forEach(function(hcard, i){
+    var x = 10 + i*(hw+4);
+    pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.roundedRect(x, y, hw, 20, 2, 2, 'FD');
+    pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
+    pdf.text(hcard.role, x+4, y+6);
+    pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, dark);
+    pdf.text(String(hcard.name).slice(0,22), x+4, y+12);
+    pdf.setFontSize(11); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(hcard.pct));
+    pdf.text(hcard.pct+'%', x+4, y+18);
+  });
+  footer(2);
+
+  pdf.save('WE_Executive_Report_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+
 function exportExcel() {
   const headers = ['Month','Store','Partner','Region','Account Manager','Area Manager','Supervisor','Regional Manager',
     'Mobile Target','Mobile Subs','Gold Target','Gold Subs','FBB Target','FBB Subs',
@@ -5813,6 +6005,8 @@ function renderMTD() {
     // Hide standard KPI cards + product grid in day mode
     var kpiEl = document.getElementById('mtd-kpi-mobile');
     if (kpiEl && kpiEl.parentNode) kpiEl.parentNode.style.display = 'none';
+    var fcEl = document.getElementById('mtd-forecast-banner');
+    if (fcEl) fcEl.style.display = 'none';
     var pgParent = document.getElementById('mtd-product-grid');
     if (pgParent) pgParent.style.display = 'none';
     // Hide pkg mix (we show day pkg instead)
@@ -5829,6 +6023,8 @@ function renderMTD() {
     // Normal MTD mode
     var kpiParent = document.getElementById('mtd-kpi-mobile');
     if (kpiParent && kpiParent.parentNode) kpiParent.parentNode.style.display = '';
+    var fcParent = document.getElementById('mtd-forecast-banner');
+    if (fcParent) fcParent.style.display = '';
     var pgNorm = document.getElementById('mtd-product-grid');
     if (pgNorm) pgNorm.style.display = '';
     var dayBanner = document.getElementById('mtd-day-banner');
@@ -5838,6 +6034,7 @@ function renderMTD() {
     var dayPkg = document.getElementById('mtd-day-pkg-wrap');
     if (dayPkg) dayPkg.style.display = 'none';
     renderMTDKPIs();
+    renderMTDForecastBanner();
     renderMTDProductGrid();
     renderMTDDailyTrend();
     renderMTDLowPerf();
@@ -5892,6 +6089,71 @@ function renderMTDKPIs() {
 }
 
 // ── Product Grid ───────────────────────────────────────────────
+// ── Projected Month-End Forecast Banner ──────────────────────────
+// WE's own MTD export already carries a per-store day-pace projection
+// (the "Proj" columns — see MTD_PRODS / WALLET_DATA). This aggregates that
+// into one prominent executive headline instead of leaving it as small
+// print inside each KPI card, so leadership sees "will we hit target?"
+// at a glance without doing the math themselves.
+function renderMTDForecastBanner() {
+  var el = document.getElementById('mtd-forecast-banner');
+  if (!el) return;
+  var d = MTD_FILTERED;
+  if (!d || !d.length) { el.innerHTML = ''; return; }
+
+  var dayCols = (MTD_DAILY && MTD_DAILY.dayCols) || [];
+  var currentDay = dayCols.length ? Math.max.apply(null, dayCols) : null;
+  var daysInMonth = new Date(2000 + Number((MTD_MOBILE_DATE_LABEL||'').slice(-2) || new Date().getFullYear()%100), new Date().getMonth()+1, 0).getDate();
+  var dayText = currentDay ? ('Day '+currentDay+(daysInMonth?' of ~'+daysInMonth:'')) : '';
+
+  var mainProducts = [
+    { key:'mobile', label:'Mobile', icon:'fa-mobile-alt', tKey:'mobileTarget', aKey:'mobileSubs', projKey:'mobileProj' },
+    { key:'fbb',    label:'FBB',    icon:'fa-wifi',       tKey:'fbbTarget',    aKey:'fbbSubs',    projKey:'fbbProj' },
+    { key:'fixed',  label:'Fixed',  icon:'fa-phone',      tKey:'fixedTarget',  aKey:'fixedSubs',  projKey:'fixedProj' }
+  ];
+  var cards = mainProducts.map(function(p){
+    var tgt = mtdSum(d, p.tKey), act = mtdSum(d, p.aKey), proj = mtdSum(d, p.projKey) || act;
+    return { label:p.label, icon:p.icon, tgt:tgt, act:act, proj:proj, pct: tgt>0?(act/tgt*100):0, projPct: tgt>0?(proj/tgt*100):0 };
+  });
+  // Wallet from WALLET_DATA (separate source, same idea)
+  var wRows = d.map(function(r){ return WALLET_DATA[String(r.storeCode||'').trim().toUpperCase()] || {}; });
+  var wTgt = wRows.reduce(function(s,w){return s+(Number(w.walletTarget)||0);},0);
+  var wAct = wRows.reduce(function(s,w){return s+(Number(w.walletSales)||0);},0);
+  var wProj = wRows.reduce(function(s,w){return s+(Number(w.walletProj)||0);},0) || wAct;
+  if (wTgt > 0) cards.push({ label:'Wallet', icon:'fa-wallet', tgt:wTgt, act:wAct, proj:wProj, pct:(wAct/wTgt*100), projPct:(wProj/wTgt*100) });
+
+  function verdict(c) {
+    if (c.projPct >= 100) return { text:'On track ✓', color:'#16a34a' };
+    if (c.projPct >= 90)  return { text:'Slight miss', color:'#d97706' };
+    return { text:'At risk', color:'#dc2626' };
+  }
+
+  var cardsHTML = cards.map(function(c){
+    var v = verdict(c);
+    return '<div style="flex:1;min-width:130px;background:rgba(255,255,255,.08);border-radius:10px;padding:10px 12px">' +
+      '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.04em"><i class="fas '+c.icon+' mr-1"></i>'+c.label+'</div>' +
+      '<div style="display:flex;align-items:baseline;gap:6px;margin-top:4px">' +
+        '<span style="font-size:19px;font-weight:900;color:white">'+c.projPct.toFixed(0)+'%</span>' +
+        '<span style="font-size:10px;color:rgba(255,255,255,.6)">projected</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:2px">Now: '+c.pct.toFixed(0)+'% · EOM: '+fmtN(Math.round(c.proj))+' / '+fmtN(c.tgt)+'</div>' +
+      '<div style="margin-top:5px;display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;background:'+v.color+'">'+v.text+'</div>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="background:linear-gradient(135deg,#5E2D91,#3d1d61);border-radius:14px;padding:16px 18px;box-shadow:0 4px 16px rgba(94,45,145,.25)">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<i class="fas fa-chart-line" style="color:white;font-size:15px"></i>' +
+          '<span style="color:white;font-weight:800;font-size:13px">Projected Month-End Performance</span>' +
+        '</div>' +
+        (dayText ? '<span style="background:rgba(255,255,255,.15);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px">'+dayText+'</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' + cardsHTML + '</div>' +
+    '</div>';
+}
+
 function renderMTDProductGrid() {
   var el=document.getElementById('mtd-product-grid'); if(!el) return;
   var d=MTD_FILTERED;
