@@ -1,0 +1,45 @@
+name: Process Daily MTD Files
+
+# Runs automatically whenever new files are pushed into raw_mtd/
+on:
+  push:
+    paths:
+      - 'raw_mtd/**.xlsb'
+  workflow_dispatch: {}   # lets you also trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: scripts
+
+      - name: Convert any new MTD files in raw_mtd/
+        run: node scripts/convert_mtd.js --scan raw_mtd data/mtd
+
+      - name: Archive processed raw files
+        run: |
+          mkdir -p raw_mtd/processed
+          # Move any .xlsb sitting directly in raw_mtd/ into raw_mtd/processed/
+          # so the next run doesn't try to reprocess the same day.
+          find raw_mtd -maxdepth 1 -name '*.xlsb' -exec mv {} raw_mtd/processed/ \;
+
+      - name: Commit and push updated MTD data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/mtd/ raw_mtd/
+          git diff --cached --quiet || git commit -m "Auto-process daily MTD data [skip ci]"
+          git push
