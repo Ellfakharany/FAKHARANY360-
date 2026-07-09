@@ -430,25 +430,51 @@ function parseWalletSheet(wb) {
 //  raw_mtd/ filename → date + kind detection
 // ══════════════════════════════════════════════════════════════
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const MONTH_NAME_TO_NUM = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12,
+};
 
 function detectDate(filename) {
   var name = String(filename).replace(/\.[^.]+$/, '');
-  var m = name.match(/(20\d{2})[-_. ](\d{1,2})[-_. ](\d{1,2})/);
-  if (m) {
-    var y = +m[1], mo = +m[2], d = +m[3];
-    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return iso(y, mo, d);
-  }
-  m = name.match(/(\d{1,2})[-_. ](\d{1,2})[-_. ](20\d{2})/);
-  if (m) {
-    var d2 = +m[1], mo2 = +m[2], y2 = +m[3];
-    if (mo2 >= 1 && mo2 <= 12 && d2 >= 1 && d2 <= 31) return iso(y2, mo2, d2);
-  }
-  return null;
+
   function iso(y, mo, d) {
     var isoStr = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     var label = d + ' ' + AR_MONTHS[mo - 1] + ' ' + y;
     return { iso: isoStr, label: label };
   }
+
+  // 1) Numeric YYYY-MM-DD (e.g. "2026-07-08", "2026_07_08")
+  var m = name.match(/(20\d{2})[-_. ](\d{1,2})[-_. ](\d{1,2})/);
+  if (m) {
+    var y = +m[1], mo = +m[2], d = +m[3];
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return iso(y, mo, d);
+  }
+
+  // 2) Numeric DD-MM-YYYY (e.g. "08-07-2026")
+  m = name.match(/(\d{1,2})[-_. ](\d{1,2})[-_. ](20\d{2})/);
+  if (m) {
+    var d2 = +m[1], mo2 = +m[2], y2 = +m[3];
+    if (mo2 >= 1 && mo2 <= 12 && d2 >= 1 && d2 <= 31) return iso(y2, mo2, d2);
+  }
+
+  // 3) D Month YYYY with a text month name (e.g. "8 July 2026", "8-Jul-2026")
+  m = name.match(/(?:^|[^0-9])(\d{1,2})[\s_.\-]+([A-Za-z]{3,9})[\s_.\-]+(20\d{2})/);
+  if (m) {
+    var d3 = +m[1], moName = m[2].toLowerCase(), y3 = +m[3];
+    if (MONTH_NAME_TO_NUM[moName] && d3 >= 1 && d3 <= 31) return iso(y3, MONTH_NAME_TO_NUM[moName], d3);
+  }
+
+  // 4) Month D, YYYY (e.g. "July 8 2026", "July 8, 2026")
+  m = name.match(/([A-Za-z]{3,9})[\s_.\-]+(\d{1,2}),?[\s_.\-]+(20\d{2})/);
+  if (m) {
+    var moName2 = m[1].toLowerCase(), d4 = +m[2], y4 = +m[3];
+    if (MONTH_NAME_TO_NUM[moName2] && d4 >= 1 && d4 <= 31) return iso(y4, MONTH_NAME_TO_NUM[moName2], d4);
+  }
+
+  return null;
 }
 
 function detectKind(filename) {
@@ -491,10 +517,12 @@ async function scanAndConvert(rawDir, dataDir) {
   // If several files of the same kind are pushed at once, keep only the one
   // with the latest date (a team member may re-upload a corrected file).
   const byKind = { mobile: null, wallet: null };
+  const recognized = []; // every file whose type+date WE successfully detected
   for (const file of files) {
     const kind = detectKind(file);
     const date = detectDate(file);
-    if (!kind || !date) { console.warn('  ⚠️  Skipping (could not detect type/date): ' + file); continue; }
+    if (!kind || !date) { console.warn('  ⚠️  Skipping (could not detect type/date — check the filename): ' + file); continue; }
+    recognized.push(file);
     if (!byKind[kind] || date.iso > byKind[kind].date.iso) byKind[kind] = { file: file, date: date };
   }
 
@@ -538,6 +566,20 @@ async function scanAndConvert(rawDir, dataDir) {
 
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   console.log('  📄 data/mtd/manifest.json updated:', JSON.stringify(manifest));
+
+  // Archive every file we successfully recognized (type + date), so the
+  // next run doesn't reprocess it. Files we could NOT recognize are left
+  // in place at the root of raw_mtd/ so you can see them and fix the name.
+  if (recognized.length) {
+    const processedDir = path.join(rawDir, 'processed');
+    fs.mkdirSync(processedDir, { recursive: true });
+    for (const file of recognized) {
+      const from = path.join(rawDir, file);
+      const to = path.join(processedDir, file);
+      try { fs.renameSync(from, to); } catch (e) { console.warn('  ⚠️  Could not archive ' + file + ':', e.message); }
+    }
+    console.log('  📦 Archived ' + recognized.length + ' processed file(s) to ' + processedDir);
+  }
 }
 
 const args = process.argv.slice(2);
