@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -2900,44 +2901,169 @@ async function exportPDF() {
 }
 
 // ── Executive Report (real designed PDF — vector-drawn, not a screenshot) ──
-function tpTopBottomEntities(data, key, n) {
-  var groups = groupBy(data, key);
-  var list = Object.keys(groups).map(function(name){
-    var g = calcGroup(groups[name]);
-    return { name: name, pct: g.pct, target: g.totalTarget, ach: g.totalAch, gap: g.gap, stores: g.storeCount };
-  }).filter(function(e){ return e.target > 0; });
-  var top = list.slice().sort(function(a,b){ return b.pct - a.pct; }).slice(0, n);
-  var bottom = list.slice().sort(function(a,b){ return a.pct - b.pct; }).slice(0, n);
-  return { top: top, bottom: bottom };
+// ══════════════════════════════════════════════════════════════
+//  EXECUTIVE REPORT — real vector-drawn PDF (jsPDF + autoTable),
+//  built around per-PRODUCT numbers only. We deliberately never sum
+//  Target/Achievement across different products (Mobile units + FBB
+//  units + Wallet EGP means nothing added together) — every table and
+//  KPI here is either per-product, or a threshold-based score.
+// ══════════════════════════════════════════════════════════════
+
+// Core products used when judging "best performers" — WE Air is excluded
+// per business rule, and each product can carry its own bar to clear.
+var BEST_CRITERIA = [
+  { key:'mobile', threshold:100 },
+  { key:'gold',   threshold:100 },
+  { key:'fbb',    threshold:100 },
+  { key:'wallet', threshold:100 },
+  { key:'fixed',  threshold:90  }
+];
+
+// Scores a set of rows against BEST_CRITERIA: how many of the (available)
+// core products cleared their bar, plus the plain average Ach% across
+// those same products — used only as a tiebreaker, never displayed as if
+// it were a single combined "total %".
+function scoreEntityRows(rows) {
+  var k = calcGroup(rows);
+  var metCount = 0, sumPct = 0, n = 0, detail = [];
+  BEST_CRITERIA.forEach(function(c){
+    var prod = PRODUCTS.filter(function(p){ return p.key === c.key; })[0];
+    var t = k[prod.tKey] || 0, a = k[prod.aKey] || 0;
+    if (t <= 0) return; // no target for this product here — don't penalize
+    var pc = a / t * 100;
+    n++; sumPct += pc;
+    var met = pc >= c.threshold;
+    if (met) metCount++;
+    detail.push({ label: prod.label, pct: pc, threshold: c.threshold, met: met });
+  });
+  return { metCount: metCount, of: n, avgPct: n>0 ? sumPct/n : 0, detail: detail, storeCount: k.storeCount };
 }
 
-function buildExecNarrative(data) {
-  var overall = calcGroup(data);
+function rankEntities(data, groupKey, minStores) {
+  var groups = groupBy(data, groupKey);
+  return Object.keys(groups)
+    .map(function(name){ return Object.assign({ name:name }, scoreEntityRows(groups[name])); })
+    .filter(function(e){ return e.of > 0 && e.storeCount >= (minStores||1); })
+    .sort(function(a,b){ return (b.metCount - a.metCount) || (b.avgPct - a.avgPct); });
+}
+
+function reportPeriodLabel(data) {
+  var monthSel = document.getElementById('f-month');
+  if (monthSel && monthSel.value) {
+    var opt = monthSel.selectedOptions[0];
+    return opt ? opt.text : monthSel.value;
+  }
+  var months = Array.from(new Set(data.map(function(r){ return r.month; }))).filter(Boolean)
+    .sort(function(a,b){ return MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b); });
+  if (months.length === 0) return 'All Months';
+  if (months.length === 1) return (MONTH_LABELS[months[0]]||months[0]) + ' ' + months[0].split('-')[1];
+  var first = months[0], last = months[months.length-1];
+  return 'All Months (' + (MONTH_LABELS[first]||first) + ' to ' + (MONTH_LABELS[last]||last) + ' ' + last.split('-')[1] + ')';
+}
+
+function buildExecNarrative(data, periodLabel) {
   var prodStats = PRODUCTS.map(function(p){
     var t = sum(data, p.tKey), a = sum(data, p.aKey);
-    return { label: p.label, pct: t>0 ? (a/t*100) : 0 };
-  });
+    return { label: p.label, pct: t>0 ? (a/t*100) : 0, hasTarget: t>0 };
+  }).filter(function(p){ return p.hasTarget; });
   var best = prodStats.slice().sort(function(a,b){ return b.pct - a.pct; })[0];
   var worst = prodStats.slice().sort(function(a,b){ return a.pct - b.pct; })[0];
-  var byRM = tpTopBottomEntities(data, 'regionalManager', 1);
-  var sentence1 = 'Overall achievement stands at ' + overall.pct + '% (' + fmtN(overall.totalAch) + ' vs target ' + fmtN(overall.totalTarget) + '), a ' +
-    (overall.gap>=0 ? 'surplus' : 'gap') + ' of ' + fmtN(Math.abs(overall.gap)) + ' units across ' + overall.storeCount + ' branches.';
-  var sentence2 = best.label + ' is the strongest performer at ' + best.pct.toFixed(0) + '% of target, while ' + worst.label + ' trails at ' + worst.pct.toFixed(0) + '%' +
-    (worst.pct < 90 ? ' and needs focused attention.' : '.');
-  var sentence3 = byRM.top.length ? (byRM.top[0].name + ' leads all Regional Managers at ' + byRM.top[0].pct + '% achievement.') : '';
-  return [sentence1, sentence2, sentence3].filter(Boolean).join(' ');
+  var storeCount = new Set(data.map(function(r){ return r.storeCode; })).size;
+  var rmRank = rankEntities(data, 'regionalManager', 1);
+
+  var s1 = 'Performance reviewed across ' + storeCount + ' branches for ' + periodLabel + '.';
+  var s2 = best ? (best.label + ' is the strongest product at ' + best.pct.toFixed(0) + '% of target' +
+    (worst && worst.label !== best.label ? ', while ' + worst.label + ' trails at ' + worst.pct.toFixed(0) + '%' + (worst.pct<90?' and needs focused attention.':'.') : '.')) : '';
+  var s3 = rmRank.length ? (rmRank[0].name + ' leads all Regional Managers, clearing ' + rmRank[0].metCount + ' of ' + rmRank[0].of + ' core product targets.') : '';
+  return [s1, s2, s3].filter(Boolean).join(' ');
+}
+
+// Renders a Chart.js chart on a hidden off-screen canvas and returns a PNG
+// data URL — lets the PDF embed real charts instead of screenshotting the
+// live dashboard canvases (which may be scrolled off-screen / different tab).
+function renderOffscreenChart(config, wPx, hPx) {
+  return new Promise(function(resolve){
+    var canvas = document.createElement('canvas');
+    canvas.width = wPx; canvas.height = hPx;
+    canvas.style.position = 'fixed'; canvas.style.left = '-9999px';
+    document.body.appendChild(canvas);
+    config.options = config.options || {};
+    config.options.animation = false;
+    config.options.responsive = false;
+    var chart = new Chart(canvas.getContext('2d'), config);
+    setTimeout(function(){
+      var url = canvas.toDataURL('image/png', 1.0);
+      chart.destroy();
+      document.body.removeChild(canvas);
+      resolve(url);
+    }, 60);
+  });
+}
+
+async function buildMonthlyTrendChartImage(data) {
+  var months = Array.from(new Set(data.map(function(r){ return r.month; }))).filter(Boolean)
+    .sort(function(a,b){ return MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b); });
+  if (months.length < 2) return null;
+  var byMonth = groupBy(data, 'month');
+  var datasets = PRODUCTS.map(function(p){
+    return {
+      label: p.label, borderColor: p.color, backgroundColor: p.color, borderWidth: 2.5,
+      tension: 0.3, pointRadius: 2,
+      data: months.map(function(m){
+        var rows = byMonth[m] || [];
+        var t = sum(rows, p.tKey), a = sum(rows, p.aKey);
+        return t>0 ? +(a/t*100).toFixed(1) : null;
+      })
+    };
+  });
+  return renderOffscreenChart({
+    type:'line',
+    data: { labels: months.map(function(m){ return (MONTH_LABELS[m]||m); }), datasets: datasets },
+    options: {
+      plugins: { legend: { position:'bottom', labels:{ font:{ size:13 }, boxWidth:14 } } },
+      scales: { y: { title:{ display:true, text:'Achievement %' }, ticks:{ font:{size:12} } }, x: { ticks:{ font:{size:12} } } }
+    }
+  }, 1100, 480);
+}
+
+async function buildTariffMixChartImage(data) {
+  var lowT = sum(data,'lowT'), midT = sum(data,'midT'), highT = sum(data,'highT'), pt12 = sum(data,'pt12');
+  var tot = lowT+midT+highT+pt12;
+  if (tot <= 0) return null;
+  var url = await renderOffscreenChart({
+    type:'bar',
+    data: {
+      labels: ['Low','Mid','High','12PT'],
+      datasets: [{ data:[lowT,midT,highT,pt12], backgroundColor:['#ef4444','#f5a623','#22c55e','#5E2D91'] }]
+    },
+    options: {
+      indexAxis:'y',
+      plugins: { legend: { display:false } },
+      scales: { x: { ticks:{ font:{size:12} } }, y: { ticks:{ font:{size:13} } } }
+    }
+  }, 700, 380);
+  return { url: url, lowT:lowT, midT:midT, highT:highT, pt12:pt12, tot:tot };
 }
 
 function generateExecutiveReport() {
+  generateExecutiveReportAsync().catch(function(err){
+    console.error('Executive report failed', err);
+    alert('⚠️ حصل خطأ أثناء توليد التقرير. جرب تاني.');
+  });
+}
+
+async function generateExecutiveReportAsync() {
   var { jsPDF } = window.jspdf;
   var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   var W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
-  var purple = [94, 45, 145], pink = [233, 30, 140], dark = [26, 26, 46], green = [22, 163, 74], amber = [217, 119, 6], red = [220, 38, 38], gray = [107, 114, 128];
+  var purple=[94,45,145], dark=[26,26,46], green=[22,163,74], amber=[217,119,6], red=[220,38,38], gray=[107,114,128];
   var data = filteredData;
   if (!data.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتقرير'); return; }
-  var k = calcGroup(data);
-  var monthLabel = (document.getElementById('f-month') && document.getElementById('f-month').selectedOptions[0]) ? document.getElementById('f-month').selectedOptions[0].text : '';
+
+  var periodLabel = reportPeriodLabel(data);
+  var storeCount = new Set(data.map(function(r){ return r.storeCode; })).size;
   var genDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  function achColor(pct){ return pct>=100?green:pct>=80?amber:red; }
 
   function headerBand(subtitle) {
     pdf.setFillColor.apply(pdf, purple); pdf.rect(0, 0, W, 24, 'F');
@@ -2952,140 +3078,221 @@ function generateExecutiveReport() {
     pdf.text('East Cairo Team · Mohamed Elfakharany', W-10, 13, { align:'right' });
     pdf.text('CONFIDENTIAL', W-10, 18, { align:'right' });
   }
-  function footer(pageNum) {
-    pdf.setDrawColor(220,220,225); pdf.line(10, H-8, W-10, H-8);
-    pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','normal');
-    pdf.text('FAKHARANY360 Performance Intelligence Platform · Internal Use Only', 10, H-4);
-    pdf.text('Page ' + pageNum, W-10, H-4, { align:'right' });
+  function sectionTitle(title, y) {
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
+    pdf.text(title, 10, y);
+    pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.5); pdf.line(10, y+2, 10+pdf.getTextWidth(title)+6, y+2);
+    return y + 8;
   }
-  function achColor(pct) { return pct>=100?green:pct>=80?amber:red; }
+  function footerAll() {
+    var n = pdf.internal.getNumberOfPages();
+    for (var i=1; i<=n; i++) {
+      pdf.setPage(i);
+      pdf.setDrawColor(220,220,225); pdf.line(10, H-8, W-10, H-8);
+      pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','normal');
+      pdf.text('FAKHARANY360 Performance Intelligence Platform · Internal Use Only', 10, H-4);
+      pdf.text('Page ' + i + ' / ' + n, W-10, H-4, { align:'right' });
+    }
+  }
 
-  // ── PAGE 1: Executive Summary ──────────────────────────────────
-  headerBand((monthLabel||'All Months') + ' · ' + data.length + ' store records');
+  // ── PAGE 1: Header context + Product Performance Summary + Narrative ──
+  headerBand(periodLabel + ' · ' + storeCount + ' branches');
   var y = 32;
-  pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica','bold'); pdf.setFontSize(11);
-  pdf.text('EXECUTIVE SUMMARY', 10, y); y += 4;
-  pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.5); pdf.line(10, y, 45, y); y += 8;
+  // Slim context bar (replaces a meaningless "sum of all product targets" KPI row)
+  pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(10, y, W-20, 12, 2, 2, 'FD');
+  pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica','bold');
+  pdf.text('PERIOD: ' + periodLabel, 14, y+7.5);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, gray);
+  pdf.text(storeCount + ' branches in scope · Each product is judged against its own target — figures are never summed across products.', 70, y+7.5);
+  y += 18;
 
-  var kpis = [
-    { label:'TOTAL TARGET', val: fmtN(k.totalTarget), color: dark },
-    { label:'TOTAL ACHIEVEMENT', val: fmtN(k.totalAch), color: dark },
-    { label:'ACHIEVEMENT %', val: k.pct+'%', color: achColor(k.pct) },
-    { label: k.gap>=0?'SURPLUS':'GAP', val: (k.gap>=0?'+':'')+fmtN(k.gap), color: k.gap>=0?green:red }
-  ];
-  var cw = (W-20-3*4)/4;
-  kpis.forEach(function(card, i){
-    var x = 10 + i*(cw+4);
-    pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(x, y, cw, 22, 2, 2, 'FD');
-    pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','bold');
-    pdf.text(card.label, x+4, y+7);
-    pdf.setFontSize(16); pdf.setTextColor.apply(pdf, card.color); pdf.setFont('helvetica','bold');
-    pdf.text(String(card.val), x+4, y+17);
+  y = sectionTitle('PRODUCT PERFORMANCE SUMMARY', y);
+  var prodRows = PRODUCTS.map(function(p){
+    var t = sum(data, p.tKey), a = sum(data, p.aKey), pp = t>0?(a/t*100):0, gap = a-t;
+    return [p.label, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp.toFixed(1)+'%':'—', t>0?((gap>=0?'+':'')+fmtN(gap)):'—', pp];
   });
-  y += 30;
+  pdf.autoTable({
+    startY: y, margin: { left:10, right:10 },
+    head: [['Product','Target','Achievement','Ach %','Gap']],
+    body: prodRows.map(function(r){ return r.slice(0,5); }),
+    theme: 'plain',
+    headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
+    styles: { fontSize: 8.5, cellPadding: 2.2 },
+    alternateRowStyles: { fillColor: [248,247,252] },
+    didParseCell: function(hd){
+      if (hd.section==='body' && hd.column.index===3) {
+        var pp = prodRows[hd.row.index][5];
+        hd.cell.styles.textColor = achColor(pp); hd.cell.styles.fontStyle = 'bold';
+      }
+      if (hd.section==='body' && hd.column.index===4) {
+        var gapStr = prodRows[hd.row.index][4];
+        hd.cell.styles.textColor = (gapStr[0]==='+') ? green : (gapStr==='—'?gray:red);
+      }
+    }
+  });
+  y = pdf.lastAutoTable.finalY + 8;
 
-  // Narrative box
-  pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
-  var narrative = buildExecNarrative(data);
+  var narrative = buildExecNarrative(data, periodLabel);
   var narrLines = pdf.splitTextToSize(narrative, W-24);
   var narrH = 8 + narrLines.length*4.2;
+  pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
   pdf.roundedRect(10, y, W-20, narrH, 2, 2, 'FD');
   pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
   pdf.text('KEY TAKEAWAY', 14, y+6);
   pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
   pdf.text(narrLines, 14, y+11.5);
-  y += narrH + 8;
 
-  // Product performance table
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
-  pdf.text('PRODUCT PERFORMANCE', 10, y); y += 4;
-  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 55, y); y += 6;
-
-  var tblX = 10, tblW = W-20;
-  var colW = [tblW*0.30, tblW*0.20, tblW*0.20, tblW*0.15, tblW*0.15];
-  var heads = ['Product','Target','Achievement','Ach %','Gap'];
-  pdf.setFillColor.apply(pdf, dark); pdf.rect(tblX, y, tblW, 7, 'F');
-  pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold');
-  var cx = tblX;
-  heads.forEach(function(h, i){ pdf.text(h, cx+3, y+4.8); cx += colW[i]; });
-  y += 7;
-  PRODUCTS.forEach(function(p, idx){
-    var t = sum(data, p.tKey), a = sum(data, p.aKey), pp = t>0?(a/t*100):0, gap = a-t;
-    if (idx % 2 === 1) { pdf.setFillColor(248,247,252); pdf.rect(tblX, y, tblW, 7, 'F'); }
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, dark);
-    cx = tblX;
-    pdf.text(p.label, cx+3, y+4.8); cx += colW[0];
-    pdf.text(fmtN(t), cx+3, y+4.8); cx += colW[1];
-    pdf.text(fmtN(a), cx+3, y+4.8); cx += colW[2];
-    pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(pp));
-    pdf.text(pp.toFixed(1)+'%', cx+3, y+4.8); cx += colW[3];
-    pdf.setTextColor.apply(pdf, gap>=0?green:red);
-    pdf.text((gap>=0?'+':'')+fmtN(gap), cx+3, y+4.8);
-    y += 7;
-  });
-  footer(1);
-
-  // ── PAGE 2: Team Leaderboard ──────────────────────────────────
+  // ── PAGE 2: Regional Manager → Supervisor → Area Manager structure ──
   pdf.addPage();
-  headerBand('Team Leaderboard — Regional Managers');
+  headerBand(periodLabel + ' · Team Structure Performance (Ach% by product)');
   y = 32;
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
-  pdf.text('TOP & BOTTOM PERFORMING TEAMS (by Regional Manager)', 10, y); y += 4;
-  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 100, y); y += 8;
+  y = sectionTitle('REGIONAL MANAGER → SUPERVISOR → AREA MANAGER', y);
 
-  var rm5 = tpTopBottomEntities(data, 'regionalManager', 5);
-  function leaderTable(title, list, color, x, w) {
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, color);
-    pdf.text(title, x, y);
-    var ty = y + 6;
-    pdf.setFillColor.apply(pdf, dark); pdf.rect(x, ty, w, 6, 'F');
-    pdf.setTextColor(255,255,255); pdf.setFontSize(7.5);
-    pdf.text('Regional Manager', x+3, ty+4); pdf.text('Ach%', x+w-14, ty+4);
-    ty += 6;
-    list.forEach(function(e, i){
-      if (i%2===1) { pdf.setFillColor(248,247,252); pdf.rect(x, ty, w, 6.5, 'F'); }
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor.apply(pdf, dark);
-      pdf.text(String(e.name).slice(0,26), x+3, ty+4.5);
-      pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(e.pct));
-      pdf.text(e.pct+'%', x+w-14, ty+4.5);
-      ty += 6.5;
+  var tree = buildTeamPivotTree(data);
+  var rmNames = Object.keys(tree).sort(function(a,b){ return calcGroup(tree[b].rows).storeCount - calcGroup(tree[a].rows).storeCount; });
+  var hierRows = [];
+  function prodPctRow(rows) {
+    return PRODUCTS.map(function(p){
+      var t = sum(rows, p.tKey), a = sum(rows, p.aKey);
+      return t>0 ? +(a/t*100).toFixed(0) : null;
     });
-    return ty;
   }
-  var halfW = (W-30)/2;
-  var endY1 = leaderTable('▲ TOP PERFORMERS', rm5.top, green, 10, halfW);
-  var endY2 = leaderTable('▼ NEEDS ATTENTION', rm5.bottom, red, 10+halfW+10, halfW);
-  y = Math.max(endY1, endY2) + 12;
+  rmNames.forEach(function(rm){
+    var rmData = tree[rm];
+    hierRows.push({ level:0, label: rm, vals: prodPctRow(rmData.rows), kind:'rm' });
+    var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return calcGroup(rmData.supervisors[b].rows).storeCount - calcGroup(rmData.supervisors[a].rows).storeCount; });
+    svNames.forEach(function(sv){
+      var svData = rmData.supervisors[sv];
+      hierRows.push({ level:1, label: sv, vals: prodPctRow(svData.rows), kind:'sv' });
+      var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return calcGroup(svData.areaManagers[b]).storeCount - calcGroup(svData.areaManagers[a]).storeCount; });
+      amNames.forEach(function(am){
+        hierRows.push({ level:2, label: am, vals: prodPctRow(svData.areaManagers[am]), kind:'am' });
+      });
+    });
+  });
 
-  // Best-in-class highlight cards
-  var bestSv = getBestEntity(data, 'supervisor');
-  var bestAm = getBestEntity(data, 'areaManager');
-  var bestPt = getBestEntity(data, 'partner');
-  var bestStores = tpTopBottomEntities(data, 'store', 1).top[0] || { name:'—', pct:0 };
-  pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
-  pdf.text('BEST IN CLASS', 10, y); y += 4;
-  pdf.setDrawColor.apply(pdf, purple); pdf.line(10, y, 55, y); y += 6;
+  pdf.autoTable({
+    startY: y, margin: { left:10, right:10 },
+    head: [['Regional Mgr / Supervisor / Area Mgr'].concat(PRODUCTS.map(function(p){ return p.label; }))],
+    body: hierRows.map(function(r){
+      return [('  '.repeat(r.level*2)) + r.label].concat(r.vals.map(function(v){ return v===null ? '—' : v+'%'; }));
+    }),
+    theme: 'plain',
+    headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:7.5 },
+    styles: { fontSize: 7.5, cellPadding: 1.8 },
+    columnStyles: { 0: { cellWidth: 62 } },
+    didParseCell: function(hd){
+      var r = hierRows[hd.row.index];
+      if (!r) return;
+      if (hd.section==='body') {
+        if (r.kind==='rm') { hd.cell.styles.fillColor=[94,45,145]; hd.cell.styles.textColor=255; hd.cell.styles.fontStyle='bold'; }
+        else if (r.kind==='sv') { hd.cell.styles.fillColor=[219,234,254]; hd.cell.styles.textColor=[30,58,138]; hd.cell.styles.fontStyle='bold'; }
+        if (hd.column.index>0 && r.vals[hd.column.index-1]!==null && r.kind==='am') {
+          hd.cell.styles.textColor = achColor(r.vals[hd.column.index-1]);
+        }
+      }
+    }
+  });
+
+  // ── PAGE 3: Monthly Trend (only if the period spans multiple months) ──
+  var trendImg = await buildMonthlyTrendChartImage(data);
+  if (trendImg) {
+    pdf.addPage();
+    headerBand(periodLabel + ' · Monthly Achievement Trend');
+    y = 32;
+    y = sectionTitle('MONTHLY TREND — ACHIEVEMENT % BY PRODUCT', y);
+    var trendW = W-20, trendH = trendW * (480/1100);
+    pdf.addImage(trendImg, 'PNG', 10, y, trendW, trendH);
+    y += trendH + 10;
+  } else {
+    if (!trendImg && pdf.internal.getNumberOfPages()===2) { /* single month — trend page skipped intentionally */ }
+  }
+
+  // ── Tariff Mix (reasonably sized chart + numeric summary side by side) ──
+  var tariff = await buildTariffMixChartImage(data);
+  if (tariff) {
+    if (!trendImg) { pdf.addPage(); headerBand(periodLabel + ' · Tariff Mix'); y = 32; }
+    else if (y > H - 75) { pdf.addPage(); headerBand(periodLabel + ' · Tariff Mix'); y = 32; }
+    y = sectionTitle('TARIFF MIX', y);
+    var chartW = 95, chartH = chartW * (380/700);
+    pdf.addImage(tariff.url, 'PNG', 10, y, chartW, chartH);
+    var sx = 10 + chartW + 10;
+    var rows2 = [
+      ['Low Tier (25,29,32,37)', tariff.lowT, (tariff.lowT/tariff.tot*100).toFixed(1)+'%', red],
+      ['Mid Tier (40,45,46,52)', tariff.midT, (tariff.midT/tariff.tot*100).toFixed(1)+'%', amber],
+      ['High Tier (50+)',        tariff.highT,(tariff.highT/tariff.tot*100).toFixed(1)+'%', green],
+      ['12 PT (12-month plan)',  tariff.pt12, (tariff.pt12/tariff.tot*100).toFixed(1)+'%', purple]
+    ];
+    var ry = y + 4;
+    rows2.forEach(function(r){
+      pdf.setFillColor.apply(pdf, r[3]); pdf.circle(sx+2, ry-1.2, 1.3, 'F');
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
+      pdf.text(r[0], sx+7, ry);
+      pdf.setFont('helvetica','bold');
+      pdf.text(fmtN(r[1]) + '  (' + r[2] + ')', sx+7, ry+5);
+      ry += 12;
+    });
+    y += chartH + 10;
+  }
+
+  // ── Team Leaderboard + Best-in-class (threshold-based, never summed) ──
+  pdf.addPage();
+  headerBand(periodLabel + ' · Team Leaderboard');
+  y = 32;
+  y = sectionTitle('TOP & BOTTOM REGIONAL MANAGERS', y);
+  pdf.setFontSize(7.5); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
+  pdf.text('Scored on core products only (Mobile/WE Gold/FBB/Wallet ≥100%, Fixed ≥90%) — WE Air excluded.', 10, y);
+  y += 5;
+
+  var rmRanked = rankEntities(data, 'regionalManager', 1);
+  var top5 = rmRanked.slice(0,5), bottom5 = rmRanked.slice(-5).reverse();
+  var halfW = (W-30)/2;
+  pdf.autoTable({
+    startY: y, margin: { left:10, right:10+halfW+10 },
+    head: [['▲ Top Performers','Met','Avg %']],
+    body: top5.map(function(e){ return [e.name, e.metCount+'/'+e.of, e.avgPct.toFixed(0)+'%']; }),
+    theme:'plain', headStyles:{ fillColor: green, textColor:255, fontSize:8 }, styles:{ fontSize:8, cellPadding:2 },
+    tableWidth: halfW
+  });
+  var endY1 = pdf.lastAutoTable.finalY;
+  pdf.autoTable({
+    startY: y, margin: { left: 10+halfW+10, right:10 },
+    head: [['▼ Needs Attention','Met','Avg %']],
+    body: bottom5.map(function(e){ return [e.name, e.metCount+'/'+e.of, e.avgPct.toFixed(0)+'%']; }),
+    theme:'plain', headStyles:{ fillColor: red, textColor:255, fontSize:8 }, styles:{ fontSize:8, cellPadding:2 },
+    tableWidth: halfW
+  });
+  var endY2 = pdf.lastAutoTable.finalY;
+  y = Math.max(endY1, endY2) + 10;
+
+  y = sectionTitle('BEST IN CLASS', y);
+  pdf.setFontSize(7.5); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
+  pdf.text('Same scoring rule — ranked by core products met, then average %.', 10, y);
+  y += 5;
+  var bestSv = rankEntities(data,'supervisor',1)[0]   || {name:'—',metCount:0,of:0,avgPct:0};
+  var bestAm = rankEntities(data,'areaManager',1)[0]  || {name:'—',metCount:0,of:0,avgPct:0};
+  var bestPt = rankEntities(data,'partner',1)[0]      || {name:'—',metCount:0,of:0,avgPct:0};
+  var bestSt = rankEntities(data,'store',1)[0]        || {name:'—',metCount:0,of:0,avgPct:0};
   var highlights = [
-    { role:'BEST SUPERVISOR', name: bestSv.name, pct: bestSv.pct },
-    { role:'BEST AREA MANAGER', name: bestAm.name, pct: bestAm.pct },
-    { role:'BEST PARTNER', name: bestPt.name, pct: bestPt.pct },
-    { role:'BEST STORE', name: bestStores.name, pct: bestStores.pct }
+    { role:'BEST SUPERVISOR', e:bestSv }, { role:'BEST AREA MANAGER', e:bestAm },
+    { role:'BEST PARTNER', e:bestPt }, { role:'BEST STORE', e:bestSt }
   ];
   var hw = (W-20-3*4)/4;
   highlights.forEach(function(hcard, i){
     var x = 10 + i*(hw+4);
-    pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.roundedRect(x, y, hw, 20, 2, 2, 'FD');
+    pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.roundedRect(x, y, hw, 22, 2, 2, 'FD');
     pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
     pdf.text(hcard.role, x+4, y+6);
     pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, dark);
-    pdf.text(String(hcard.name).slice(0,22), x+4, y+12);
-    pdf.setFontSize(11); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(hcard.pct));
-    pdf.text(hcard.pct+'%', x+4, y+18);
+    pdf.text(String(hcard.e.name).slice(0,24), x+4, y+12);
+    pdf.setFontSize(10); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(hcard.e.avgPct));
+    pdf.text(hcard.e.metCount+'/'+hcard.e.of+' targets · '+hcard.e.avgPct.toFixed(0)+'% avg', x+4, y+18);
   });
-  footer(2);
 
+  footerAll();
   pdf.save('WE_Executive_Report_' + new Date().toISOString().slice(0,10) + '.pdf');
 }
+
 
 
 function exportExcel() {
