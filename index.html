@@ -796,6 +796,10 @@ async function doLogin() {
       alert('⚠️ تعذر تحميل بيانات الشهور من مجلد data/. تأكد إن الملف موجود على GitHub Pages بنفس المسار.');
       RAW_DATA = [];
     }
+    // Auto-load the latest daily MTD (Mobile + WE Pay) data pushed via
+    // raw_mtd/ + GitHub Action, if any is available. Failures here are
+    // non-fatal — the MTD tab just falls back to its manual upload buttons.
+    try { await fetchAutoMTDData(); } catch (e) { console.warn('[MTD Auto] init load failed:', e.message); }
     document.getElementById('login-screen').style.display = 'none';
     applyRolePermissions();
     initAppWithData(RAW_DATA);
@@ -1364,6 +1368,11 @@ document.addEventListener('DOMContentLoaded', function() {
           <span id="mtd-wallet-badge" style="display:none;background:#16a34a;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px"><i class="fas fa-wallet mr-1"></i>Wallet Loaded</span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="mtd-refresh-btn" onclick="refreshAutoMTDData()" title="اسحب آخر نسخة تلقائية من data/mtd/" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700">
+            <i class="fas fa-sync-alt"></i> تحديث تلقائي
+          </button>
+          <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
+          <span style="font-size:10px;color:#9ca3af;font-weight:700">رفع يدوي:</span>
           <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border-radius:20px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(192,57,43,0.3)">
             <i class="fas fa-chart-line"></i> Upload MTD
             <input type="file" id="mtd-import-input-full" accept=".xlsx,.xls,.xlsb,application/vnd.ms-excel.sheet.binary.macroEnabled.12" style="display:none" onchange="loadMTDFile(this.files[0])">
@@ -1374,6 +1383,11 @@ document.addEventListener('DOMContentLoaded', function() {
           </label>
           <span id="mtd-converting-badge" style="display:none;background:#f59e0b;color:white;font-size:10px;font-weight:700;padding:5px 12px;border-radius:12px"><i class="fas fa-spinner fa-spin mr-1"></i>Converting xlsb...</span>
         </div>
+      </div>
+
+      <!-- ── Data Freshness / Source bar (Mobile + WE Pay, auto vs manual) ── -->
+      <div id="mtd-data-freshness-note" style="display:none;font-size:12px;color:#374151;margin-bottom:14px;background:#f9fafb;border:1px solid #eef0f2;border-radius:10px;padding:8px 14px">
+        <i class="fas fa-info-circle mr-1" style="color:#9ca3af"></i><span id="mtd-data-freshness-text"></span>
       </div>
 
       <!-- ── Empty State (shown until an MTD file is uploaded) ── -->
@@ -1448,9 +1462,6 @@ document.addEventListener('DOMContentLoaded', function() {
           <i class="fas fa-exchange-alt"></i> Quick Compare
         </button>
         <span id="mtd-filter-badge" class="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-semibold"></span>
-      </div>
-      <div id="mtd-data-freshness-note" style="font-size:11px;color:#6b7280;margin-bottom:16px;display:none">
-        <i class="fas fa-info-circle mr-1" style="color:#9ca3af"></i><span id="mtd-data-freshness-text"></span>
       </div>
 
       <div id="mtd-store-overlay" class="hidden fixed inset-0 z-20" onclick="closeMTDStoreDropdown()"></div>
@@ -4615,6 +4626,107 @@ var MTD_DAY_PKG_EXPANDED = {};     // which package category cards are expanded 
 var MTD_SELECTED_STORE = '';       // exact store name chosen from the search dropdown
 var MTD_MOBILE_DATE_LABEL = '';    // date parsed from the Mobile MTD file name
 var MTD_WALLET_DATE_LABEL = '';    // date parsed from the Wallet file name
+var MTD_SOURCE_MOBILE = null;      // 'auto' | 'manual' | null — where the current Mobile MTD data came from
+var MTD_SOURCE_WALLET = null;      // 'auto' | 'manual' | null — where the current WE Pay data came from
+var MTD_AUTO_LOADING  = false;
+
+// ══════════════════════════════════════════════════════════════
+//  MTD AUTO-LOAD — pulls the latest daily Mobile / WE Pay MTD data that
+//  the GitHub Action auto-converts from raw_mtd/*.xlsb into data/mtd/*.json
+//  (see scripts/convert_mtd.js). This runs automatically after login so
+//  the whole team sees fresh MTD data without anyone uploading anything —
+//  the manual "Upload MTD" / "Upload Wallet" buttons still work exactly as
+//  before and simply take over for the rest of the session once used.
+// ══════════════════════════════════════════════════════════════
+async function fetchAutoMTDData(opts) {
+  opts = opts || {};
+  if (MTD_AUTO_LOADING) return;
+  MTD_AUTO_LOADING = true;
+  var v = Date.now();
+  async function parseJsonResponse(res) {
+    var text = await res.text();
+    text = text.replace(/^\uFEFF/, '').trim();
+    return JSON.parse(text);
+  }
+  try {
+    var manifestRes;
+    try {
+      manifestRes = await fetch('data/mtd/manifest.json?v=' + v, { cache: 'no-store' });
+    } catch (e) { console.warn('[MTD Auto] manifest fetch failed:', e.message); return; }
+    if (!manifestRes.ok) { console.warn('[MTD Auto] data/mtd/manifest.json not found (HTTP ' + manifestRes.status + ') — no auto data pushed yet'); return; }
+    var manifest;
+    try { manifest = await parseJsonResponse(manifestRes); } catch (e) { console.warn('[MTD Auto] manifest parse failed:', e.message); return; }
+
+    // ── Mobile ──
+    if (manifest.mobile && (opts.force || MTD_SOURCE_MOBILE !== 'manual')) {
+      try {
+        var mRes = await fetch('data/mtd/' + manifest.mobile.file + '?v=' + v, { cache: 'no-store' });
+        if (mRes.ok) {
+          var mJson = await parseJsonResponse(mRes);
+          MTD_DATA = mJson.mtdData || [];
+          MTD_FILTERED = MTD_DATA.slice();
+          MTD_SALES_DATA = mJson.mtdSalesData || [];
+          MTD_PKGMIX = mJson.pkgMix || null;
+          MTD_DAILY  = mJson.daily  || null;
+          MTD_MOBILE_DATE_LABEL = mJson.dateLabel || manifest.mobile.dateLabel || '';
+          MTD_SOURCE_MOBILE = 'auto';
+          var mtdTabBtn = document.getElementById('mtd-tab-btn');
+          if (mtdTabBtn) mtdTabBtn.style.display = '';
+          populateMTDFilters();
+        } else {
+          console.warn('[MTD Auto] Missing data/mtd/' + manifest.mobile.file + ' (HTTP ' + mRes.status + ')');
+        }
+      } catch (e) { console.warn('[MTD Auto] mobile load failed:', e.message); }
+    }
+
+    // ── WE Pay / Wallet ──
+    if (manifest.wallet && (opts.force || MTD_SOURCE_WALLET !== 'manual')) {
+      try {
+        var wRes = await fetch('data/mtd/' + manifest.wallet.file + '?v=' + v, { cache: 'no-store' });
+        if (wRes.ok) {
+          var wJson = await parseJsonResponse(wRes);
+          WALLET_DATA = wJson.walletData || {};
+          MTD_WALLET_DAILY = wJson.walletDaily || null;
+          MTD_WALLET_DATE_LABEL = wJson.dateLabel || manifest.wallet.dateLabel || '';
+          MTD_SOURCE_WALLET = 'auto';
+          var wCount = Object.keys(WALLET_DATA).length;
+          var badge = document.getElementById('mtd-wallet-badge');
+          var pill  = document.getElementById('mtd-pill-wallet');
+          var lpPill = document.getElementById('mtd-lp-pill-wallet');
+          var kpi   = document.getElementById('mtd-kpi-wallet');
+          if (wCount > 0) {
+            if (badge) { badge.style.display = ''; badge.textContent = '✅ Wallet: ' + wCount + ' فرع'; }
+            if (pill)  pill.style.display = '';
+            if (lpPill) lpPill.style.display = '';
+            if (kpi)   kpi.style.display = '';
+          }
+        } else {
+          console.warn('[MTD Auto] Missing data/mtd/' + manifest.wallet.file + ' (HTTP ' + wRes.status + ')');
+        }
+      } catch (e) { console.warn('[MTD Auto] wallet load failed:', e.message); }
+    }
+
+    if (MTD_DATA.length > 0) {
+      var emptyState = document.getElementById('mtd-empty-state');
+      var dashContent = document.getElementById('mtd-dashboard-content');
+      if (emptyState)  emptyState.style.display = 'none';
+      if (dashContent) dashContent.style.display = '';
+    }
+    updateMTDFreshnessNote();
+    if (MTD_DATA.length > 0 && typeof renderMTD === 'function' && activeTab === 'mtd') renderMTD();
+  } finally {
+    MTD_AUTO_LOADING = false;
+  }
+}
+
+// Manual "refresh" button — re-pulls the latest auto data on demand (useful
+// right after the GitHub Action finishes, without having to log out/in).
+async function refreshAutoMTDData() {
+  var btn = document.getElementById('mtd-refresh-btn');
+  if (btn) { btn.disabled = true; btn.querySelector('i').className = 'fas fa-spinner fa-spin'; }
+  await fetchAutoMTDData({ force: false });
+  if (btn) { btn.disabled = false; btn.querySelector('i').className = 'fas fa-sync-alt'; }
+}
 
 // Returns the dataset to use based on current mode.
 // Falls back to MTD_DATA (activation) if no separate Sales data has been uploaded yet.
@@ -5103,6 +5215,8 @@ function loadMTDFile(file) {
       document.getElementById('mtd-tab-btn').style.display = '';
       populateMTDFilters();
       document.getElementById('drop-zone').style.display = 'none';
+      MTD_SOURCE_MOBILE = 'manual';
+      updateMTDFreshnessNote();
       var salesNote = idleData ? ' (+ Activation/Sales)' : '';
       if (statusEl) statusEl.textContent = '✅ MTD: ' + parsed.length + ' فرع' + salesNote;
       if (convBadge) convBadge.style.display = 'none';
@@ -5219,6 +5333,7 @@ function loadWalletFile(file) {
 
       document.getElementById('wallet-import-input').value='';
       if (statusEl) statusEl.textContent = '✅ Wallet: ' + count + ' فرع';
+      MTD_SOURCE_WALLET = 'manual';
       updateMTDFreshnessNote();
       renderMTD();
 
@@ -5288,10 +5403,21 @@ function updateMTDFreshnessNote() {
   var wrap = document.getElementById('mtd-data-freshness-note');
   var txt  = document.getElementById('mtd-data-freshness-text');
   if (!wrap || !txt) return;
+  function srcTag(src) {
+    if (src === 'manual') return '<span style="color:#c0392b;font-weight:700">📤 رفع يدوي</span>';
+    if (src === 'auto')   return '<span style="color:#16a34a;font-weight:700">🤖 تحديث تلقائي</span>';
+    return '';
+  }
   var parts = [];
-  if (MTD_MOBILE_DATE_LABEL) parts.push('بيانات Mobile حتى ' + MTD_MOBILE_DATE_LABEL);
-  if (MTD_WALLET_DATE_LABEL) parts.push('بيانات WE Pay حتى ' + MTD_WALLET_DATE_LABEL);
-  if (parts.length) { txt.textContent = parts.join(' · '); wrap.style.display = ''; }
+  if (MTD_MOBILE_DATE_LABEL) {
+    var t = srcTag(MTD_SOURCE_MOBILE);
+    parts.push('📱 بيانات <b>Mobile</b> حتى <b>' + MTD_MOBILE_DATE_LABEL + '</b>' + (t ? ' — ' + t : ''));
+  }
+  if (MTD_WALLET_DATE_LABEL) {
+    var t2 = srcTag(MTD_SOURCE_WALLET);
+    parts.push('💰 بيانات <b>WE Pay</b> حتى <b>' + MTD_WALLET_DATE_LABEL + '</b>' + (t2 ? ' — ' + t2 : ''));
+  }
+  if (parts.length) { txt.innerHTML = parts.join(' &nbsp;&nbsp;|&nbsp;&nbsp; '); wrap.style.display = ''; }
   else { wrap.style.display = 'none'; }
 }
 
