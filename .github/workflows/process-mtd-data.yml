@@ -29,13 +29,6 @@ jobs:
       - name: Convert any new MTD files in raw_mtd/
         run: node scripts/convert_mtd.js --scan raw_mtd data/mtd
 
-      - name: Archive processed raw files
-        run: |
-          mkdir -p raw_mtd/processed
-          # Move any .xlsb sitting directly in raw_mtd/ into raw_mtd/processed/
-          # so the next run doesn't try to reprocess the same day.
-          find raw_mtd -maxdepth 1 -name '*.xlsb' -exec mv {} raw_mtd/processed/ \;
-
       - name: Commit and push updated MTD data
         run: |
           git config user.name "github-actions[bot]"
