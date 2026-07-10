@@ -1536,7 +1536,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
       <!-- ── Low Performance Stores (Proj < 100%) ── -->
       <div id="mtd-lowperf-wrap" style="display:none">
-        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span style="color:#c0392b"><i class="fas fa-exclamation-triangle mr-2"></i>Low Performance Stores — Proj &lt; 100%</span><button onclick="exportMTDLowPerf()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel"></i> Export</button></div>
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span style="color:#c0392b"><i class="fas fa-exclamation-triangle mr-2"></i>Low Performance Stores — Proj &lt; 100%</span>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button onclick="exportMTDLowPerf()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel"></i> Export</button>
+            <button onclick="exportMTDLowPerfAll()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-export"></i> Export All</button>
+          </div>
+        </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="mtd-lowperf-pills">
           <button class="class-pill active" data-lp="mobile" onclick="setLowPerfProd('mobile')" style="background:#c0392b;border-color:#c0392b;color:white"><i class="fas fa-mobile-alt mr-1"></i>Mobile</button>
           <button class="class-pill" data-lp="fbb"    onclick="setLowPerfProd('fbb')"><i class="fas fa-wifi mr-1"></i>FBB</button>
@@ -1545,7 +1551,15 @@ document.addEventListener('DOMContentLoaded', function() {
           <button class="class-pill" data-lp="gold"   onclick="setLowPerfProd('gold')"><i class="fas fa-star mr-1"></i>WE Gold</button>
           <button class="class-pill" data-lp="wallet" onclick="setLowPerfProd('wallet')" id="mtd-lp-pill-wallet" style="display:none"><i class="fas fa-wallet mr-1"></i>Wallet</button>
         </div>
-        <div id="mtd-lowperf-table" style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden"></div>
+        <div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead id="mtd-lowperf-thead"></thead>
+              <tbody id="mtd-lowperf-tbody"></tbody>
+            </table>
+          </div>
+          <div id="mtd-lowperf-foot" style="display:none;padding:12px;text-align:center;border-top:1px solid #fee2e2;background:#fff5f5"></div>
+        </div>
       </div>
 
       <!-- ── Package Mix Breakdown (Mobile packages, MTD) ── -->
@@ -1567,7 +1581,9 @@ document.addEventListener('DOMContentLoaded', function() {
         <div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:16px">
           <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">Tariff Mix Distribution</div>
           <div style="font-size:10px;color:#9ca3af;margin-bottom:10px">اضغط على أي جزء من الدائرة لعرض الفروع اللي عاملة الأرقام دي</div>
-          <canvas id="chart-mtd-tariff-donut" height="220"></canvas>
+          <div style="max-width:280px;margin:0 auto">
+            <canvas id="chart-mtd-tariff-donut" height="220"></canvas>
+          </div>
         </div>
         <div id="mtd-tariffmix-drill" style="margin-top:14px"></div>
       </div>
@@ -3057,6 +3073,13 @@ async function buildTariffMixChartImage(data) {
 }
 
 function generateExecutiveReport() {
+  if (activeTab === 'mtd') {
+    generateMTDExecutiveReportAsync().catch(function(err){
+      console.error('MTD Executive report failed', err);
+      alert('⚠️ حصل خطأ أثناء توليد تقرير MTD. جرب تاني.');
+    });
+    return;
+  }
   generateExecutiveReportAsync().catch(function(err){
     console.error('Executive report failed', err);
     alert('⚠️ حصل خطأ أثناء توليد التقرير. جرب تاني.');
@@ -3305,6 +3328,241 @@ async function generateExecutiveReportAsync() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════
+//  MTD EXECUTIVE REPORT — same visual language as the main Exec
+//  Report, but scoped to MTD_FILTERED (i.e. whatever filters are
+//  currently applied on the MTD tab: Region, Regional Manager, Area
+//  Manager, Supervisor, Classification, Account Manager, Partner,
+//  Day, or a single selected Store).
+// ══════════════════════════════════════════════════════════════
+async function generateMTDExecutiveReportAsync() {
+  var { jsPDF } = window.jspdf;
+  var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  var W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+  var purple=[94,45,145], dark=[26,26,46], green=[22,163,74], amber=[217,119,6], red=[220,38,38], gray=[107,114,128];
+
+  var data = MTD_FILTERED;
+  if (!data.length) { alert('⚠️ مفيش بيانات في العرض الحالي لتاب MTD'); return; }
+
+  function achColor(pct){ return pct>=100?green:pct>=80?amber:red; }
+  var genDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+  // ── Filter summary (mirrors exactly what's applied on the MTD tab now) ──
+  function selLabel(id){
+    var el = document.getElementById(id);
+    if (!el || !el.value) return null;
+    return (el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text : el.value;
+  }
+  var filterParts = [];
+  var region  = selLabel('mtd-f-region');  if (region)  filterParts.push('Region: '+region);
+  var rm      = selLabel('mtd-f-rm');      if (rm)      filterParts.push('Regional Manager: '+rm);
+  var am      = selLabel('mtd-f-am');      if (am)      filterParts.push('Area Manager: '+am);
+  var sv      = selLabel('mtd-f-sv');      if (sv)      filterParts.push('Supervisor: '+sv);
+  var cls     = selLabel('mtd-f-cls');     if (cls)     filterParts.push('Classification: '+cls);
+  var acc     = selLabel('mtd-f-acc');     if (acc)     filterParts.push('Account Manager: '+acc);
+  var partner = selLabel('mtd-f-partner'); if (partner) filterParts.push('Partner: '+partner);
+  var dayEl   = document.getElementById('mtd-f-day');
+  if (dayEl && dayEl.value) filterParts.push('Day: '+dayEl.value);
+  if (MTD_SELECTED_STORE) filterParts.push('Store: '+MTD_SELECTED_STORE);
+  var filterText = filterParts.length ? filterParts.join('  ·  ') : 'All stores (no filters applied)';
+
+  var dateParts = [];
+  if (MTD_MOBILE_DATE_LABEL) dateParts.push('Mobile as of ' + MTD_MOBILE_DATE_LABEL);
+  if (MTD_WALLET_DATE_LABEL) dateParts.push('WE Pay as of ' + MTD_WALLET_DATE_LABEL);
+  var dateLabel = dateParts.length ? dateParts.join('  ·  ') : 'Month to Date';
+  var storeCount = data.length;
+
+  function headerBand(subtitle) {
+    pdf.setFillColor.apply(pdf, purple); pdf.rect(0, 0, W, 24, 'F');
+    pdf.setFillColor(255,255,255); pdf.roundedRect(10, 5, 16, 14, 2, 2, 'F');
+    pdf.setTextColor.apply(pdf, purple); pdf.setFont('helvetica','bold'); pdf.setFontSize(11);
+    pdf.text('WE', 18, 14.5, { align:'center' });
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(15);
+    pdf.text('FAKHARANY360 — MTD Executive Report', 32, 11);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+    pdf.text(subtitle, 32, 17);
+    pdf.setFontSize(8); pdf.text('Generated ' + genDate, W-10, 8, { align:'right' });
+    pdf.text('East Cairo Team · Mohamed Elfakharany', W-10, 13, { align:'right' });
+    pdf.text('CONFIDENTIAL', W-10, 18, { align:'right' });
+  }
+  function sectionTitle(title, y) {
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.setTextColor.apply(pdf, dark);
+    pdf.text(title, 10, y);
+    pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.5); pdf.line(10, y+2, 10+pdf.getTextWidth(title)+6, y+2);
+    return y + 8;
+  }
+  function footerAll() {
+    var n = pdf.internal.getNumberOfPages();
+    for (var i=1; i<=n; i++) {
+      pdf.setPage(i);
+      pdf.setDrawColor(220,220,225); pdf.line(10, H-8, W-10, H-8);
+      pdf.setFontSize(7.5); pdf.setTextColor.apply(pdf, gray); pdf.setFont('helvetica','normal');
+      pdf.text('FAKHARANY360 Performance Intelligence Platform · Internal Use Only', 10, H-4);
+      pdf.text('Page ' + i + ' / ' + n, W-10, H-4, { align:'right' });
+    }
+  }
+
+  // ── PAGE 1: header + filters + product summary + narrative ──
+  headerBand(dateLabel + '  ·  ' + storeCount + ' branches in scope');
+  var y = 32;
+  var filterLines = pdf.splitTextToSize(filterText, W-40);
+  var boxH = Math.max(12, 6 + filterLines.length*4.2);
+  pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(10, y, W-20, boxH, 2, 2, 'FD');
+  pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica','bold');
+  pdf.text('FILTERS APPLIED', 14, y+6);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, gray); pdf.setFontSize(8.5);
+  pdf.text(filterLines, 14, y+11);
+  y += boxH + 6;
+
+  y = sectionTitle('PRODUCT PERFORMANCE SUMMARY (MTD)', y);
+  var mtdProdList = ['mobile','fbb','fixed','fwa','gold'];
+  var prodRows = mtdProdList.map(function(key){
+    var p = MTD_PRODS[key];
+    var t = mtdSum(data, p.tKey), a = mtdSum(data, p.aKey), proj = mtdSum(data, p.projKey);
+    var pp = t>0 ? (a/t*100) : 0;
+    var projPct = t>0 ? (proj/t*100) : 0;
+    var gap = a - t;
+    return [p.label, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp.toFixed(1)+'%':'—', t>0?fmtN(Math.round(proj)):'—', t>0?projPct.toFixed(1)+'%':'—', t>0?((gap>=0?'+':'')+fmtN(gap)):'—', pp, projPct];
+  });
+  if (Object.keys(WALLET_DATA).length > 0) {
+    var wt=0, wa=0, wp=0;
+    data.forEach(function(r){
+      var code=String(r.storeCode||'').trim().toUpperCase();
+      var w = WALLET_DATA[code]||{};
+      wt += Number(w.walletTarget)||0; wa += Number(w.walletSales)||0; wp += Number(w.walletProj)||0;
+    });
+    var wpp = wt>0?(wa/wt*100):0, wprojPct = wt>0?(wp/wt*100):0, wgap = wa-wt;
+    prodRows.push(['Wallet', wt>0?fmtN(wt):'—', wt>0?fmtN(wa):'—', wt>0?wpp.toFixed(1)+'%':'—', wt>0?fmtN(Math.round(wp)):'—', wt>0?wprojPct.toFixed(1)+'%':'—', wt>0?((wgap>=0?'+':'')+fmtN(wgap)):'—', wpp, wprojPct]);
+  }
+  pdf.autoTable({
+    startY: y, margin: { left:10, right:10 },
+    head: [['Product','Target','Actual','Ach %','Proj','Proj %','Gap']],
+    body: prodRows.map(function(r){ return r.slice(0,7); }),
+    theme: 'plain',
+    headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
+    styles: { fontSize: 8.5, cellPadding: 2.2 },
+    alternateRowStyles: { fillColor: [248,247,252] },
+    didParseCell: function(hd){
+      if (hd.section==='body' && hd.column.index===3) {
+        var pp = prodRows[hd.row.index][7];
+        hd.cell.styles.textColor = achColor(pp); hd.cell.styles.fontStyle = 'bold';
+      }
+      if (hd.section==='body' && hd.column.index===5) {
+        var ppr = prodRows[hd.row.index][8];
+        hd.cell.styles.textColor = achColor(ppr); hd.cell.styles.fontStyle = 'bold';
+      }
+      if (hd.section==='body' && hd.column.index===6) {
+        var gapStr = prodRows[hd.row.index][6];
+        hd.cell.styles.textColor = (gapStr.charAt(0)==='+') ? green : (gapStr==='—'?gray:red);
+      }
+    }
+  });
+  y = pdf.lastAutoTable.finalY + 8;
+
+  var withTgt = prodRows.filter(function(r){ return r[1] !== '—'; });
+  var best  = withTgt.length ? withTgt.slice().sort(function(a,b){return b[7]-a[7];})[0]  : null;
+  var worst = withTgt.length ? withTgt.slice().sort(function(a,b){return a[7]-b[7];})[0] : null;
+  var lowMobileCount = data.filter(function(r){ return (r.mobilePct||0) < 1; }).length;
+  var narrative = storeCount + ' branch(es) in the current MTD scope.' +
+    (best ? '  ' + best[0] + ' leads at ' + best[7].toFixed(1) + '% achievement' : '') +
+    (worst && best && worst[0]!==best[0] ? ', while ' + worst[0] + ' trails at ' + worst[7].toFixed(1) + '%.' : '.') +
+    '  ' + lowMobileCount + ' of ' + storeCount + ' branch(es) are currently below 100% on Mobile.';
+  var narrLines = pdf.splitTextToSize(narrative, W-24);
+  var narrH = 8 + narrLines.length*4.2;
+  pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
+  pdf.roundedRect(10, y, W-20, narrH, 2, 2, 'FD');
+  pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
+  pdf.text('KEY TAKEAWAY', 14, y+6);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
+  pdf.text(narrLines, 14, y+11.5);
+  y += narrH + 8;
+
+  // ── Low Performance Stores (same product currently selected in that section) ──
+  var lpProdKey = (typeof MTD_LP_PROD !== 'undefined' && MTD_LP_PROD) ? MTD_LP_PROD : 'mobile';
+  var lpLabel = lpProdKey === 'wallet' ? 'Wallet' : (MTD_PRODS[lpProdKey] ? MTD_PRODS[lpProdKey].label : 'Mobile');
+  if (y > H - 55) { pdf.addPage(); headerBand(dateLabel + '  ·  Low Performance'); y = 32; }
+  y = sectionTitle('LOW PERFORMANCE STORES — ' + lpLabel + ' (Proj < 100%)', y);
+
+  var lpData;
+  if (lpProdKey === 'wallet') {
+    lpData = data.map(function(r){
+      var code=String(r.storeCode||'').trim().toUpperCase();
+      var w=WALLET_DATA[code]||{};
+      return {store:r.store, sup:r.supervisor, tgt:w.walletTarget||0, act:w.walletSales||0, proj:w.walletProj||0, projPct:w.walletProjPct||0};
+    }).filter(function(r){return r.projPct<1;});
+  } else {
+    var lpr = MTD_PRODS[lpProdKey];
+    lpData = data.map(function(r){
+      return {store:r.store, sup:r.supervisor, tgt:r[lpr.tKey]||0, act:r[lpr.aKey]||0, proj:r[lpr.projKey]||0, projPct:r[lpr.projPctKey]||0};
+    }).filter(function(r){return r.projPct<1;});
+  }
+  lpData.sort(function(a,b){return a.projPct-b.projPct;});
+  var lpTop = lpData.slice(0,15);
+
+  if (lpTop.length === 0) {
+    pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, green);
+    pdf.text('🎉 All branches in scope are at or above 100% projection for ' + lpLabel + '.', 10, y);
+    y += 8;
+  } else {
+    pdf.autoTable({
+      startY: y, margin: { left:10, right:10 },
+      head: [['Store','Supervisor','Target','Actual','Proj','Proj %']],
+      body: lpTop.map(function(r){ return [r.store, r.sup, fmtN(r.tgt), fmtN(r.act), fmtN(Math.round(r.proj)), (r.projPct*100).toFixed(1)+'%']; }),
+      theme: 'plain',
+      headStyles: { fillColor: red, textColor: 255, fontStyle:'bold', fontSize:8.5 },
+      styles: { fontSize: 8, cellPadding: 2 },
+      alternateRowStyles: { fillColor: [254,242,242] },
+      didParseCell: function(hd){ if (hd.section==='body' && hd.column.index===5) hd.cell.styles.textColor = red; }
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+    if (lpData.length > 15) {
+      pdf.setFontSize(7.5); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
+      pdf.text('+ ' + (lpData.length-15) + ' more branch(es) below 100% — use "Export All" on the MTD tab for the full list.', 10, y);
+      y += 6;
+    }
+  }
+
+  // ── PAGE 2: Supervisor breakdown for the low-perf product ──
+  pdf.addPage();
+  headerBand(dateLabel + '  ·  Team Structure Performance (' + lpLabel + ')');
+  y = 32;
+  y = sectionTitle('SUPERVISOR PERFORMANCE — ' + lpLabel, y);
+
+  var svGroups = {};
+  data.forEach(function(r){ var k=r.supervisor||'—'; (svGroups[k]=svGroups[k]||[]).push(r); });
+  var svRows = Object.keys(svGroups).map(function(sv2){
+    var rows = svGroups[sv2], t, a;
+    if (lpProdKey === 'wallet') {
+      t=0; a=0;
+      rows.forEach(function(r){ var code=String(r.storeCode||'').trim().toUpperCase(); var w=WALLET_DATA[code]||{}; t+=Number(w.walletTarget)||0; a+=Number(w.walletSales)||0; });
+    } else {
+      var pr2 = MTD_PRODS[lpProdKey];
+      t = mtdSum(rows, pr2.tKey); a = mtdSum(rows, pr2.aKey);
+    }
+    var pp2 = t>0?(a/t*100):0;
+    return [sv2, rows.length, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp2.toFixed(1)+'%':'—', pp2];
+  }).sort(function(a,b){ return b[5]-a[5]; });
+
+  pdf.autoTable({
+    startY: y, margin: { left:10, right:10 },
+    head: [['Supervisor','Branches','Target','Actual','Ach %']],
+    body: svRows.map(function(r){ return r.slice(0,5); }),
+    theme: 'plain',
+    headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
+    styles: { fontSize: 8.5, cellPadding: 2.2 },
+    alternateRowStyles: { fillColor: [248,247,252] },
+    didParseCell: function(hd){
+      if (hd.section==='body' && hd.column.index===4) {
+        var pp2 = svRows[hd.row.index][5];
+        hd.cell.styles.textColor = achColor(pp2); hd.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  footerAll();
+  pdf.save('WE_MTD_Executive_Report_' + new Date().toISOString().slice(0,10) + '.pdf');
+}
 
 function exportExcel() {
   const headers = ['Month','Store','Partner','Region','Account Manager','Area Manager','Supervisor','Regional Manager',
@@ -6745,9 +7003,11 @@ var MTD_LP_SHOW_ALL = false;
 var MTD_LP_PAGE_SIZE = 20;
 
 function renderMTDLowPerf() {
-  var wrap = document.getElementById('mtd-lowperf-wrap');
-  var el   = document.getElementById('mtd-lowperf-table');
-  if (!wrap || !el) return;
+  var wrap  = document.getElementById('mtd-lowperf-wrap');
+  var thead = document.getElementById('mtd-lowperf-thead');
+  var tbody = document.getElementById('mtd-lowperf-tbody');
+  var foot  = document.getElementById('mtd-lowperf-foot');
+  if (!wrap || !thead || !tbody) return;
 
   var prod = MTD_PRODS[MTD_LP_PROD];
   var isWallet = MTD_LP_PROD === 'wallet';
@@ -6776,7 +7036,9 @@ function renderMTDLowPerf() {
 
   if (data.length === 0) {
     wrap.style.display='';
-    el.innerHTML='<div style="padding:20px;text-align:center;color:#22c55e;font-weight:700;font-size:13px">🎉 كل الفروع Proj ≥ 100% — ممتاز!</div>';
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td style="padding:20px;text-align:center;color:#22c55e;font-weight:700;font-size:13px">🎉 كل الفروع Proj ≥ 100% — ممتاز!</td></tr>';
+    if (foot) foot.style.display = 'none';
     return;
   }
   wrap.style.display='';
@@ -6784,16 +7046,17 @@ function renderMTDLowPerf() {
   var visible = MTD_LP_SHOW_ALL ? data : data.slice(0, MTD_LP_PAGE_SIZE);
   var hasMore = data.length > MTD_LP_PAGE_SIZE;
 
-  var header = '<div style="display:table;width:100%;background:#fef2f2;border-bottom:2px solid #fca5a5">'+
-    '<div style="display:table-row">'+
-    '<div style="display:table-cell;padding:9px 14px;font-size:10px;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.05em;width:40%">Store</div>'+
-    '<div style="display:table-cell;padding:9px 10px;font-size:10px;font-weight:800;color:#c0392b;text-align:center">Target</div>'+
-    '<div style="display:table-cell;padding:9px 10px;font-size:10px;font-weight:800;color:#c0392b;text-align:center">Actual</div>'+
-    '<div style="display:table-cell;padding:9px 10px;font-size:10px;font-weight:800;color:#c0392b;text-align:center">Proj</div>'+
-    '<div style="display:table-cell;padding:9px 10px;font-size:10px;font-weight:800;color:#c0392b;text-align:center">Proj%</div>'+
-    '</div></div>';
+  var thStyle='padding:9px 10px;text-align:center;border-bottom:2px solid #fca5a5;white-space:nowrap;font-size:10px;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.05em';
+  var thLeft ='padding:9px 14px;text-align:left;border-bottom:2px solid #fca5a5;white-space:nowrap;font-size:10px;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.05em';
+  thead.innerHTML = '<tr style="background:#fef2f2">'+
+    '<th style="'+thLeft+'">Store</th>'+
+    '<th style="'+thStyle+'">Target</th>'+
+    '<th style="'+thStyle+'">Actual</th>'+
+    '<th style="'+thStyle+'">Proj</th>'+
+    '<th style="'+thStyle+'">Proj%</th>'+
+  '</tr>';
 
-  var rows = visible.map(function(r,i){
+  tbody.innerHTML = visible.map(function(r,i){
     var bg = i%2===0?'white':'#fff5f5';
     var pp = (r.projPct*100).toFixed(1);
     var ppNum = parseFloat(pp);
@@ -6801,33 +7064,32 @@ function renderMTDLowPerf() {
     var gapColor = gap>=0?'#22c55e':'#ef4444';
     var gapStr = (gap>=0?'▲':'▼')+fmtN(Math.abs(Math.round(gap)));
     var pctColor = ppNum>=90?'#f59e0b':'#ef4444';
-    return '<div style="display:table;width:100%;background:'+bg+';border-bottom:1px solid #fee2e2">'+
-      '<div style="display:table-row">'+
-      '<div style="display:table-cell;padding:8px 14px;width:40%;vertical-align:middle">'+
-        '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="'+r.store+'">'+r.store+'</div>'+
-        '<div style="font-size:9px;color:#9ca3af;margin-top:1px">'+r.supervisor+'</div>'+
-      '</div>'+
-      '<div style="display:table-cell;padding:8px 10px;text-align:center;font-size:12px;color:#6b7280;vertical-align:middle">'+fmtN(r.tgt)+'</div>'+
-      '<div style="display:table-cell;padding:8px 10px;text-align:center;font-size:12px;font-weight:700;color:#374151;vertical-align:middle">'+fmtN(r.act)+'</div>'+
-      '<div style="display:table-cell;padding:8px 10px;text-align:center;font-size:12px;font-weight:600;color:'+gapColor+';vertical-align:middle">'+fmtN(Math.round(r.proj))+'<div style="font-size:9px">'+gapStr+'</div></div>'+
-      '<div style="display:table-cell;padding:8px 10px;text-align:center;vertical-align:middle">'+
+    return '<tr style="background:'+bg+';border-bottom:1px solid #fee2e2">'+
+      '<td style="padding:8px 14px;vertical-align:middle;max-width:180px">'+
+        '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.store+'">'+r.store+'</div>'+
+        '<div style="font-size:9px;color:#9ca3af;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.supervisor+'</div>'+
+      '</td>'+
+      '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#6b7280;vertical-align:middle">'+fmtN(r.tgt)+'</td>'+
+      '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:700;color:#374151;vertical-align:middle">'+fmtN(r.act)+'</td>'+
+      '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:600;color:'+gapColor+';vertical-align:middle">'+fmtN(Math.round(r.proj))+'<div style="font-size:9px">'+gapStr+'</div></td>'+
+      '<td style="padding:8px 10px;text-align:center;vertical-align:middle">'+
         '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:800;background:'+pctColor+'18;color:'+pctColor+'">'+pp+'%</span>'+
-      '</div>'+
-      '</div></div>';
+      '</td>'+
+    '</tr>';
   }).join('');
 
-  var pagination = '';
-  if (hasMore) {
-    var cnt = data.length;
-    pagination = '<div style="padding:12px;text-align:center;border-top:1px solid #fee2e2;background:#fff5f5">' +
-      (MTD_LP_SHOW_ALL
+  if (foot) {
+    if (hasMore) {
+      foot.style.display = '';
+      var cnt = data.length;
+      foot.innerHTML = MTD_LP_SHOW_ALL
         ? '<button onclick="MTD_LP_SHOW_ALL=false;renderMTDLowPerf()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #c0392b;background:white;color:#c0392b;font-size:11px;font-weight:700;cursor:pointer">Show First '+MTD_LP_PAGE_SIZE+' Only</button>'
         : '<span style="font-size:11px;color:#6b7280;margin-right:10px">عرض '+MTD_LP_PAGE_SIZE+' من '+cnt+' فرع</span>'+
-          '<button onclick="MTD_LP_SHOW_ALL=true;renderMTDLowPerf()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #c0392b;background:#c0392b;color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+cnt+')</button>'
-      )+'</div>';
+          '<button onclick="MTD_LP_SHOW_ALL=true;renderMTDLowPerf()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #c0392b;background:#c0392b;color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+cnt+')</button>';
+    } else {
+      foot.style.display = 'none';
+    }
   }
-
-  el.innerHTML = header + rows + pagination;
 }
 
 function exportMTDLowPerf() {
@@ -6862,6 +7124,54 @@ function exportMTDLowPerf() {
   var wb2=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb2,ws,'Low Performance');
   exportWithPassword(wb2,'MTD_LowPerf_'+(MTD_LP_PROD==='wallet'?'Wallet':(prod&&prod.label)||MTD_LP_PROD));
+}
+
+function exportMTDLowPerfAll() {
+  var wb2 = XLSX.utils.book_new();
+  var prodList = [
+    {key:'mobile',label:'Mobile'},
+    {key:'fbb',   label:'FBB'},
+    {key:'fixed', label:'Fixed'},
+    {key:'fwa',   label:'WE Air'},
+    {key:'gold',  label:'WE Gold'},
+  ];
+  if (Object.keys(WALLET_DATA).length>0) prodList.push({key:'wallet',label:'Wallet'});
+
+  var anySheet = false;
+  prodList.forEach(function(p){
+    var isWallet = p.key === 'wallet';
+    var data;
+    if (isWallet) {
+      data = MTD_FILTERED.map(function(r){
+        var code=String(r.storeCode||'').trim().toUpperCase();
+        var w=WALLET_DATA[code]||{};
+        return {store:r.store,storeCode:code,supervisor:r.supervisor,areaManager:r.areaManager,
+                tgt:w.walletTarget||0,act:w.walletSales||0,proj:w.walletProj||0,projPct:w.walletProjPct||0};
+      }).filter(function(r){return r.projPct<1;});
+    } else {
+      var pr = MTD_PRODS[p.key];
+      data = getMTDActiveDataset().filter(function(r){
+        var code=String(r.storeCode||'').trim().toUpperCase();
+        return MTD_FILTERED.some(function(f){return String(f.storeCode||'').trim().toUpperCase()===code;});
+      }).map(function(r){
+        return {store:r.store,storeCode:r.storeCode,supervisor:r.supervisor,areaManager:r.areaManager,
+                tgt:r[pr.tKey]||0,act:r[pr.aKey]||0,proj:r[pr.projKey]||0,projPct:r[pr.projPctKey]||0};
+      }).filter(function(r){return r.projPct<1;});
+    }
+    data.sort(function(a,b){return a.projPct-b.projPct;});
+    if (data.length === 0) return;
+    anySheet = true;
+    var sheetData = data.map(function(r){
+      return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'',
+              'Target':r.tgt,'Actual':r.act,'Projection':Math.round(r.proj),'Proj%':(r.projPct*100).toFixed(1)};
+    });
+    var ws = XLSX.utils.json_to_sheet(sheetData);
+    ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:10},{wch:10},{wch:12},{wch:8}];
+    XLSX.utils.book_append_sheet(wb2, ws, p.label);
+  });
+
+  if (!anySheet) { alert('⚠️ مفيش فروع Low Performance في أي منتج'); return; }
+  exportWithPassword(wb2, 'MTD_LowPerf_AllProducts');
 }
 
 // ── Summary / Details view toggle ─────────────────────────────
