@@ -1581,8 +1581,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:16px">
           <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">Tariff Mix Distribution</div>
           <div style="font-size:10px;color:#9ca3af;margin-bottom:10px">اضغط على أي جزء من الدائرة لعرض الفروع اللي عاملة الأرقام دي</div>
-          <div style="max-width:280px;margin:0 auto">
-            <canvas id="chart-mtd-tariff-donut" height="220"></canvas>
+          <div style="max-width:280px;height:260px;margin:0 auto;position:relative">
+            <canvas id="chart-mtd-tariff-donut"></canvas>
           </div>
         </div>
         <div id="mtd-tariffmix-drill" style="margin-top:14px"></div>
@@ -3336,6 +3336,127 @@ async function generateExecutiveReportAsync() {
 //  Manager, Supervisor, Classification, Account Manager, Partner,
 //  Day, or a single selected Store).
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  ARABIC TEXT SUPPORT FOR PDF EXPORTS
+//  jsPDF has no built-in Arabic glyph shaping or bidi reordering —
+//  it just draws whatever characters you give it, left to right. We
+//  load a Unicode Arabic font once (Amiri) and reshape + reorder
+//  Arabic runs ourselves before handing text to jsPDF/autoTable, so
+//  store/supervisor names render correctly (joined letters, right-
+//  to-left order) instead of as disconnected/garbled glyphs.
+// ══════════════════════════════════════════════════════════════
+var ARABIC_FONT_READY = null;
+var ARABIC_FONT_LOADED_OK = false;
+var ARABIC_FONT_NAME = 'Amiri';
+
+function arrayBufferToBase64(buffer) {
+  var bytes = new Uint8Array(buffer), binary = '', chunk = 0x8000;
+  for (var i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+
+function ensureArabicFont(pdf) {
+  if (ARABIC_FONT_READY) return ARABIC_FONT_READY;
+  ARABIC_FONT_READY = fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf')
+    .then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.arrayBuffer(); })
+    .then(function(buf){
+      var b64 = arrayBufferToBase64(buf);
+      pdf.addFileToVFS('Amiri-Regular.ttf', b64);
+      pdf.addFont('Amiri-Regular.ttf', ARABIC_FONT_NAME, 'normal');
+      ARABIC_FONT_LOADED_OK = true;
+      return true;
+    })
+    .catch(function(e){ console.warn('[PDF] Arabic font failed to load — Arabic text will fall back to default rendering:', e.message); return false; });
+  return ARABIC_FONT_READY;
+}
+
+// Presentation-form map: base letter -> [Isolated, Final, Initial, Medial]
+var AR_FORMS = {
+  '\u0621':['\uFE80','\uFE80','\uFE80','\uFE80'], '\u0622':['\uFE81','\uFE82','\uFE81','\uFE82'],
+  '\u0623':['\uFE83','\uFE84','\uFE83','\uFE84'], '\u0624':['\uFE85','\uFE86','\uFE85','\uFE86'],
+  '\u0625':['\uFE87','\uFE88','\uFE87','\uFE88'], '\u0626':['\uFE89','\uFE8A','\uFE8B','\uFE8C'],
+  '\u0627':['\uFE8D','\uFE8E','\uFE8D','\uFE8E'], '\u0628':['\uFE8F','\uFE90','\uFE91','\uFE92'],
+  '\u0629':['\uFE93','\uFE94','\uFE93','\uFE94'], '\u062A':['\uFE95','\uFE96','\uFE97','\uFE98'],
+  '\u062B':['\uFE99','\uFE9A','\uFE9B','\uFE9C'], '\u062C':['\uFE9D','\uFE9E','\uFE9F','\uFEA0'],
+  '\u062D':['\uFEA1','\uFEA2','\uFEA3','\uFEA4'], '\u062E':['\uFEA5','\uFEA6','\uFEA7','\uFEA8'],
+  '\u062F':['\uFEA9','\uFEAA','\uFEA9','\uFEAA'], '\u0630':['\uFEAB','\uFEAC','\uFEAB','\uFEAC'],
+  '\u0631':['\uFEAD','\uFEAE','\uFEAD','\uFEAE'], '\u0632':['\uFEAF','\uFEB0','\uFEAF','\uFEB0'],
+  '\u0633':['\uFEB1','\uFEB2','\uFEB3','\uFEB4'], '\u0634':['\uFEB5','\uFEB6','\uFEB7','\uFEB8'],
+  '\u0635':['\uFEB9','\uFEBA','\uFEBB','\uFEBC'], '\u0636':['\uFEBD','\uFEBE','\uFEBF','\uFEC0'],
+  '\u0637':['\uFEC1','\uFEC2','\uFEC3','\uFEC4'], '\u0638':['\uFEC5','\uFEC6','\uFEC7','\uFEC8'],
+  '\u0639':['\uFEC9','\uFECA','\uFECB','\uFECC'], '\u063A':['\uFECD','\uFECE','\uFECF','\uFED0'],
+  '\u0641':['\uFED1','\uFED2','\uFED3','\uFED4'], '\u0642':['\uFED5','\uFED6','\uFED7','\uFED8'],
+  '\u0643':['\uFED9','\uFEDA','\uFEDB','\uFEDC'], '\u0644':['\uFEDD','\uFEDE','\uFEDF','\uFEE0'],
+  '\u0645':['\uFEE1','\uFEE2','\uFEE3','\uFEE4'], '\u0646':['\uFEE5','\uFEE6','\uFEE7','\uFEE8'],
+  '\u0647':['\uFEE9','\uFEEA','\uFEEB','\uFEEC'], '\u0648':['\uFEED','\uFEEE','\uFEED','\uFEEE'],
+  '\u0649':['\uFEEF','\uFEF0','\uFEEF','\uFEF0'], '\u064A':['\uFEF1','\uFEF2','\uFEF3','\uFEF4'],
+};
+// Letters with no Initial/Medial form (never connect to the following letter)
+var AR_NO_FORWARD = {'\u0621':1,'\u0622':1,'\u0623':1,'\u0624':1,'\u0625':1,'\u0627':1,'\u062F':1,'\u0630':1,'\u0631':1,'\u0632':1,'\u0648':1,'\u0649':1};
+var AR_ISOLATE_ONLY = {'\u0621':1}; // Hamza alone never connects either side
+
+function isArabicLetter(ch){ return !!AR_FORMS[ch]; }
+function canConnectForward(ch){ return isArabicLetter(ch) && !AR_NO_FORWARD[ch]; }
+function canConnectBackward(ch){ return isArabicLetter(ch) && !AR_ISOLATE_ONLY[ch]; }
+function containsArabic(str){ return /[\u0600-\u06FF]/.test(str); }
+
+function reshapeArabicWord(word) {
+  var chars = Array.from(word), out = [];
+  for (var i = 0; i < chars.length; i++) {
+    var ch = chars[i];
+    if (!isArabicLetter(ch)) { out.push(ch); continue; }
+    var prev = i > 0 ? chars[i-1] : null;
+    var next = i < chars.length-1 ? chars[i+1] : null;
+    var linkPrev = canConnectBackward(ch) && prev && isArabicLetter(prev) && canConnectForward(prev);
+    var linkNext = canConnectForward(ch) && next && isArabicLetter(next) && canConnectBackward(next);
+    var formIdx = linkPrev && linkNext ? 3 : (linkPrev ? 1 : (linkNext ? 2 : 0));
+    out.push(AR_FORMS[ch][formIdx]);
+  }
+  return out.reverse().join('');
+}
+
+// Reshapes + reorders mixed Arabic/Latin text for correct LTR glyph-drawing
+// in jsPDF: splits into space-separated words, reshapes+reverses Arabic
+// words, then reverses overall word order (RTL reading direction) while
+// leaving Latin/number words untouched and in their own internal order.
+function prepArabicForPdf(str) {
+  if (str === null || str === undefined) return '';
+  str = String(str);
+  if (!containsArabic(str)) return str;
+  var words = str.split(' ');
+  return words.map(function(w){ return containsArabic(w) ? reshapeArabicWord(w) : w; }).reverse().join(' ');
+}
+
+// Draws text with jsPDF, auto-switching to the Arabic font + reshaping
+// when the string contains Arabic. Use this instead of pdf.text() for any
+// value that might contain Arabic (store/person/region names, filters...).
+function pdfText(pdf, text, x, y, opts) {
+  var str = (text === null || text === undefined) ? '' : String(text);
+  if (containsArabic(str) && ARABIC_FONT_LOADED_OK) {
+    var prevFont = pdf.getFont();
+    pdf.setFont(ARABIC_FONT_NAME, 'normal');
+    pdf.text(prepArabicForPdf(str), x, y, opts);
+    pdf.setFont(prevFont.fontName, prevFont.fontStyle);
+  } else {
+    pdf.text(str, x, y, opts);
+  }
+}
+
+// autoTable didParseCell hook: reshapes+reorders any Arabic cell content
+// and switches that cell to the Arabic font. Compose with other hooks via
+// combineDidParseCell().
+function arabizeCell(cellData) {
+  if (!ARABIC_FONT_LOADED_OK) return;
+  var raw = cellData.cell.raw;
+  if (raw !== null && raw !== undefined && containsArabic(String(raw))) {
+    cellData.cell.styles.font = ARABIC_FONT_NAME;
+    cellData.cell.text = [prepArabicForPdf(String(raw))];
+  }
+}
+function combineDidParseCell(customFn) {
+  return function(data) { arabizeCell(data); if (customFn) customFn(data); };
+}
+
 async function generateMTDExecutiveReportAsync() {
   var { jsPDF } = window.jspdf;
   var pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -3344,6 +3465,8 @@ async function generateMTDExecutiveReportAsync() {
 
   var data = MTD_FILTERED;
   if (!data.length) { alert('⚠️ مفيش بيانات في العرض الحالي لتاب MTD'); return; }
+
+  await ensureArabicFont(pdf);
 
   function achColor(pct){ return pct>=100?green:pct>=80?amber:red; }
   var genDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
@@ -3354,16 +3477,25 @@ async function generateMTDExecutiveReportAsync() {
     if (!el || !el.value) return null;
     return (el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text : el.value;
   }
+  var fRegion  = selLabel('mtd-f-region');
+  var fRM      = selLabel('mtd-f-rm');
+  var fAM      = selLabel('mtd-f-am');
+  var fSV      = selLabel('mtd-f-sv');
+  var fCls     = selLabel('mtd-f-cls');
+  var fAcc     = selLabel('mtd-f-acc');
+  var fPartner = selLabel('mtd-f-partner');
+  var dayEl    = document.getElementById('mtd-f-day');
+  var fDay     = (dayEl && dayEl.value) ? dayEl.value : null;
+
   var filterParts = [];
-  var region  = selLabel('mtd-f-region');  if (region)  filterParts.push('Region: '+region);
-  var rm      = selLabel('mtd-f-rm');      if (rm)      filterParts.push('Regional Manager: '+rm);
-  var am      = selLabel('mtd-f-am');      if (am)      filterParts.push('Area Manager: '+am);
-  var sv      = selLabel('mtd-f-sv');      if (sv)      filterParts.push('Supervisor: '+sv);
-  var cls     = selLabel('mtd-f-cls');     if (cls)     filterParts.push('Classification: '+cls);
-  var acc     = selLabel('mtd-f-acc');     if (acc)     filterParts.push('Account Manager: '+acc);
-  var partner = selLabel('mtd-f-partner'); if (partner) filterParts.push('Partner: '+partner);
-  var dayEl   = document.getElementById('mtd-f-day');
-  if (dayEl && dayEl.value) filterParts.push('Day: '+dayEl.value);
+  if (fRegion)  filterParts.push('Region: '+fRegion);
+  if (fRM)      filterParts.push('Regional Manager: '+fRM);
+  if (fAM)      filterParts.push('Area Manager: '+fAM);
+  if (fSV)      filterParts.push('Supervisor: '+fSV);
+  if (fCls)     filterParts.push('Classification: '+fCls);
+  if (fAcc)     filterParts.push('Account Manager: '+fAcc);
+  if (fPartner) filterParts.push('Partner: '+fPartner);
+  if (fDay)     filterParts.push('Day: '+fDay);
   if (MTD_SELECTED_STORE) filterParts.push('Store: '+MTD_SELECTED_STORE);
   var filterText = filterParts.length ? filterParts.join('  ·  ') : 'All stores (no filters applied)';
 
@@ -3372,6 +3504,19 @@ async function generateMTDExecutiveReportAsync() {
   if (MTD_WALLET_DATE_LABEL) dateParts.push('WE Pay as of ' + MTD_WALLET_DATE_LABEL);
   var dateLabel = dateParts.length ? dateParts.join('  ·  ') : 'Month to Date';
   var storeCount = data.length;
+
+  // ── Report mode: most specific hierarchy filter wins ──
+  var mode = 'default';
+  if (fSV) mode = 'supervisor';
+  else if (fAM) mode = 'areaManager';
+  else if (fRM) mode = 'regionalManager';
+  var modeScopeName = mode==='supervisor' ? fSV : mode==='areaManager' ? fAM : mode==='regionalManager' ? fRM : null;
+  var modeLabel = {
+    supervisor: 'Supervisor Scope',
+    areaManager: 'Area Manager Scope',
+    regionalManager: 'Regional Manager Scope',
+    default: 'Overall MTD Scope'
+  }[mode];
 
   function headerBand(subtitle) {
     pdf.setFillColor.apply(pdf, purple); pdf.rect(0, 0, W, 24, 'F');
@@ -3402,8 +3547,38 @@ async function generateMTDExecutiveReportAsync() {
       pdf.text('Page ' + i + ' / ' + n, W-10, H-4, { align:'right' });
     }
   }
+  // Generic ranked table with automatic Ach% coloring (parses "xx.x%" cells)
+  function drawRankTable(head, body, startY, pctCols, headColor) {
+    pdf.autoTable({
+      startY: startY, margin: { left:10, right:10 },
+      head: [head], body: body,
+      theme: 'plain',
+      headStyles: { fillColor: headColor||dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
+      styles: { fontSize: 8.5, cellPadding: 2.2 },
+      alternateRowStyles: { fillColor: [248,247,252] },
+      didParseCell: combineDidParseCell(function(hd){
+        if (hd.section==='body' && pctCols && pctCols.indexOf(hd.column.index) !== -1) {
+          var num = parseFloat(String(hd.cell.raw));
+          if (!isNaN(num)) { hd.cell.styles.textColor = achColor(num); hd.cell.styles.fontStyle = 'bold'; }
+        }
+      })
+    });
+    return pdf.lastAutoTable.finalY;
+  }
+  // Group `rows` by `field`, aggregate `prodKey` (from MTD_PRODS) target/actual
+  function rankByField(rows, field, prodKey) {
+    var groups = {};
+    rows.forEach(function(r){ var k = r[field] || '—'; (groups[k] = groups[k] || []).push(r); });
+    var pr = MTD_PRODS[prodKey];
+    return Object.keys(groups).map(function(k){
+      var grp = groups[k];
+      var t = mtdSum(grp, pr.tKey), a = mtdSum(grp, pr.aKey);
+      var pp = t>0 ? (a/t*100) : 0;
+      return { name:k, count:grp.length, t:t, a:a, pp:pp };
+    }).sort(function(a,b){ return b.pp - a.pp; });
+  }
 
-  // ── PAGE 1: header + filters + product summary + narrative ──
+  // ══════════════════════ PAGE 1 — Overview ══════════════════════
   headerBand(dateLabel + '  ·  ' + storeCount + ' branches in scope');
   var y = 32;
   var filterLines = pdf.splitTextToSize(filterText, W-40);
@@ -3415,17 +3590,27 @@ async function generateMTDExecutiveReportAsync() {
   pdf.text(filterLines, 14, y+11);
   y += boxH + 6;
 
+  if (modeScopeName) {
+    pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
+    pdf.roundedRect(10, y, W-20, 12, 2, 2, 'FD');
+    pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
+    pdf.text(modeLabel.toUpperCase() + ':', 14, y+7.5);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor.apply(pdf, dark);
+    pdfText(pdf, modeScopeName, 62, y+7.5);
+    y += 18;
+  }
+
   y = sectionTitle('PRODUCT PERFORMANCE SUMMARY (MTD)', y);
   var mtdProdList = ['mobile','fbb','fixed','fwa','gold'];
-  var prodRows = mtdProdList.map(function(key){
+  var prodRowsFull = mtdProdList.map(function(key){
     var p = MTD_PRODS[key];
     var t = mtdSum(data, p.tKey), a = mtdSum(data, p.aKey), proj = mtdSum(data, p.projKey);
-    var pp = t>0 ? (a/t*100) : 0;
-    var projPct = t>0 ? (proj/t*100) : 0;
-    var gap = a - t;
-    return [p.label, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp.toFixed(1)+'%':'—', t>0?fmtN(Math.round(proj)):'—', t>0?projPct.toFixed(1)+'%':'—', t>0?((gap>=0?'+':'')+fmtN(gap)):'—', pp, projPct];
+    var pp = t>0 ? (a/t*100) : 0, projPct = t>0 ? (proj/t*100) : 0, gap = a - t;
+    return { label:p.label, t:t, a:a, proj:proj, pp:pp, projPct:projPct, gap:gap,
+      row: [p.label, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp.toFixed(1)+'%':'—', t>0?fmtN(Math.round(proj)):'—', t>0?projPct.toFixed(1)+'%':'—', t>0?((gap>=0?'+':'')+fmtN(gap)):'—'] };
   });
-  if (Object.keys(WALLET_DATA).length > 0) {
+  var hasWallet = Object.keys(WALLET_DATA).length > 0;
+  if (hasWallet) {
     var wt=0, wa=0, wp=0;
     data.forEach(function(r){
       var code=String(r.storeCode||'').trim().toUpperCase();
@@ -3433,40 +3618,37 @@ async function generateMTDExecutiveReportAsync() {
       wt += Number(w.walletTarget)||0; wa += Number(w.walletSales)||0; wp += Number(w.walletProj)||0;
     });
     var wpp = wt>0?(wa/wt*100):0, wprojPct = wt>0?(wp/wt*100):0, wgap = wa-wt;
-    prodRows.push(['Wallet', wt>0?fmtN(wt):'—', wt>0?fmtN(wa):'—', wt>0?wpp.toFixed(1)+'%':'—', wt>0?fmtN(Math.round(wp)):'—', wt>0?wprojPct.toFixed(1)+'%':'—', wt>0?((wgap>=0?'+':'')+fmtN(wgap)):'—', wpp, wprojPct]);
+    prodRowsFull.push({ label:'Wallet', t:wt, a:wa, proj:wp, pp:wpp, projPct:wprojPct, gap:wgap,
+      row: ['Wallet', wt>0?fmtN(wt):'—', wt>0?fmtN(wa):'—', wt>0?wpp.toFixed(1)+'%':'—', wt>0?fmtN(Math.round(wp)):'—', wt>0?wprojPct.toFixed(1)+'%':'—', wt>0?((wgap>=0?'+':'')+fmtN(wgap)):'—'] });
   }
   pdf.autoTable({
     startY: y, margin: { left:10, right:10 },
     head: [['Product','Target','Actual','Ach %','Proj','Proj %','Gap']],
-    body: prodRows.map(function(r){ return r.slice(0,7); }),
+    body: prodRowsFull.map(function(r){ return r.row; }),
     theme: 'plain',
     headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
     styles: { fontSize: 8.5, cellPadding: 2.2 },
     alternateRowStyles: { fillColor: [248,247,252] },
-    didParseCell: function(hd){
-      if (hd.section==='body' && hd.column.index===3) {
-        var pp = prodRows[hd.row.index][7];
-        hd.cell.styles.textColor = achColor(pp); hd.cell.styles.fontStyle = 'bold';
-      }
-      if (hd.section==='body' && hd.column.index===5) {
-        var ppr = prodRows[hd.row.index][8];
-        hd.cell.styles.textColor = achColor(ppr); hd.cell.styles.fontStyle = 'bold';
+    didParseCell: combineDidParseCell(function(hd){
+      if (hd.section==='body' && (hd.column.index===3 || hd.column.index===5)) {
+        var num = parseFloat(String(hd.cell.raw));
+        if (!isNaN(num)) { hd.cell.styles.textColor = achColor(num); hd.cell.styles.fontStyle = 'bold'; }
       }
       if (hd.section==='body' && hd.column.index===6) {
-        var gapStr = prodRows[hd.row.index][6];
-        hd.cell.styles.textColor = (gapStr.charAt(0)==='+') ? green : (gapStr==='—'?gray:red);
+        var raw = String(hd.cell.raw);
+        hd.cell.styles.textColor = raw.charAt(0)==='+' ? green : (raw==='—'?gray:red);
       }
-    }
+    })
   });
   y = pdf.lastAutoTable.finalY + 8;
 
-  var withTgt = prodRows.filter(function(r){ return r[1] !== '—'; });
-  var best  = withTgt.length ? withTgt.slice().sort(function(a,b){return b[7]-a[7];})[0]  : null;
-  var worst = withTgt.length ? withTgt.slice().sort(function(a,b){return a[7]-b[7];})[0] : null;
+  var withTgt = prodRowsFull.filter(function(r){ return r.t > 0; });
+  var best  = withTgt.length ? withTgt.slice().sort(function(a,b){return b.pp-a.pp;})[0]  : null;
+  var worst = withTgt.length ? withTgt.slice().sort(function(a,b){return a.pp-b.pp;})[0] : null;
   var lowMobileCount = data.filter(function(r){ return (r.mobilePct||0) < 1; }).length;
   var narrative = storeCount + ' branch(es) in the current MTD scope.' +
-    (best ? '  ' + best[0] + ' leads at ' + best[7].toFixed(1) + '% achievement' : '') +
-    (worst && best && worst[0]!==best[0] ? ', while ' + worst[0] + ' trails at ' + worst[7].toFixed(1) + '%.' : '.') +
+    (best ? '  ' + best.label + ' leads at ' + best.pp.toFixed(1) + '% achievement' : '') +
+    (worst && best && worst.label!==best.label ? ', while ' + worst.label + ' trails at ' + worst.pp.toFixed(1) + '%.' : '.') +
     '  ' + lowMobileCount + ' of ' + storeCount + ' branch(es) are currently below 100% on Mobile.';
   var narrLines = pdf.splitTextToSize(narrative, W-24);
   var narrH = 8 + narrLines.length*4.2;
@@ -3478,7 +3660,138 @@ async function generateMTDExecutiveReportAsync() {
   pdf.text(narrLines, 14, y+11.5);
   y += narrH + 8;
 
-  // ── Low Performance Stores (same product currently selected in that section) ──
+  // ══════════════════════ PAGE 2 — Hierarchy-aware breakdown ══════════════════════
+  pdf.addPage();
+  if (mode === 'regionalManager') {
+    headerBand(dateLabel + '  ·  Team Structure Under Regional Manager');
+    y = 32;
+    y = sectionTitle('SUPERVISORS UNDER THIS REGIONAL MANAGER (Mobile Ach%)', y);
+    var svR = rankByField(data, 'supervisor', 'mobile');
+    y = drawRankTable(['Supervisor','Branches','Target','Actual','Ach %'],
+      svR.map(function(r){ return [r.name, r.count, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [4]) + 8;
+
+    if (y > H - 55) { pdf.addPage(); headerBand(dateLabel + '  ·  Team Structure Under Regional Manager'); y = 32; }
+    y = sectionTitle('AREA MANAGERS UNDER THIS REGIONAL MANAGER (Mobile Ach%)', y);
+    var amR = rankByField(data, 'areaManager', 'mobile');
+    y = drawRankTable(['Area Manager','Branches','Target','Actual','Ach %'],
+      amR.map(function(r){ return [r.name, r.count, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [4]) + 8;
+
+  } else if (mode === 'areaManager') {
+    headerBand(dateLabel + '  ·  Branches Under This Area Manager');
+    y = 32;
+    y = sectionTitle('BRANCHES UNDER THIS AREA MANAGER — Ranked by Mobile Ach%', y);
+    var stRows = data.map(function(r){
+      return { store:r.store, sup:r.supervisor, t:r.mobileTarget||0, a:r.mobileSubs||0, pp:(r.mobilePct||0)*100 };
+    }).sort(function(a,b){ return b.pp - a.pp; });
+    y = drawRankTable(['Store','Supervisor','Target','Actual','Ach %'],
+      stRows.map(function(r){ return [r.store, r.sup, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [4]) + 8;
+
+  } else if (mode === 'supervisor') {
+    headerBand(dateLabel + '  ·  Supervisor Scope Detail');
+    y = 32;
+    var parentAM = data[0] ? data[0].areaManager : null;
+    if (parentAM) {
+      var amRows = MTD_DATA.filter(function(r){ return r.areaManager === parentAM; });
+      var amT = mtdSum(amRows, 'mobileTarget'), amA = mtdSum(amRows, 'mobileSubs');
+      var amPp = amT>0 ? (amA/amT*100) : 0;
+      y = sectionTitle('PARENT AREA MANAGER OVERVIEW', y);
+      pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(10, y, W-20, 16, 2, 2, 'FD');
+      pdf.setFontSize(8.5); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, dark);
+      pdf.text('Area Manager:', 14, y+6.5);
+      pdfText(pdf, parentAM, 45, y+6.5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, gray);
+      pdf.text(amRows.length + ' branches total  ·  Mobile Target ' + fmtN(amT) + '  ·  Actual ' + fmtN(amA), 14, y+12.5);
+      pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(amPp));
+      pdf.text(amPp.toFixed(1)+'% Ach', W-16, y+9.5, { align:'right' });
+      y += 22;
+    }
+    var svStores = data.map(function(r){
+      return { store:r.store, t:r.mobileTarget||0, a:r.mobileSubs||0, pp:(r.mobilePct||0)*100 };
+    }).sort(function(a,b){ return b.pp - a.pp; });
+    y = sectionTitle('TOP 5 BRANCHES (Mobile Ach%)', y);
+    y = drawRankTable(['Store','Target','Actual','Ach %'],
+      svStores.slice(0,5).map(function(r){ return [r.store, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [3], green) + 8;
+
+    if (y > H - 55) { pdf.addPage(); headerBand(dateLabel + '  ·  Supervisor Scope Detail'); y = 32; }
+    y = sectionTitle('BOTTOM 5 BRANCHES (Mobile Ach%)', y);
+    y = drawRankTable(['Store','Target','Actual','Ach %'],
+      svStores.slice(-5).reverse().map(function(r){ return [r.store, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [3], red) + 8;
+
+  } else {
+    headerBand(dateLabel + '  ·  Team Structure Performance');
+    y = 32;
+    y = sectionTitle('SUPERVISOR PERFORMANCE — Mobile Ach%', y);
+    var svAll = rankByField(data, 'supervisor', 'mobile');
+    y = drawRankTable(['Supervisor','Branches','Target','Actual','Ach %'],
+      svAll.map(function(r){ return [r.name, r.count, fmtN(r.t), fmtN(r.a), r.pp.toFixed(1)+'%']; }), y, [4]) + 8;
+  }
+
+  // ══════════════════════ PAGE 3 — Tariff Mix + Low Performance ══════════════════════
+  pdf.addPage();
+  headerBand(dateLabel + '  ·  Tariff Mix & Low Performance');
+  y = 32;
+
+  y = sectionTitle('TARIFF MIX DISTRIBUTION', y);
+  if (MTD_PKGMIX && MTD_PKGMIX.rows && MTD_PKGMIX.rows.length) {
+    var storeMeta = {}; data.forEach(function(r){ storeMeta[String(r.storeCode||'').trim().toUpperCase()] = r; });
+    var pkgRows = MTD_PKGMIX.rows.filter(function(r){ return storeMeta[r.storeCode]; });
+    var colSums = {}; MTD_PKGMIX.cols.forEach(function(c){ colSums[c.ci]=0; });
+    pkgRows.forEach(function(r){ for (var ci in r.vals) { if (colSums.hasOwnProperty(ci)) colSums[ci]+=r.vals[ci]; } });
+    var LOW_SET=[25,29,32,37], MID_SET=[40,45,46,52];
+    function classifyCol(c) {
+      if (c.cat === 'payg') return 'pt12';
+      if (c.cat !== 'kix' && c.cat !== 'tazbeet') return null;
+      var m = c.label.match(/(\d+)(?!.*\d)/);
+      if (!m) return null;
+      var n = +m[1];
+      if (LOW_SET.indexOf(n)!==-1) return 'low';
+      if (MID_SET.indexOf(n)!==-1) return 'mid';
+      return 'high';
+    }
+    var low=0, mid=0, high=0, pt12=0;
+    MTD_PKGMIX.cols.forEach(function(c){
+      var v = colSums[c.ci]||0; if (!v) return;
+      var tier = classifyCol(c);
+      if (tier==='low') low+=v; else if (tier==='mid') mid+=v; else if (tier==='high') high+=v; else if (tier==='pt12') pt12+=v;
+    });
+    var mobileTotal = mtdSum(data, 'mobileSubs');
+    var tariffTotal = low+mid+high;
+    var tierRows = [
+      ['Low Tier (25, 29, 32, 37)',    fmtN(low),  tariffTotal>0?(low/tariffTotal*100).toFixed(1)+'%':'0.0%'],
+      ['Mid Tier (40, 45, 46, 52)',    fmtN(mid),  tariffTotal>0?(mid/tariffTotal*100).toFixed(1)+'%':'0.0%'],
+      ['High Tier (50, 58, 60–165)',   fmtN(high), tariffTotal>0?(high/tariffTotal*100).toFixed(1)+'%':'0.0%'],
+      ['12 PT (12-month plan)',        fmtN(pt12), mobileTotal>0?(pt12/mobileTotal*100).toFixed(1)+'% of Mobile':'0.0%'],
+    ];
+    var tierColors = [red, amber, green, purple];
+    pdf.autoTable({
+      startY:y, margin:{left:10,right:10},
+      head:[['Tier','Subscriptions','% Share']],
+      body: tierRows,
+      theme:'plain',
+      headStyles:{fillColor:purple,textColor:255,fontStyle:'bold',fontSize:8.5},
+      styles:{fontSize:8.5,cellPadding:2.2},
+      alternateRowStyles:{fillColor:[248,247,252]},
+      didParseCell: combineDidParseCell(function(hd){
+        if (hd.section==='body' && hd.column.index===0) { hd.cell.styles.textColor = tierColors[hd.row.index]; hd.cell.styles.fontStyle='bold'; }
+      })
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+
+    var donutChart = charts['chart-mtd-tariff-donut'];
+    if (donutChart) {
+      try {
+        var imgData = donutChart.toBase64Image();
+        var imgSize = 50;
+        pdf.addImage(imgData, 'PNG', 10, y, imgSize, imgSize);
+      } catch(e) { console.warn('[PDF] tariff donut image failed:', e.message); }
+    }
+    y += 56;
+  } else {
+    pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
+    pdf.text('No package mix data available in the current MTD file.', 10, y);
+    y += 8;
+  }
+
   var lpProdKey = (typeof MTD_LP_PROD !== 'undefined' && MTD_LP_PROD) ? MTD_LP_PROD : 'mobile';
   var lpLabel = lpProdKey === 'wallet' ? 'Wallet' : (MTD_PRODS[lpProdKey] ? MTD_PRODS[lpProdKey].label : 'Mobile');
   if (y > H - 55) { pdf.addPage(); headerBand(dateLabel + '  ·  Low Performance'); y = 32; }
@@ -3498,7 +3811,7 @@ async function generateMTDExecutiveReportAsync() {
     }).filter(function(r){return r.projPct<1;});
   }
   lpData.sort(function(a,b){return a.projPct-b.projPct;});
-  var lpTop = lpData.slice(0,15);
+  var lpTop = lpData.slice(0,12);
 
   if (lpTop.length === 0) {
     pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, green);
@@ -3513,52 +3826,64 @@ async function generateMTDExecutiveReportAsync() {
       headStyles: { fillColor: red, textColor: 255, fontStyle:'bold', fontSize:8.5 },
       styles: { fontSize: 8, cellPadding: 2 },
       alternateRowStyles: { fillColor: [254,242,242] },
-      didParseCell: function(hd){ if (hd.section==='body' && hd.column.index===5) hd.cell.styles.textColor = red; }
+      didParseCell: combineDidParseCell(function(hd){ if (hd.section==='body' && hd.column.index===5) hd.cell.styles.textColor = red; })
     });
     y = pdf.lastAutoTable.finalY + 6;
-    if (lpData.length > 15) {
+    if (lpData.length > 12) {
       pdf.setFontSize(7.5); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
-      pdf.text('+ ' + (lpData.length-15) + ' more branch(es) below 100% — use "Export All" on the MTD tab for the full list.', 10, y);
+      pdf.text('+ ' + (lpData.length-12) + ' more branch(es) below 100% — use "Export All" on the MTD tab for the full list.', 10, y);
       y += 6;
     }
   }
 
-  // ── PAGE 2: Supervisor breakdown for the low-perf product ──
+  // ══════════════════════ PAGE 4 — Daily Trend ══════════════════════
   pdf.addPage();
-  headerBand(dateLabel + '  ·  Team Structure Performance (' + lpLabel + ')');
+  headerBand(dateLabel + '  ·  Daily Trend');
   y = 32;
-  y = sectionTitle('SUPERVISOR PERFORMANCE — ' + lpLabel, y);
+  var dailyLabel = (typeof MTD_DAILY_PROD !== 'undefined' && MTD_DAILY_PROD === 'wallet') ? 'WE Pay (Wallet)' : 'Mobile';
+  y = sectionTitle(dailyLabel.toUpperCase() + ' DAILY TREND CHART (MTD)', y);
+  var dailyChart = charts['mtd-daily-chart'];
+  if (dailyChart) {
+    try { var dImg = dailyChart.toBase64Image(); pdf.addImage(dImg, 'PNG', 10, y, W-20, 68); y += 74; }
+    catch(e) { console.warn('[PDF] daily trend chart image failed:', e.message); y += 4; }
+  } else {
+    pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor.apply(pdf, gray);
+    pdf.text('No daily trend chart currently rendered.', 10, y); y += 8;
+  }
 
-  var svGroups = {};
-  data.forEach(function(r){ var k=r.supervisor||'—'; (svGroups[k]=svGroups[k]||[]).push(r); });
-  var svRows = Object.keys(svGroups).map(function(sv2){
-    var rows = svGroups[sv2], t, a;
-    if (lpProdKey === 'wallet') {
-      t=0; a=0;
-      rows.forEach(function(r){ var code=String(r.storeCode||'').trim().toUpperCase(); var w=WALLET_DATA[code]||{}; t+=Number(w.walletTarget)||0; a+=Number(w.walletSales)||0; });
-    } else {
-      var pr2 = MTD_PRODS[lpProdKey];
-      t = mtdSum(rows, pr2.tKey); a = mtdSum(rows, pr2.aKey);
-    }
-    var pp2 = t>0?(a/t*100):0;
-    return [sv2, rows.length, t>0?fmtN(t):'—', t>0?fmtN(a):'—', t>0?pp2.toFixed(1)+'%':'—', pp2];
-  }).sort(function(a,b){ return b[5]-a[5]; });
+  var dayCodes = {}; data.forEach(function(r){ dayCodes[String(r.storeCode||'').trim().toUpperCase()] = true; });
 
-  pdf.autoTable({
-    startY: y, margin: { left:10, right:10 },
-    head: [['Supervisor','Branches','Target','Actual','Ach %']],
-    body: svRows.map(function(r){ return r.slice(0,5); }),
-    theme: 'plain',
-    headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:8.5 },
-    styles: { fontSize: 8.5, cellPadding: 2.2 },
-    alternateRowStyles: { fillColor: [248,247,252] },
-    didParseCell: function(hd){
-      if (hd.section==='body' && hd.column.index===4) {
-        var pp2 = svRows[hd.row.index][5];
-        hd.cell.styles.textColor = achColor(pp2); hd.cell.styles.fontStyle = 'bold';
-      }
-    }
-  });
+  if (MTD_DAILY && MTD_DAILY.rows && MTD_DAILY.rows.length) {
+    y = sectionTitle('Mobile — Day by Day (current filtered scope)', y);
+    var mRows = MTD_DAILY.rows.filter(function(r){ return dayCodes[r.storeCode]; });
+    var mVals = MTD_DAILY.dayCols.map(function(d){ return mRows.reduce(function(s,r){ return s+(r.days[d]||0); }, 0); });
+    pdf.autoTable({
+      startY: y, margin: { left:10, right:10 },
+      head: [MTD_DAILY.dayCols.map(function(d){ return 'D'+d; })],
+      body: [mVals.map(function(v){ return fmtN(v); })],
+      theme: 'plain',
+      headStyles: { fillColor: dark, textColor: 255, fontStyle:'bold', fontSize:7 },
+      styles: { fontSize: 7.5, cellPadding: 1.6, halign: 'center' },
+    });
+    y = pdf.lastAutoTable.finalY + 8;
+  }
+
+  if (hasWallet && MTD_WALLET_DAILY && MTD_WALLET_DAILY.rows && MTD_WALLET_DAILY.rows.length) {
+    if (y > H - 40) { pdf.addPage(); headerBand(dateLabel + '  ·  Daily Trend'); y = 32; }
+    y = sectionTitle('WE Pay — Day by Day (current filtered scope)', y);
+    var wRows2 = MTD_WALLET_DAILY.rows.filter(function(r){ return dayCodes[r.storeCode]; });
+    if (wRows2.length === 0) wRows2 = MTD_WALLET_DAILY.rows;
+    var wVals2 = MTD_WALLET_DAILY.dayCols.map(function(d){ return wRows2.reduce(function(s,r){ return s+(r.days[d]||0); }, 0); });
+    pdf.autoTable({
+      startY: y, margin: { left:10, right:10 },
+      head: [MTD_WALLET_DAILY.dayCols.map(function(d){ return 'D'+d; })],
+      body: [wVals2.map(function(v){ return fmtN(v); })],
+      theme: 'plain',
+      headStyles: { fillColor: green, textColor: 255, fontStyle:'bold', fontSize:7 },
+      styles: { fontSize: 7.5, cellPadding: 1.6, halign: 'center' },
+    });
+    y = pdf.lastAutoTable.finalY + 8;
+  }
 
   footerAll();
   pdf.save('WE_MTD_Executive_Report_' + new Date().toISOString().slice(0,10) + '.pdf');
@@ -5784,6 +6109,7 @@ function renderMTDTariffDonut(cards) {
     data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 3, hoverOffset: 8 }] },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 } } },
         tooltip: { callbacks: { label: function(ctx){ return ' '+ctx.label+': '+fmtN(ctx.parsed)+' ('+(total>0?(ctx.parsed/total*100).toFixed(1):0)+'%)'; } } }
