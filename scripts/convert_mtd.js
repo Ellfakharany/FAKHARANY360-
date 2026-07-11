@@ -526,6 +526,11 @@ async function scanAndConvert(rawDir, dataDir) {
     if (!byKind[kind] || date.iso > byKind[kind].date.iso) byKind[kind] = { file: file, date: date };
   }
 
+  if (SUPABASE_ENABLED) console.log('  ☁️  Supabase sync ENABLED (' + SUPABASE_URL + ')');
+  else console.log('  ℹ️  Supabase sync disabled (SUPABASE_URL/SUPABASE_SERVICE_KEY not set) — local JSON only');
+
+  let mobileHierarchyMap = null; // storeCode -> {regional_manager, area_manager, supervisor, region}, from THIS run
+
   for (const kind of ['mobile', 'wallet']) {
     const pick = byKind[kind];
     if (!pick) continue;
@@ -552,6 +557,13 @@ async function scanAndConvert(rawDir, dataDir) {
       fs.writeFileSync(path.join(dataDir, outName), JSON.stringify(out));
       manifest.mobile = { date: pick.date.iso, dateLabel: pick.date.label, file: outName, stores: mtdData.length };
       console.log('  ✅ Mobile ' + pick.date.iso + ' → ' + outName + ' (' + mtdData.length + ' stores)');
+
+      mobileHierarchyMap = {};
+      mtdData.forEach(function (r) {
+        if (r.storeCode) mobileHierarchyMap[r.storeCode] = { regional_manager: r.regionalManager, area_manager: r.areaManager, supervisor: r.supervisor, region: r.region };
+      });
+      try { await syncMobileToSupabase(pick.date.iso, mtdData); }
+      catch (e) { console.error('  ❌ Supabase sync (mobile) failed:', e.message); }
     } else {
       const walletData = safeCall(function () { return parseWalletSheet(wb); }, 'Wallet');
       if (!walletData) { console.warn('  ⚠️  ' + pick.file + ': WE Pay parse failed — skipped'); continue; }
@@ -561,6 +573,11 @@ async function scanAndConvert(rawDir, dataDir) {
       fs.writeFileSync(path.join(dataDir, outName), JSON.stringify(out));
       manifest.wallet = { date: pick.date.iso, dateLabel: pick.date.label, file: outName, stores: Object.keys(walletData).length };
       console.log('  ✅ Wallet ' + pick.date.iso + ' → ' + outName + ' (' + Object.keys(walletData).length + ' stores)');
+
+      try {
+        const hierarchyMap = mobileHierarchyMap || await fetchHierarchyMapFromSupabase();
+        await syncWalletToSupabase(pick.date.iso, walletData, hierarchyMap);
+      } catch (e) { console.error('  ❌ Supabase sync (wallet) failed:', e.message); }
     }
   }
 
@@ -580,6 +597,91 @@ async function scanAndConvert(rawDir, dataDir) {
     }
     console.log('  📦 Archived ' + recognized.length + ' processed file(s) to ' + processedDir);
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUPABASE SYNC (optional — only runs if SUPABASE_URL and
+//  SUPABASE_SERVICE_KEY env vars are set, e.g. from GitHub Secrets).
+//  Local JSON files under data/mtd/ keep being written exactly as
+//  before regardless, so nothing about the existing site breaks.
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_ENABLED = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY);
+
+async function supabaseUpsert(table, rows, conflictCols) {
+  if (!rows.length) return;
+  const url = SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + table + '?on_conflict=' + conflictCols;
+  const CHUNK = 500; // keep request bodies reasonable
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify(chunk),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(function () { return ''; });
+      throw new Error('Supabase upsert into ' + table + ' failed (HTTP ' + res.status + '): ' + text);
+    }
+  }
+}
+
+// Looks up regionalManager/areaManager/supervisor/region for each store —
+// needed to enrich Wallet rows (which don't carry org hierarchy columns
+// themselves) so Supabase's row-level security can filter them correctly.
+async function fetchHierarchyMapFromSupabase() {
+  const map = {};
+  if (!SUPABASE_ENABLED) return map;
+  try {
+    const url = SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/mtd_mobile?select=store_code,regional_manager,area_manager,supervisor,region&order=snapshot_date.desc&limit=2000';
+    const res = await fetch(url, { headers: { 'apikey': SUPABASE_SERVICE_KEY, 'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY } });
+    if (!res.ok) return map;
+    const rows = await res.json();
+    for (const r of rows) { if (r.store_code && !map[r.store_code]) map[r.store_code] = r; }
+  } catch (e) { console.warn('  ⚠️  Could not fetch hierarchy map from Supabase for wallet enrichment:', e.message); }
+  return map;
+}
+
+async function syncMobileToSupabase(dateIso, mtdData) {
+  if (!SUPABASE_ENABLED) return;
+  const rows = mtdData.filter(function (r) { return r.storeCode; }).map(function (r) {
+    return {
+      snapshot_date: dateIso,
+      store_code: r.storeCode,
+      regional_manager: r.regionalManager || null,
+      area_manager: r.areaManager || null,
+      supervisor: r.supervisor || null,
+      region: r.region || null,
+      row: r,
+    };
+  });
+  await supabaseUpsert('mtd_mobile', rows, 'snapshot_date,store_code');
+  console.log('  ☁️  Synced ' + rows.length + ' Mobile row(s) to Supabase');
+}
+
+async function syncWalletToSupabase(dateIso, walletData, hierarchyMap) {
+  if (!SUPABASE_ENABLED) return;
+  const rows = Object.keys(walletData).map(function (code) {
+    const w = walletData[code];
+    const h = hierarchyMap[code] || {};
+    return {
+      snapshot_date: dateIso,
+      store_code: code,
+      regional_manager: h.regional_manager || null,
+      area_manager: h.area_manager || null,
+      supervisor: h.supervisor || null,
+      region: h.region || null,
+      row: w,
+    };
+  });
+  await supabaseUpsert('mtd_wallet', rows, 'snapshot_date,store_code');
+  console.log('  ☁️  Synced ' + rows.length + ' Wallet row(s) to Supabase');
 }
 
 const args = process.argv.slice(2);
