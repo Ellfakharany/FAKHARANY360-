@@ -3366,87 +3366,34 @@ function ensureArabicFont(pdf) {
 }
 
 // Presentation-form map: base letter -> [Isolated, Final, Initial, Medial]
-var AR_FORMS = {
-  '\u0621':['\uFE80','\uFE80','\uFE80','\uFE80'], '\u0622':['\uFE81','\uFE82','\uFE81','\uFE82'],
-  '\u0623':['\uFE83','\uFE84','\uFE83','\uFE84'], '\u0624':['\uFE85','\uFE86','\uFE85','\uFE86'],
-  '\u0625':['\uFE87','\uFE88','\uFE87','\uFE88'], '\u0626':['\uFE89','\uFE8A','\uFE8B','\uFE8C'],
-  '\u0627':['\uFE8D','\uFE8E','\uFE8D','\uFE8E'], '\u0628':['\uFE8F','\uFE90','\uFE91','\uFE92'],
-  '\u0629':['\uFE93','\uFE94','\uFE93','\uFE94'], '\u062A':['\uFE95','\uFE96','\uFE97','\uFE98'],
-  '\u062B':['\uFE99','\uFE9A','\uFE9B','\uFE9C'], '\u062C':['\uFE9D','\uFE9E','\uFE9F','\uFEA0'],
-  '\u062D':['\uFEA1','\uFEA2','\uFEA3','\uFEA4'], '\u062E':['\uFEA5','\uFEA6','\uFEA7','\uFEA8'],
-  '\u062F':['\uFEA9','\uFEAA','\uFEA9','\uFEAA'], '\u0630':['\uFEAB','\uFEAC','\uFEAB','\uFEAC'],
-  '\u0631':['\uFEAD','\uFEAE','\uFEAD','\uFEAE'], '\u0632':['\uFEAF','\uFEB0','\uFEAF','\uFEB0'],
-  '\u0633':['\uFEB1','\uFEB2','\uFEB3','\uFEB4'], '\u0634':['\uFEB5','\uFEB6','\uFEB7','\uFEB8'],
-  '\u0635':['\uFEB9','\uFEBA','\uFEBB','\uFEBC'], '\u0636':['\uFEBD','\uFEBE','\uFEBF','\uFEC0'],
-  '\u0637':['\uFEC1','\uFEC2','\uFEC3','\uFEC4'], '\u0638':['\uFEC5','\uFEC6','\uFEC7','\uFEC8'],
-  '\u0639':['\uFEC9','\uFECA','\uFECB','\uFECC'], '\u063A':['\uFECD','\uFECE','\uFECF','\uFED0'],
-  '\u0641':['\uFED1','\uFED2','\uFED3','\uFED4'], '\u0642':['\uFED5','\uFED6','\uFED7','\uFED8'],
-  '\u0643':['\uFED9','\uFEDA','\uFEDB','\uFEDC'], '\u0644':['\uFEDD','\uFEDE','\uFEDF','\uFEE0'],
-  '\u0645':['\uFEE1','\uFEE2','\uFEE3','\uFEE4'], '\u0646':['\uFEE5','\uFEE6','\uFEE7','\uFEE8'],
-  '\u0647':['\uFEE9','\uFEEA','\uFEEB','\uFEEC'], '\u0648':['\uFEED','\uFEEE','\uFEED','\uFEEE'],
-  '\u0649':['\uFEEF','\uFEF0','\uFEEF','\uFEF0'], '\u064A':['\uFEF1','\uFEF2','\uFEF3','\uFEF4'],
-};
-// Letters with no Initial/Medial form (never connect to the following letter)
-var AR_NO_FORWARD = {'\u0621':1,'\u0622':1,'\u0623':1,'\u0624':1,'\u0625':1,'\u0627':1,'\u062F':1,'\u0630':1,'\u0631':1,'\u0632':1,'\u0648':1,'\u0649':1};
-var AR_ISOLATE_ONLY = {'\u0621':1}; // Hamza alone never connects either side
-
-function isArabicLetter(ch){ return !!AR_FORMS[ch]; }
-function canConnectForward(ch){ return isArabicLetter(ch) && !AR_NO_FORWARD[ch]; }
-function canConnectBackward(ch){ return isArabicLetter(ch) && !AR_ISOLATE_ONLY[ch]; }
 function containsArabic(str){ return /[\u0600-\u06FF]/.test(str); }
 
-function reshapeArabicWord(word) {
-  var chars = Array.from(word), out = [];
-  for (var i = 0; i < chars.length; i++) {
-    var ch = chars[i];
-    if (!isArabicLetter(ch)) { out.push(ch); continue; }
-    var prev = i > 0 ? chars[i-1] : null;
-    var next = i < chars.length-1 ? chars[i+1] : null;
-    var linkPrev = canConnectBackward(ch) && prev && isArabicLetter(prev) && canConnectForward(prev);
-    var linkNext = canConnectForward(ch) && next && isArabicLetter(next) && canConnectBackward(next);
-    var formIdx = linkPrev && linkNext ? 3 : (linkPrev ? 1 : (linkNext ? 2 : 0));
-    out.push(AR_FORMS[ch][formIdx]);
-  }
-  return out.reverse().join('');
-}
-
-// Reshapes + reorders mixed Arabic/Latin text for correct LTR glyph-drawing
-// in jsPDF: splits into space-separated words, reshapes+reverses Arabic
-// words, then reverses overall word order (RTL reading direction) while
-// leaving Latin/number words untouched and in their own internal order.
-function prepArabicForPdf(str) {
-  if (str === null || str === undefined) return '';
-  str = String(str);
-  if (!containsArabic(str)) return str;
-  var words = str.split(' ');
-  return words.map(function(w){ return containsArabic(w) ? reshapeArabicWord(w) : w; }).reverse().join(' ');
-}
-
-// Draws text with jsPDF, auto-switching to the Arabic font + reshaping
-// when the string contains Arabic. Use this instead of pdf.text() for any
-// value that might contain Arabic (store/person/region names, filters...).
+// Draws text with jsPDF, auto-switching to the Arabic font when the string
+// contains Arabic. NOTE: jsPDF automatically shapes/reorders Arabic text
+// when using a custom embedded TTF (unlike the built-in "helvetica" etc.
+// fonts, which have no Arabic glyphs at all) — so we deliberately do NOT
+// do any manual reshaping/reordering here; that would double-process the
+// text and scramble it. Just pick the right font and hand over raw text.
 function pdfText(pdf, text, x, y, opts) {
   var str = (text === null || text === undefined) ? '' : String(text);
   if (containsArabic(str) && ARABIC_FONT_LOADED_OK) {
     var prevFont = pdf.getFont();
     pdf.setFont(ARABIC_FONT_NAME, 'normal');
-    pdf.text(prepArabicForPdf(str), x, y, opts);
+    pdf.text(str, x, y, opts);
     pdf.setFont(prevFont.fontName, prevFont.fontStyle);
   } else {
     pdf.text(str, x, y, opts);
   }
 }
 
-// autoTable didParseCell hook: reshapes+reorders any Arabic cell content
-// and switches that cell to the Arabic font. Compose with other hooks via
-// combineDidParseCell().
+// autoTable didParseCell hook: switches a cell to the Arabic font (raw text
+// unchanged — jsPDF shapes it itself). Compose via combineDidParseCell().
 function arabizeCell(cellData) {
   if (!ARABIC_FONT_LOADED_OK) return;
   var raw = cellData.cell.raw;
   if (raw !== null && raw !== undefined && containsArabic(String(raw))) {
     cellData.cell.styles.font = ARABIC_FONT_NAME;
     cellData.cell.styles.halign = 'right';
-    cellData.cell.text = [prepArabicForPdf(String(raw))];
   }
 }
 function combineDidParseCell(customFn) {
@@ -3493,11 +3440,24 @@ async function generateMTDExecutiveReportAsync() {
   if (fPartner) filterParts.push('Partner: '+fPartner);
   if (fDay)     filterParts.push('Day: '+fDay);
   if (MTD_SELECTED_STORE) filterParts.push('Store: '+MTD_SELECTED_STORE);
-  var filterText = filterParts.length ? filterParts.join('  ·  ') : 'All stores (no filters applied)';
+
+  // jsPDF shapes/reorders Arabic automatically for custom TTF fonts, but
+  // only reliably within a single simple run — a string with several
+  // separate "Label: قيمة عربية" segments concatenated together can get
+  // truncated. So dates (which combine two Arabic month names into one
+  // sentence) are converted to English here, and filters are drawn one
+  // per line below instead of joined into one paragraph.
+  var AR_MONTH_TO_EN = {'يناير':'Jan','فبراير':'Feb','مارس':'Mar','أبريل':'Apr','مايو':'May','يونيو':'Jun','يوليو':'Jul','أغسطس':'Aug','سبتمبر':'Sep','أكتوبر':'Oct','نوفمبر':'Nov','ديسمبر':'Dec'};
+  function toEnglishDateLabel(label) {
+    if (!label) return label;
+    var m = String(label).match(/^(\d{1,2})\s+(\S+)\s+(\d{4})$/);
+    if (m && AR_MONTH_TO_EN[m[2]]) return m[1] + ' ' + AR_MONTH_TO_EN[m[2]] + ' ' + m[3];
+    return label;
+  }
 
   var dateParts = [];
-  if (MTD_MOBILE_DATE_LABEL) dateParts.push('Mobile as of ' + MTD_MOBILE_DATE_LABEL);
-  if (MTD_WALLET_DATE_LABEL) dateParts.push('WE Pay as of ' + MTD_WALLET_DATE_LABEL);
+  if (MTD_MOBILE_DATE_LABEL) dateParts.push('Mobile as of ' + toEnglishDateLabel(MTD_MOBILE_DATE_LABEL));
+  if (MTD_WALLET_DATE_LABEL) dateParts.push('WE Pay as of ' + toEnglishDateLabel(MTD_WALLET_DATE_LABEL));
   var dateLabel = dateParts.length ? dateParts.join('  ·  ') : 'Month to Date';
   var storeCount = data.length;
 
@@ -3577,13 +3537,13 @@ async function generateMTDExecutiveReportAsync() {
   // ══════════════════════ PAGE 1 — Overview ══════════════════════
   headerBand(dateLabel + '  ·  ' + storeCount + ' branches in scope');
   var y = 32;
-  var filterLines = pdf.splitTextToSize(filterText, W-40);
-  var boxH = Math.max(12, 6 + filterLines.length*4.2);
+  var filterDisplayParts = filterParts.length ? filterParts : ['All stores (no filters applied)'];
+  var boxH = Math.max(12, 6 + filterDisplayParts.length*4.6);
   pdf.setFillColor(248,247,252); pdf.setDrawColor(230,225,240); pdf.roundedRect(10, y, W-20, boxH, 2, 2, 'FD');
   pdf.setFontSize(8.5); pdf.setTextColor.apply(pdf, dark); pdf.setFont('helvetica','bold');
   pdf.text('FILTERS APPLIED', 14, y+6);
-  pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, gray); pdf.setFontSize(8.5);
-  pdf.text(filterLines, 14, y+11);
+  pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, gray);
+  filterDisplayParts.forEach(function(part, i){ pdfText(pdf, part, 14, y+11+i*4.6); });
   y += boxH + 6;
 
   if (modeScopeName) {
