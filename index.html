@@ -3093,6 +3093,7 @@ async function generateExecutiveReportAsync() {
   var purple=[94,45,145], dark=[26,26,46], green=[22,163,74], amber=[217,119,6], red=[220,38,38], gray=[107,114,128];
   var data = filteredData;
   if (!data.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتقرير'); return; }
+  await ensureArabicFont(pdf);
 
   var periodLabel = reportPeriodLabel(data);
   var storeCount = new Set(data.map(function(r){ return r.storeCode; })).size;
@@ -3154,6 +3155,7 @@ async function generateExecutiveReportAsync() {
     styles: { fontSize: 8.5, cellPadding: 2.2 },
     alternateRowStyles: { fillColor: [248,247,252] },
     didParseCell: function(hd){
+      arabizeCell(hd);
       if (hd.section==='body' && hd.column.index===3) {
         var pp = prodRows[hd.row.index][5];
         hd.cell.styles.textColor = achColor(pp); hd.cell.styles.fontStyle = 'bold';
@@ -3167,14 +3169,18 @@ async function generateExecutiveReportAsync() {
   y = pdf.lastAutoTable.finalY + 8;
 
   var narrative = buildExecNarrative(data, periodLabel);
+  var narrHasArabic = containsArabic(narrative);
+  if (narrHasArabic && ARABIC_FONT_LOADED_OK) pdf.setFont(ARABIC_FONT_NAME,'normal'); else pdf.setFont('helvetica','normal');
   var narrLines = pdf.splitTextToSize(narrative, W-24);
   var narrH = 8 + narrLines.length*4.2;
   pdf.setFillColor(247,243,255); pdf.setDrawColor.apply(pdf, purple); pdf.setLineWidth(0.3);
   pdf.roundedRect(10, y, W-20, narrH, 2, 2, 'FD');
   pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
   pdf.text('KEY TAKEAWAY', 14, y+6);
-  pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
+  if (narrHasArabic && ARABIC_FONT_LOADED_OK) pdf.setFont(ARABIC_FONT_NAME,'normal'); else pdf.setFont('helvetica','normal');
+  pdf.setFontSize(9); pdf.setTextColor.apply(pdf, dark);
   pdf.text(narrLines, 14, y+11.5);
+  pdf.setFont('helvetica','normal');
 
   // ── PAGE 2: Regional Manager → Supervisor → Area Manager structure ──
   pdf.addPage();
@@ -3216,6 +3222,7 @@ async function generateExecutiveReportAsync() {
     styles: { fontSize: 7.5, cellPadding: 1.8 },
     columnStyles: { 0: { cellWidth: 62 } },
     didParseCell: function(hd){
+      arabizeCell(hd);
       var r = hierRows[hd.row.index];
       if (!r) return;
       if (hd.section==='body') {
@@ -3283,18 +3290,20 @@ async function generateExecutiveReportAsync() {
   var halfW = (W-30)/2;
   pdf.autoTable({
     startY: y, margin: { left:10, right:10+halfW+10 },
-    head: [['▲ Top Performers','Met','Avg %']],
+    head: [['Top Performers','Met','Avg %']],
     body: top5.map(function(e){ return [e.name, e.metCount+'/'+e.of, e.avgPct.toFixed(0)+'%']; }),
     theme:'plain', headStyles:{ fillColor: green, textColor:255, fontSize:8 }, styles:{ fontSize:8, cellPadding:2 },
-    tableWidth: halfW
+    tableWidth: halfW,
+    didParseCell: combineDidParseCell()
   });
   var endY1 = pdf.lastAutoTable.finalY;
   pdf.autoTable({
     startY: y, margin: { left: 10+halfW+10, right:10 },
-    head: [['▼ Needs Attention','Met','Avg %']],
+    head: [['Needs Attention','Met','Avg %']],
     body: bottom5.map(function(e){ return [e.name, e.metCount+'/'+e.of, e.avgPct.toFixed(0)+'%']; }),
     theme:'plain', headStyles:{ fillColor: red, textColor:255, fontSize:8 }, styles:{ fontSize:8, cellPadding:2 },
-    tableWidth: halfW
+    tableWidth: halfW,
+    didParseCell: combineDidParseCell()
   });
   var endY2 = pdf.lastAutoTable.finalY;
   y = Math.max(endY1, endY2) + 10;
@@ -3318,7 +3327,7 @@ async function generateExecutiveReportAsync() {
     pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, purple);
     pdf.text(hcard.role, x+4, y+6);
     pdf.setFontSize(8.5); pdf.setFont('helvetica','normal'); pdf.setTextColor.apply(pdf, dark);
-    pdf.text(String(hcard.e.name).slice(0,24), x+4, y+12);
+    pdfText(pdf, String(hcard.e.name).slice(0,24), x+4, y+12);
     pdf.setFontSize(10); pdf.setFont('helvetica','bold'); pdf.setTextColor.apply(pdf, achColor(hcard.e.avgPct));
     pdf.text(hcard.e.metCount+'/'+hcard.e.of+' targets · '+hcard.e.avgPct.toFixed(0)+'% avg', x+4, y+18);
   });
