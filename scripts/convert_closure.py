@@ -282,6 +282,54 @@ def detect_kind(filename):
         return 'mobile'
     return None
 
+import os
+import urllib.request
+import urllib.error
+
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
+
+
+def supabase_upsert(table, rows, conflict_cols):
+    if not rows:
+        return
+    url = SUPABASE_URL.rstrip('/') + '/rest/v1/' + table + '?on_conflict=' + conflict_cols
+    chunk_size = 500
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i:i + chunk_size]
+        data = json.dumps(chunk, ensure_ascii=False, allow_nan=False).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST', headers={
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal',
+        })
+        try:
+            urllib.request.urlopen(req)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace')
+            raise RuntimeError(f'Supabase upsert into {table} failed (HTTP {e.code}): {body}')
+
+
+def sync_month_to_supabase(rows):
+    if not SUPABASE_ENABLED or not rows:
+        return
+    payload = []
+    for r in rows:
+        payload.append({
+            'month': r.get('month'),
+            'store_code': r.get('storeCode'),
+            'regional_manager': r.get('regionalManager'),
+            'area_manager': r.get('areaManager'),
+            'supervisor': r.get('supervisor'),
+            'region': r.get('region'),
+            'row': r,
+        })
+    supabase_upsert('monthly_closure', payload, 'month,store_code')
+    print(f'  ☁️  Synced {len(payload)} row(s) for {rows[0].get("month")} to Supabase')
+
+
 def scan_and_convert(raw_dir, data_dir):
     files = glob.glob(os.path.join(raw_dir, '*.xlsb'))
     pairs = {}  # month_str -> {'mobile': path, 'wallet': path}
@@ -294,7 +342,11 @@ def scan_and_convert(raw_dir, data_dir):
             continue
         pairs.setdefault(month_str, {})[kind] = f
 
-    os.makedirs(data_dir, exist_ok=True)
+    if SUPABASE_ENABLED:
+        print(f'  ☁️  Supabase sync ENABLED ({SUPABASE_URL})')
+    else:
+        print('  ℹ️  Supabase sync disabled (SUPABASE_URL/SUPABASE_SERVICE_KEY not set)')
+
     processed = []
     for month_str, pair in sorted(pairs.items()):
         if 'mobile' not in pair or 'wallet' not in pair:
@@ -302,24 +354,14 @@ def scan_and_convert(raw_dir, data_dir):
             print(f'  ⚠️  {month_str}: missing the {missing} file — skipped')
             continue
         yyyy, mm = month_str.split('-')[1], month_str.split('-')[0]
-        out_name = f'{yyyy}-{mm}.json'
-        out_path = os.path.join(data_dir, out_name)
-        rows = build_month(pair['mobile'], pair['wallet'], month_str)
-        with open(out_path, 'w', encoding='utf-8') as fh:
-            json.dump(sanitize_rows(rows), fh, ensure_ascii=False, allow_nan=False)
-        print(f'  ✅ {month_str} → {out_name} ({len(rows)} stores)')
+        rows = sanitize_rows(build_month(pair['mobile'], pair['wallet'], month_str))
+        print(f'  ✅ {month_str} parsed ({len(rows)} stores)')
+        try:
+            sync_month_to_supabase(rows)
+        except Exception as e:
+            print(f'  ❌ Supabase sync failed for {month_str}: {e}')
         processed.append(f'{yyyy}-{mm}')
 
-    # Refresh manifest.json with every JSON file present in data_dir
-    all_months = sorted(set(
-        os.path.splitext(os.path.basename(p))[0]
-        for p in glob.glob(os.path.join(data_dir, '*.json'))
-        if re.match(r'^\d{4}-\d{2}$', os.path.splitext(os.path.basename(p))[0])
-    ))
-    manifest_path = os.path.join(data_dir, 'manifest.json')
-    with open(manifest_path, 'w', encoding='utf-8') as fh:
-        json.dump({'months': all_months}, fh, ensure_ascii=False, indent=2)
-    print(f'  📄 manifest.json updated — {len(all_months)} month(s) total: {all_months}')
     return processed
 
 
