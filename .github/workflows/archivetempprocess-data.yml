@@ -26,6 +26,9 @@ jobs:
         run: pip install pandas pyxlsb
 
       - name: Convert any new Closure files in raw/
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python scripts/convert_closure.py --scan raw data
 
       - name: Archive processed raw files
@@ -39,6 +42,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/ raw/
-          git diff --cached --quiet || git commit -m "Auto-process monthly closure data [skip ci]"
+          git add raw/
+          git diff --cached --quiet || git commit -m "Archive processed monthly closure files [skip ci]"
           git push
