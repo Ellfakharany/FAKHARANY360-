@@ -17,6 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cairo:wght@400;600;700&display=swap"/>
 <style>
@@ -760,54 +761,84 @@ input *, textarea *, select * {
 //  password uncrackable (a short numeric code can still be brute-forced
 //  offline). True security needs a real backend/auth service.
 // ====================================
-const USERS = {
-  'admin':  { passHash: 'b3cddf7a103bb3a88721cb2c7d2b7cb8833b7a95d0a5dc00f3e28e02a99be5b7', role: 'admin'  }, // 0711
-  'user1':  { passHash: 'fe2592b42a727e977f055947385b709cc82b16b9a87f88c6abf3900d65d0cdc3', role: 'viewer' }  // 4321
-};
+// ══════════════════════════════════════════════════════════════
+//  SUPABASE — real backend auth + data access (replaces the old
+//  client-side-only USERS check). The login screen UI/inputs stay
+//  exactly the same ("Username" + "Password") — usernames just map
+//  to two shared Supabase Auth accounts under the hood so nobody on
+//  the team has to change how they log in.
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://iyplpllrqsqfatnmzzyo.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5cGxwbGxycXNxZmF0bm16enlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDAzNDYsImV4cCI6MjA5OTM3NjM0Nn0.3jd22rqAkDVjT1OXFGoorxAOsSFD3KzDWpklCEj4MgI';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-async function sha256Hex(text) {
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// Map the familiar usernames to fixed Supabase Auth accounts. Passwords
+// live only in Supabase (Authentication → Users), not in this file.
+const USERNAME_TO_EMAIL = {
+  'admin': 'admin@fakharany360.app',
+  'user1': 'user1@fakharany360.app',
+};
 
 let currentUser = null;
 let currentRole = null;
+let currentSupabaseUserId = null;
 
 async function doLogin() {
   const uname = document.getElementById('login-username').value.trim().toLowerCase();
-  const pass   = document.getElementById('login-password').value;
-  const errEl  = document.getElementById('login-error');
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
 
-  const entryHash = await sha256Hex(pass);
-  if (USERS[uname] && USERS[uname].passHash === entryHash) {
-    currentUser = uname;
-    currentRole = USERS[uname].role;
-    errEl.classList.remove('show');
-    const loginBtn = document.querySelector('.login-btn');
-    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'جاري تحميل البيانات...'; }
-    try {
-      RAW_DATA = await fetchAllMonthsData();
-      if (window.__mtdFailedMonths && window.__mtdFailedMonths.length) {
-        alert('⚠️ الشهور دي ما اتحملتش: ' + window.__mtdFailedMonths.join(', ') + '\nجرب تعمل refresh للصفحة بعد شوية دقايق (ممكن يكون الـ CDN لسه بيحدث الملفات الجديدة).');
-      }
-    } catch (e) {
-      console.error('[Data] Failed to load monthly data from data/:', e);
-      alert('⚠️ تعذر تحميل بيانات الشهور من مجلد data/. تأكد إن الملف موجود على GitHub Pages بنفس المسار.');
-      RAW_DATA = [];
-    }
-    // Auto-load the latest daily MTD (Mobile + WE Pay) data pushed via
-    // raw_mtd/ + GitHub Action, if any is available. Failures here are
-    // non-fatal — the MTD tab just falls back to its manual upload buttons.
-    try { await fetchAutoMTDData(); } catch (e) { console.warn('[MTD Auto] init load failed:', e.message); }
-    document.getElementById('login-screen').style.display = 'none';
-    applyRolePermissions();
-    initAppWithData(RAW_DATA);
-  } else {
+  const email = USERNAME_TO_EMAIL[uname];
+  if (!email) {
     errEl.classList.add('show');
     document.getElementById('login-password').value = '';
     document.getElementById('login-password').focus();
+    return;
   }
+
+  const loginBtn = document.querySelector('.login-btn');
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'جاري التحقق...'; }
+
+  const { data: authData, error: authError } = await sb.auth.signInWithPassword({ email: email, password: pass });
+
+  if (authError || !authData || !authData.user) {
+    errEl.classList.add('show');
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-password').focus();
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i>Sign In'; }
+    return;
+  }
+
+  currentSupabaseUserId = authData.user.id;
+  currentUser = uname;
+
+  const { data: profile, error: profileError } = await sb.from('profiles').select('role').eq('id', currentSupabaseUserId).single();
+  if (profileError || !profile) {
+    console.error('[Auth] No profile row found for this account:', profileError && profileError.message);
+    currentRole = 'viewer';
+  } else {
+    currentRole = profile.role === 'admin' ? 'admin' : 'viewer';
+  }
+
+  errEl.classList.remove('show');
+  if (loginBtn) { loginBtn.textContent = 'جاري تحميل البيانات...'; }
+  try {
+    RAW_DATA = await fetchAllMonthsData();
+    if (window.__mtdFailedMonths && window.__mtdFailedMonths.length) {
+      alert('⚠️ الشهور دي ما اتحملتش: ' + window.__mtdFailedMonths.join(', ') + '\nجرب تعمل refresh للصفحة بعد شوية دقايق (ممكن يكون الـ CDN لسه بيحدث الملفات الجديدة).');
+    }
+  } catch (e) {
+    console.error('[Data] Failed to load monthly data from data/:', e);
+    alert('⚠️ تعذر تحميل بيانات الشهور من مجلد data/. تأكد إن الملف موجود على GitHub Pages بنفس المسار.');
+    RAW_DATA = [];
+  }
+  // Auto-load the latest daily MTD (Mobile + WE Pay) data — now pulled
+  // directly from Supabase (falls back to the old data/mtd/*.json files
+  // automatically if Supabase is unreachable for any reason).
+  try { await fetchAutoMTDData(); } catch (e) { console.warn('[MTD Auto] init load failed:', e.message); }
+  document.getElementById('login-screen').style.display = 'none';
+  applyRolePermissions();
+  initAppWithData(RAW_DATA);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -5186,6 +5217,71 @@ var MTD_AUTO_LOADING  = false;
 //  the manual "Upload MTD" / "Upload Wallet" buttons still work exactly as
 //  before and simply take over for the rest of the session once used.
 // ══════════════════════════════════════════════════════════════
+var AR_MONTHS_FULL = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+function isoToArabicLabel(iso) {
+  var parts = String(iso).split('-');
+  if (parts.length !== 3) return iso;
+  var y = +parts[0], m = +parts[1], d = +parts[2];
+  return d + ' ' + (AR_MONTHS_FULL[m - 1] || '') + ' ' + y;
+}
+
+// Pulls the per-store MTD data (Mobile + WE Pay) straight from Supabase —
+// this is the data that's actually protected by login now. Returns which
+// of the two loaded successfully so the JSON fallback below only fills in
+// whichever one didn't.
+async function fetchAutoMTDDataFromSupabase(opts) {
+  var loaded = { mobile: false, wallet: false };
+
+  if (opts.force || MTD_SOURCE_MOBILE !== 'manual') {
+    try {
+      var maxM = await sb.from('mtd_mobile').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
+      if (maxM.data && maxM.data.snapshot_date) {
+        var rowsM = await sb.from('mtd_mobile').select('row').eq('snapshot_date', maxM.data.snapshot_date);
+        if (!rowsM.error && rowsM.data && rowsM.data.length) {
+          MTD_DATA = rowsM.data.map(function (r) { return r.row; });
+          MTD_FILTERED = MTD_DATA.slice();
+          MTD_MOBILE_DATE_LABEL = isoToArabicLabel(maxM.data.snapshot_date);
+          MTD_SOURCE_MOBILE = 'auto';
+          var mtdTabBtn = document.getElementById('mtd-tab-btn');
+          if (mtdTabBtn) mtdTabBtn.style.display = '';
+          populateMTDFilters();
+          loaded.mobile = true;
+        }
+      }
+    } catch (e) { console.warn('[MTD Auto] Supabase mobile query failed, will try local JSON:', e.message); }
+  }
+
+  if (opts.force || MTD_SOURCE_WALLET !== 'manual') {
+    try {
+      var maxW = await sb.from('mtd_wallet').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
+      if (maxW.data && maxW.data.snapshot_date) {
+        var rowsW = await sb.from('mtd_wallet').select('store_code,row').eq('snapshot_date', maxW.data.snapshot_date);
+        if (!rowsW.error && rowsW.data && rowsW.data.length) {
+          var wd = {};
+          rowsW.data.forEach(function (r) { wd[String(r.store_code || '').toUpperCase()] = r.row; });
+          WALLET_DATA = wd;
+          MTD_WALLET_DATE_LABEL = isoToArabicLabel(maxW.data.snapshot_date);
+          MTD_SOURCE_WALLET = 'auto';
+          var wCount = Object.keys(WALLET_DATA).length;
+          var badge = document.getElementById('mtd-wallet-badge');
+          var pill = document.getElementById('mtd-pill-wallet');
+          var lpPill = document.getElementById('mtd-lp-pill-wallet');
+          var kpi = document.getElementById('mtd-kpi-wallet');
+          if (wCount > 0) {
+            if (badge) { badge.style.display = ''; badge.textContent = '✅ Wallet: ' + wCount + ' فرع'; }
+            if (pill) pill.style.display = '';
+            if (lpPill) lpPill.style.display = '';
+            if (kpi) kpi.style.display = '';
+          }
+          loaded.wallet = true;
+        }
+      }
+    } catch (e) { console.warn('[MTD Auto] Supabase wallet query failed, will try local JSON:', e.message); }
+  }
+
+  return loaded;
+}
+
 async function fetchAutoMTDData(opts) {
   opts = opts || {};
   if (MTD_AUTO_LOADING) return;
@@ -5197,67 +5293,73 @@ async function fetchAutoMTDData(opts) {
     return JSON.parse(text);
   }
   try {
-    var manifestRes;
+    // 1) Supabase first — this is the protected path (needs login/RLS).
+    var loaded = await fetchAutoMTDDataFromSupabase(opts);
+
+    // 2) Local JSON — used as a fallback for whichever type Supabase
+    //    didn't provide, AND always for pkgMix/daily trend/Sales-vs-
+    //    Activation breakdown, which haven't been migrated to Supabase
+    //    yet (they're aggregate report data, not raw per-store numbers).
     try {
-      manifestRes = await fetch('data/mtd/manifest.json?v=' + v, { cache: 'no-store' });
-    } catch (e) { console.warn('[MTD Auto] manifest fetch failed:', e.message); return; }
-    if (!manifestRes.ok) { console.warn('[MTD Auto] data/mtd/manifest.json not found (HTTP ' + manifestRes.status + ') — no auto data pushed yet'); return; }
-    var manifest;
-    try { manifest = await parseJsonResponse(manifestRes); } catch (e) { console.warn('[MTD Auto] manifest parse failed:', e.message); return; }
+      var manifestRes = await fetch('data/mtd/manifest.json?v=' + v, { cache: 'no-store' });
+      if (manifestRes.ok) {
+        var manifest = await parseJsonResponse(manifestRes);
 
-    // ── Mobile ──
-    if (manifest.mobile && (opts.force || MTD_SOURCE_MOBILE !== 'manual')) {
-      try {
-        var mRes = await fetch('data/mtd/' + manifest.mobile.file + '?v=' + v, { cache: 'no-store' });
-        if (mRes.ok) {
-          var mJson = await parseJsonResponse(mRes);
-          MTD_DATA = mJson.mtdData || [];
-          MTD_FILTERED = MTD_DATA.slice();
-          MTD_SALES_DATA = mJson.mtdSalesData || [];
-          MTD_PKGMIX = mJson.pkgMix || null;
-          MTD_DAILY  = mJson.daily  || null;
-          MTD_MOBILE_DATE_LABEL = mJson.dateLabel || manifest.mobile.dateLabel || '';
-          MTD_SOURCE_MOBILE = 'auto';
-          var mtdTabBtn = document.getElementById('mtd-tab-btn');
-          if (mtdTabBtn) mtdTabBtn.style.display = '';
-          populateMTDFilters();
-        } else {
-          console.warn('[MTD Auto] Missing data/mtd/' + manifest.mobile.file + ' (HTTP ' + mRes.status + ')');
+        if (manifest.mobile && (opts.force || MTD_SOURCE_MOBILE !== 'manual')) {
+          try {
+            var mRes = await fetch('data/mtd/' + manifest.mobile.file + '?v=' + v, { cache: 'no-store' });
+            if (mRes.ok) {
+              var mJson = await parseJsonResponse(mRes);
+              MTD_SALES_DATA = mJson.mtdSalesData || [];
+              MTD_PKGMIX = mJson.pkgMix || null;
+              MTD_DAILY = mJson.daily || null;
+              if (!loaded.mobile) { // full fallback: Supabase had nothing
+                MTD_DATA = mJson.mtdData || [];
+                MTD_FILTERED = MTD_DATA.slice();
+                MTD_MOBILE_DATE_LABEL = mJson.dateLabel || manifest.mobile.dateLabel || '';
+                MTD_SOURCE_MOBILE = 'auto';
+                var mtdTabBtn2 = document.getElementById('mtd-tab-btn');
+                if (mtdTabBtn2) mtdTabBtn2.style.display = '';
+                populateMTDFilters();
+              }
+            }
+          } catch (e) { console.warn('[MTD Auto] mobile JSON load failed:', e.message); }
         }
-      } catch (e) { console.warn('[MTD Auto] mobile load failed:', e.message); }
-    }
 
-    // ── WE Pay / Wallet ──
-    if (manifest.wallet && (opts.force || MTD_SOURCE_WALLET !== 'manual')) {
-      try {
-        var wRes = await fetch('data/mtd/' + manifest.wallet.file + '?v=' + v, { cache: 'no-store' });
-        if (wRes.ok) {
-          var wJson = await parseJsonResponse(wRes);
-          WALLET_DATA = wJson.walletData || {};
-          MTD_WALLET_DAILY = wJson.walletDaily || null;
-          MTD_WALLET_DATE_LABEL = wJson.dateLabel || manifest.wallet.dateLabel || '';
-          MTD_SOURCE_WALLET = 'auto';
-          var wCount = Object.keys(WALLET_DATA).length;
-          var badge = document.getElementById('mtd-wallet-badge');
-          var pill  = document.getElementById('mtd-pill-wallet');
-          var lpPill = document.getElementById('mtd-lp-pill-wallet');
-          var kpi   = document.getElementById('mtd-kpi-wallet');
-          if (wCount > 0) {
-            if (badge) { badge.style.display = ''; badge.textContent = '✅ Wallet: ' + wCount + ' فرع'; }
-            if (pill)  pill.style.display = '';
-            if (lpPill) lpPill.style.display = '';
-            if (kpi)   kpi.style.display = '';
-          }
-        } else {
-          console.warn('[MTD Auto] Missing data/mtd/' + manifest.wallet.file + ' (HTTP ' + wRes.status + ')');
+        if (manifest.wallet && (opts.force || MTD_SOURCE_WALLET !== 'manual')) {
+          try {
+            var wRes = await fetch('data/mtd/' + manifest.wallet.file + '?v=' + v, { cache: 'no-store' });
+            if (wRes.ok) {
+              var wJson = await parseJsonResponse(wRes);
+              MTD_WALLET_DAILY = wJson.walletDaily || null;
+              if (!loaded.wallet) { // full fallback
+                WALLET_DATA = wJson.walletData || {};
+                MTD_WALLET_DATE_LABEL = wJson.dateLabel || manifest.wallet.dateLabel || '';
+                MTD_SOURCE_WALLET = 'auto';
+                var wCount2 = Object.keys(WALLET_DATA).length;
+                var badge2 = document.getElementById('mtd-wallet-badge');
+                var pill2 = document.getElementById('mtd-pill-wallet');
+                var lpPill2 = document.getElementById('mtd-lp-pill-wallet');
+                var kpi2 = document.getElementById('mtd-kpi-wallet');
+                if (wCount2 > 0) {
+                  if (badge2) { badge2.style.display = ''; badge2.textContent = '✅ Wallet: ' + wCount2 + ' فرع'; }
+                  if (pill2) pill2.style.display = '';
+                  if (lpPill2) lpPill2.style.display = '';
+                  if (kpi2) kpi2.style.display = '';
+                }
+              }
+            }
+          } catch (e) { console.warn('[MTD Auto] wallet JSON load failed:', e.message); }
         }
-      } catch (e) { console.warn('[MTD Auto] wallet load failed:', e.message); }
-    }
+      } else {
+        console.warn('[MTD Auto] data/mtd/manifest.json not found (HTTP ' + manifestRes.status + ') — Tariff Mix / Daily Trend sections will be empty until it exists');
+      }
+    } catch (e) { console.warn('[MTD Auto] manifest fetch failed (non-fatal, Supabase data still applies):', e.message); }
 
     if (MTD_DATA.length > 0) {
       var emptyState = document.getElementById('mtd-empty-state');
       var dashContent = document.getElementById('mtd-dashboard-content');
-      if (emptyState)  emptyState.style.display = 'none';
+      if (emptyState) emptyState.style.display = 'none';
       if (dashContent) dashContent.style.display = '';
     }
     updateMTDFreshnessNote();
