@@ -500,14 +500,7 @@ function sanitize(obj) {
 //  Main scan/convert
 // ══════════════════════════════════════════════════════════════
 async function scanAndConvert(rawDir, dataDir) {
-  fs.mkdirSync(dataDir, { recursive: true });
   const files = fs.readdirSync(rawDir).filter(function (f) { return /\.xlsb$/i.test(f); });
-
-  const manifestPath = path.join(dataDir, 'manifest.json');
-  let manifest = { mobile: null, wallet: null };
-  if (fs.existsSync(manifestPath)) {
-    try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch (e) { /* start fresh */ }
-  }
 
   if (files.length === 0) {
     console.log('  ℹ️ No new .xlsb files in ' + rawDir);
@@ -552,37 +545,29 @@ async function scanAndConvert(rawDir, dataDir) {
       }
       const pkgMix = safeCall(function () { return parsePkgMixSheet(wb); }, 'PkgMix');
       const daily = safeCall(function () { return parseDailySheet(wb); }, 'Daily');
-      const out = sanitize({ date: pick.date.iso, dateLabel: pick.date.label, mtdData: mtdData, mtdSalesData: mtdSalesData, pkgMix: pkgMix, daily: daily });
-      const outName = 'mobile-' + pick.date.iso + '.json';
-      fs.writeFileSync(path.join(dataDir, outName), JSON.stringify(out));
-      manifest.mobile = { date: pick.date.iso, dateLabel: pick.date.label, file: outName, stores: mtdData.length };
-      console.log('  ✅ Mobile ' + pick.date.iso + ' → ' + outName + ' (' + mtdData.length + ' stores)');
+      console.log('  ✅ Mobile ' + pick.date.iso + ' parsed (' + mtdData.length + ' stores)');
 
       mobileHierarchyMap = {};
       mtdData.forEach(function (r) {
         if (r.storeCode) mobileHierarchyMap[r.storeCode] = { regional_manager: r.regionalManager, area_manager: r.areaManager, supervisor: r.supervisor, region: r.region };
       });
-      try { await syncMobileToSupabase(pick.date.iso, mtdData); }
-      catch (e) { console.error('  ❌ Supabase sync (mobile) failed:', e.message); }
+      try {
+        await syncMobileToSupabase(pick.date.iso, mtdData);
+        await syncMTDMeta(pick.date.iso, 'mobile', sanitize({ pkg_mix: pkgMix, daily: daily, sales_data: mtdSalesData }));
+      } catch (e) { console.error('  ❌ Supabase sync (mobile) failed:', e.message); }
     } else {
       const walletData = safeCall(function () { return parseWalletSheet(wb); }, 'Wallet');
       if (!walletData) { console.warn('  ⚠️  ' + pick.file + ': WE Pay parse failed — skipped'); continue; }
       const walletDaily = safeCall(function () { return parseDailySheet(wb); }, 'WalletDaily');
-      const out = sanitize({ date: pick.date.iso, dateLabel: pick.date.label, walletData: walletData, walletDaily: walletDaily });
-      const outName = 'wallet-' + pick.date.iso + '.json';
-      fs.writeFileSync(path.join(dataDir, outName), JSON.stringify(out));
-      manifest.wallet = { date: pick.date.iso, dateLabel: pick.date.label, file: outName, stores: Object.keys(walletData).length };
-      console.log('  ✅ Wallet ' + pick.date.iso + ' → ' + outName + ' (' + Object.keys(walletData).length + ' stores)');
+      console.log('  ✅ Wallet ' + pick.date.iso + ' parsed (' + Object.keys(walletData).length + ' stores)');
 
       try {
         const hierarchyMap = mobileHierarchyMap || await fetchHierarchyMapFromSupabase();
         await syncWalletToSupabase(pick.date.iso, walletData, hierarchyMap);
+        await syncMTDMeta(pick.date.iso, 'wallet', sanitize({ pkg_mix: null, daily: walletDaily, sales_data: null }));
       } catch (e) { console.error('  ❌ Supabase sync (wallet) failed:', e.message); }
     }
   }
-
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-  console.log('  📄 data/mtd/manifest.json updated:', JSON.stringify(manifest));
 
   // Archive every file we successfully recognized (type + date), so the
   // next run doesn't reprocess it. Files we could NOT recognize are left
@@ -682,6 +667,13 @@ async function syncWalletToSupabase(dateIso, walletData, hierarchyMap) {
   });
   await supabaseUpsert('mtd_wallet', rows, 'snapshot_date,store_code');
   console.log('  ☁️  Synced ' + rows.length + ' Wallet row(s) to Supabase');
+}
+
+async function syncMTDMeta(dateIso, kind, payload) {
+  if (!SUPABASE_ENABLED) return;
+  const row = { snapshot_date: dateIso, kind: kind, pkg_mix: payload.pkg_mix, daily: payload.daily, sales_data: payload.sales_data };
+  await supabaseUpsert('mtd_meta', [row], 'snapshot_date,kind');
+  console.log('  ☁️  Synced ' + kind + ' report meta (Tariff Mix / Daily Trend) to Supabase');
 }
 
 const args = process.argv.slice(2);
