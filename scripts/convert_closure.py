@@ -1,0 +1,438 @@
+"""
+Converts Closure files (Mobile/FBB/Fixed workbook + WE Pay workbook) into the
+JSON row schema used by FAKHARANY360's dashboard.
+
+Two modes:
+
+1) Single pair (manual):
+   python convert_closure.py <mobile.xlsb> <wepay.xlsb> <MM-YYYY> <output.json>
+
+2) Batch/folder mode (used by the GitHub Action):
+   python convert_closure.py --scan <raw_dir> <data_dir>
+   Scans <raw_dir> for *.xlsb files, auto-detects each file's month and
+   whether it's the Mobile or WE Pay workbook from its filename (matching
+   the naming convention already used, e.g. "...Mobile...May-2026...xlsb"
+   and "We_Pay...May-2026...xlsb"), pairs them up, converts every complete
+   month found, writes <data_dir>/<YYYY-MM>.json for each, and refreshes
+   <data_dir>/manifest.json with the sorted list of available months.
+"""
+import sys, os, json, re, glob
+import pandas as pd
+
+MONTH_ABBR = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',
+              7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'}
+MONTH_NAME_TO_NUM = {
+    'jan':1,'january':1, 'feb':2,'february':2, 'mar':3,'march':3, 'apr':4,'april':4,
+    'may':5, 'jun':6,'june':6, 'jul':7,'july':7, 'aug':8,'august':8,
+    'sep':9,'sept':9,'september':9, 'oct':10,'october':10, 'nov':11,'november':11,
+    'dec':12,'december':12,
+}
+
+LOW_SET = {25, 29, 32, 37}
+MID_SET = {40, 45, 46, 52}
+
+
+def classify_tier(n):
+    if n in LOW_SET: return 'low'
+    if n in MID_SET: return 'mid'
+    return 'high'
+
+def norm_code(x):
+    return str(x).strip().upper()
+
+def normalize_name(s):
+    """Strips non-breaking spaces / collapses stray whitespace so the same
+    store never ends up as two different-looking entries across months."""
+    if s is None:
+        return s
+    s = str(s).replace('\xa0', ' ')
+    s = re.sub(r'\s+', ' ', s)
+    return s.strip()
+
+def find_total_col(header_row, product_label, field_label):
+    """Locate a 'grand total' column (e.g. 'FBB Target') by its exact header
+    text in the given header row, instead of a hardcoded column index.
+    Package columns get added/removed over time (e.g. WE added a batch of
+    new FBB speed tiers in June-2026), which shifts every column after them —
+    a fixed index silently starts reading the wrong package's numbers. Since
+    the WORKBOOK ALWAYS repeats the product name in the total's header
+    (e.g. 'FBB Target', 'FBB Subscriptions', 'FBB %'), searching by that text
+    is immune to columns moving around.
+    """
+    target_text = f'{product_label} {field_label}'.strip().lower()
+    for j, label in header_row.items():
+        if pd.isna(label):
+            continue
+        if str(label).strip().lower() == target_text:
+            return j
+    raise ValueError(
+        f"Could not find column '{target_text}' in the Database sheet header row — "
+        f"the workbook layout may have changed again. Check row 5 of the 'Database' sheet."
+    )
+
+
+def parse_database_sheet(path):
+    """Database sheet: header row is row index 7 (0-based) for per-store
+    columns, and row index 5 holds the repeated 'X Target'/'X Subscriptions'/
+    'X %' labels for each product's grand-total triple. Data starts row 8."""
+    df = pd.read_excel(path, sheet_name='Database', engine='pyxlsb', header=None)
+    total_header = df.iloc[5]
+
+    # Resolve each product's grand-total columns by header text (see
+    # find_total_col docstring) — NOT by a fixed column index, since new
+    # package/tariff columns inserted upstream shift everything after them.
+    mobile_t_col = find_total_col(total_header, 'Mobile', 'Target')
+    mobile_a_col = find_total_col(total_header, 'Mobile', 'Subscriptions')
+    fwa_t_col    = find_total_col(total_header, 'FWA', 'Target')
+    fwa_a_col    = find_total_col(total_header, 'FWA', 'Subscriptions')
+    fixed_t_col  = find_total_col(total_header, 'Fixed', 'Target')
+    fixed_a_col  = find_total_col(total_header, 'Fixed', 'Subscriptions')
+    fbb_t_col    = find_total_col(total_header, 'FBB', 'Target')
+    fbb_a_col    = find_total_col(total_header, 'FBB', 'Subscriptions')
+
+    rows = {}
+    for i in range(8, len(df)):
+        r = df.iloc[i]
+        code = r[0]
+        if pd.isna(code): continue
+        code = norm_code(code)
+
+        # Skip summary/total rows — they have something in the code column
+        # (e.g. "Grand Total") but no real store name, which produced NaN
+        # fields all the way through and broke the JSON output.
+        if pd.isna(r[1]) or 'grand total' in code.lower() or 'total' == code.lower():
+            continue
+
+        def num(col):
+            v = r[col]
+            return 0 if pd.isna(v) else float(v)
+
+        rows[code] = {
+            'storeCode': code,
+            'store': normalize_name(r[1]),
+            'partner': r[2],
+            'classification': r[3],
+            'region': r[4],
+            'accountManager': r[5],
+            'channelManager': r[6],
+            'areaManager': r[7],
+            'supervisor': r[8],
+            'regionalManager': r[10],
+            # Sub-product families (Database columns, 0-indexed) — these are
+            # near the front of the sheet and haven't moved historically, but
+            # if WE ever restructures Mobile's own package breakdown too,
+            # these should get the same header-lookup treatment.
+            'kixTarget': num(12), 'kixSubs': num(13),
+            'tazbeetTarget': num(15), 'tazbeetSubs': num(16),
+            'dataSimMifiTarget': num(18), 'dataSimMifiSubs': num(19),
+            'paygTarget': num(21), 'paygSubs': num(22),
+            'prepaidTarget': num(24), 'prepaidSubs': num(25),
+            'weClubTarget': num(27), 'weClubSubs': num(28),
+            'goldTarget': num(30), 'goldSubs': num(31),
+            'weMixTarget': num(33), 'weMixSubs': num(34),
+            # Aggregate totals — located by header text, see above
+            'mobileTarget': num(mobile_t_col), 'mobileSubs': num(mobile_a_col),
+            'fwaTarget': num(fwa_t_col), 'fwaSubs': num(fwa_a_col),
+            'fixedTarget': num(fixed_t_col), 'fixedSubs': num(fixed_a_col),
+            'fbbTarget': num(fbb_t_col), 'fbbSubs': num(fbb_a_col),
+        }
+    return rows
+
+def parse_idle_sheet(path):
+    """IDLE sheet: holds a separate Activation-vs-Sales split for Mobile,
+    Fixed and FBB ('<Product> All Sales' / '<Product> All Activation'),
+    same header-name-lookup approach as the Database totals — columns move
+    around whenever WE adds/removes package columns upstream. Returns {} on
+    any problem (missing sheet, missing columns, etc.) so older workbooks
+    without this split just fall back to Sales-only everywhere, instead of
+    breaking the whole conversion.
+    """
+    try:
+        df = pd.read_excel(path, sheet_name='IDLE', engine='pyxlsb', header=None)
+    except Exception:
+        return {}
+
+    header = df.iloc[5]
+    cols = {}
+    try:
+        for prod in ('Mobile', 'Fixed', 'FBB'):
+            cols[prod+'Sales'] = find_total_col(header, prod, 'All Sales')
+            cols[prod+'Act']   = find_total_col(header, prod, 'All Activation')
+    except ValueError:
+        return {}  # this month's IDLE sheet doesn't have the split — skip quietly
+
+    out = {}
+    for i in range(8, len(df)):
+        r = df.iloc[i]
+        code = r[0]
+        if pd.isna(code) or pd.isna(r[1]): continue
+        code = norm_code(code)
+
+        def num(col):
+            v = r[col]
+            return 0 if pd.isna(v) else float(v)
+
+        out[code] = {
+            'mobileSubsAct': num(cols['MobileAct']),
+            'fixedSubsAct':  num(cols['FixedAct']),
+            'fbbSubsAct':    num(cols['FBBAct']),
+        }
+    return out
+
+
+def parse_tariffs_sheet(path):
+    """Tariffs Per Stoers sheet: header row index 6, data from row 7."""
+    df = pd.read_excel(path, sheet_name='Tariffs Per Stoers', engine='pyxlsb', header=None)
+    header = df.iloc[6]
+    code_col = None
+    col_labels = {}
+    for j, label in header.items():
+        if pd.isna(label): continue
+        label = str(label).strip()
+        if label == 'StoreCodeBSS':
+            code_col = j
+        else:
+            col_labels[j] = label
+
+    out = {}
+    for i in range(7, len(df)):
+        r = df.iloc[i]
+        code = r[code_col]
+        if pd.isna(code): continue
+        code = norm_code(code)
+
+        low = mid = high = pt12 = 0.0
+        kix_fields, taz_fields = {}, {}
+
+        for j, label in col_labels.items():
+            v = r[j]
+            if pd.isna(v) or v == 0: continue
+            low_label = label.lower()
+
+            if low_label == '12 pt':
+                pt12 += float(v)
+                continue
+            if 'grand total' in low_label:
+                continue
+
+            is_kix = 'kix' in low_label
+            is_taz = 'tazbeet' in low_label
+            if not (is_kix or is_taz):
+                continue  # Gold/Wallet/Wifi/etc packages don't factor into tariff tiers
+            v = float(v)
+
+            m = re.search(r'(\d+)(?!.*\d)', label)
+            if not m:
+                # Non-numeric variant (e.g. "Kix Fn" flexible plan) — still count it,
+                # bucketed as High tier since it doesn't fit a low/mid price point.
+                high += v
+                key = ('kix' if is_kix else 'taz') + 'Other'
+                if is_kix: kix_fields[key] = kix_fields.get(key, 0) + v
+                else: taz_fields[key] = taz_fields.get(key, 0) + v
+                continue
+            n = int(m.group(1))
+            tier = classify_tier(n)
+            if tier == 'low': low += v
+            elif tier == 'mid': mid += v
+            else: high += v
+
+            if is_kix:
+                kix_fields['kix' + str(n)] = kix_fields.get('kix' + str(n), 0) + v
+            else:
+                taz_fields['taz' + str(n)] = taz_fields.get('taz' + str(n), 0) + v
+
+        out[code] = {'lowT': low, 'midT': mid, 'highT': high, 'pt12': pt12,
+                     **kix_fields, **taz_fields}
+    return out
+
+def parse_wallet_sheet(path):
+    df = pd.read_excel(path, sheet_name='Sales VS Target', engine='pyxlsb', header=None)
+    header = df.iloc[0]
+    col = {str(v).strip(): j for j, v in header.items() if pd.notna(v)}
+    out = {}
+    for i in range(1, len(df)):
+        r = df.iloc[i]
+        code = r[col['StoreCodeBSS']]
+        if pd.isna(code): continue
+        code = norm_code(code)
+        out[code] = {
+            'walletTarget': 0 if pd.isna(r[col['Wallet Target']]) else float(r[col['Wallet Target']]),
+            'walletSales':  0 if pd.isna(r[col['Sales']])         else float(r[col['Sales']]),
+        }
+    return out
+
+def detect_month(filename):
+    """Finds a Month-Year pattern in a filename, e.g. 'May-2026', 'May_2026', 'May 2026'."""
+    m = re.search(r'([A-Za-z]{3,9})[\s_.\-]+(\d{4})', filename)
+    if not m:
+        return None
+    name = m.group(1).lower()
+    year = int(m.group(2))
+    if name not in MONTH_NAME_TO_NUM:
+        return None
+    mm = MONTH_NAME_TO_NUM[name]
+    return f'{mm:02d}-{year}'
+
+def detect_kind(filename):
+    """Mobile Closure workbook vs WE Pay Closure workbook, from filename keywords."""
+    low = filename.lower()
+    if 'we_pay' in low or 'wepay' in low or 'we pay' in low or 'wallet' in low:
+        return 'wallet'
+    if 'mobile' in low:
+        return 'mobile'
+    return None
+
+import os
+import urllib.request
+import urllib.error
+
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
+
+
+def supabase_upsert(table, rows, conflict_cols):
+    if not rows:
+        return
+    url = SUPABASE_URL.rstrip('/') + '/rest/v1/' + table + '?on_conflict=' + conflict_cols
+    chunk_size = 500
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i:i + chunk_size]
+        data = json.dumps(chunk, ensure_ascii=False, allow_nan=False).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST', headers={
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal',
+        })
+        try:
+            urllib.request.urlopen(req)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace')
+            raise RuntimeError(f'Supabase upsert into {table} failed (HTTP {e.code}): {body}')
+
+
+def sync_month_to_supabase(rows):
+    if not SUPABASE_ENABLED or not rows:
+        return
+    payload = []
+    for r in rows:
+        payload.append({
+            'month': r.get('month'),
+            'store_code': r.get('storeCode'),
+            'regional_manager': r.get('regionalManager'),
+            'area_manager': r.get('areaManager'),
+            'supervisor': r.get('supervisor'),
+            'region': r.get('region'),
+            'row': r,
+        })
+    supabase_upsert('monthly_closure', payload, 'month,store_code')
+    print(f'  ☁️  Synced {len(payload)} row(s) for {rows[0].get("month")} to Supabase')
+
+
+def scan_and_convert(raw_dir, data_dir):
+    files = glob.glob(os.path.join(raw_dir, '*.xlsb'))
+    pairs = {}  # month_str -> {'mobile': path, 'wallet': path}
+    for f in files:
+        name = os.path.basename(f)
+        month_str = detect_month(name)
+        kind = detect_kind(name)
+        if not month_str or not kind:
+            print(f'  ⚠️  Skipping (could not detect month/type): {name}')
+            continue
+        pairs.setdefault(month_str, {})[kind] = f
+
+    if SUPABASE_ENABLED:
+        print(f'  ☁️  Supabase sync ENABLED ({SUPABASE_URL})')
+    else:
+        print('  ℹ️  Supabase sync disabled (SUPABASE_URL/SUPABASE_SERVICE_KEY not set)')
+
+    processed = []
+    for month_str, pair in sorted(pairs.items()):
+        if 'mobile' not in pair or 'wallet' not in pair:
+            missing = 'WE Pay' if 'mobile' in pair else 'Mobile'
+            print(f'  ⚠️  {month_str}: missing the {missing} file — skipped')
+            continue
+        yyyy, mm = month_str.split('-')[1], month_str.split('-')[0]
+        rows = sanitize_rows(build_month(pair['mobile'], pair['wallet'], month_str))
+        print(f'  ✅ {month_str} parsed ({len(rows)} stores)')
+        try:
+            sync_month_to_supabase(rows)
+        except Exception as e:
+            print(f'  ❌ Supabase sync failed for {month_str}: {e}')
+        processed.append(f'{yyyy}-{mm}')
+
+    return processed
+
+
+def sanitize_rows(rows):
+    """Belt-and-suspenders: replace any NaN/Infinity that slipped through
+    (e.g. from an unexpected blank cell) with a safe default, so we never
+    write invalid JSON again. Numbers -> 0, strings -> ''."""
+    import math
+    for row in rows:
+        for k, v in list(row.items()):
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                row[k] = 0
+    return rows
+
+
+def build_month(mobile_path, wepay_path, month_str):
+    mm, yyyy = month_str.split('-')
+    month2 = MONTH_ABBR[int(mm)]
+
+    db = parse_database_sheet(mobile_path)
+    tariffs = parse_tariffs_sheet(mobile_path)
+    wallet = parse_wallet_sheet(wepay_path)
+    idle = parse_idle_sheet(mobile_path)
+
+    rows = []
+    for code, base in db.items():
+        t = tariffs.get(code, {})
+        w = wallet.get(code, {'walletTarget': 0, 'walletSales': 0})
+        idl = idle.get(code, {})
+        row = {
+            'month': month_str, 'month2': month2,
+            'store': base['store'], 'partner': base['partner'],
+            'classification': base['classification'], 'region': base['region'],
+            'accountManager': base['accountManager'], 'channelManager': base['channelManager'],
+            'areaManager': base['areaManager'], 'supervisor': base['supervisor'],
+            'regionalManager': base['regionalManager'], 'storeCode': code,
+            'mobileTarget': base['mobileTarget'], 'mobileSubs': base['mobileSubs'],
+            'goldTarget': base['goldTarget'], 'goldSubs': base['goldSubs'],
+            'fbbTarget': base['fbbTarget'], 'fbbSubs': base['fbbSubs'],
+            'fixedTarget': base['fixedTarget'], 'fixedSubs': base['fixedSubs'],
+            'walletTarget': w['walletTarget'], 'walletSales': w['walletSales'],
+            'fwaTarget': base['fwaTarget'], 'fwaSubs': base['fwaSubs'],
+            'lowT': t.get('lowT', 0), 'midT': t.get('midT', 0),
+            'highT': t.get('highT', 0), 'pt12': t.get('pt12', 0),
+            'kixTarget': base['kixTarget'], 'kixSubs': base['kixSubs'],
+            'tazbeetTarget': base['tazbeetTarget'], 'tazbeetSubs': base['tazbeetSubs'],
+            'dataSimTarget': base['dataSimMifiTarget'], 'dataSimSubs': base['dataSimMifiSubs'],
+            'weMixTarget': base['weMixTarget'], 'weMixSubs': base['weMixSubs'],
+            'weClubTarget': base['weClubTarget'], 'weClubSubs': base['weClubSubs'],
+            'paygTarget': base['paygTarget'], 'paygSubs': base['paygSubs'],
+        }
+        # Activation figures (Mobile/Fixed/FBB only) — omitted entirely for
+        # months whose IDLE sheet didn't have a usable split, so the frontend
+        # cleanly falls back to Sales for those months.
+        if idl:
+            row['mobileSubsAct'] = idl['mobileSubsAct']
+            row['fixedSubsAct']  = idl['fixedSubsAct']
+            row['fbbSubsAct']    = idl['fbbSubsAct']
+        for k, v in t.items():
+            if k.startswith('kix') or k.startswith('taz'):
+                row[k] = v
+        rows.append(row)
+    return rows
+
+if __name__ == '__main__':
+    if len(sys.argv) >= 2 and sys.argv[1] == '--scan':
+        raw_dir, data_dir = sys.argv[2:4]
+        scan_and_convert(raw_dir, data_dir)
+    else:
+        mobile_path, wepay_path, month_str, out_path = sys.argv[1:5]
+        rows = build_month(mobile_path, wepay_path, month_str)
+        with open(out_path, 'w', encoding='utf-8') as f:
+            json.dump(sanitize_rows(rows), f, ensure_ascii=False, allow_nan=False)
+        print(f'Wrote {len(rows)} store rows to {out_path}')
