@@ -21,6 +21,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install dependencies
+        run: pip install pandas pyxlsb
+
       - name: Backfill data/*.json into Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
