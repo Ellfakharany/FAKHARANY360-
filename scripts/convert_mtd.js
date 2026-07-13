@@ -644,6 +644,7 @@ async function syncMobileToSupabase(dateIso, mtdData) {
       supervisor: r.supervisor || null,
       region: r.region || null,
       row: r,
+      updated_at: new Date().toISOString(),
     };
   });
   await supabaseUpsert('mtd_mobile', rows, 'snapshot_date,store_code');
@@ -663,6 +664,7 @@ async function syncWalletToSupabase(dateIso, walletData, hierarchyMap) {
       supervisor: h.supervisor || null,
       region: h.region || null,
       row: w,
+      updated_at: new Date().toISOString(),
     };
   });
   await supabaseUpsert('mtd_wallet', rows, 'snapshot_date,store_code');
@@ -671,7 +673,7 @@ async function syncWalletToSupabase(dateIso, walletData, hierarchyMap) {
 
 async function syncMTDMeta(dateIso, kind, payload) {
   if (!SUPABASE_ENABLED) return;
-  const row = { snapshot_date: dateIso, kind: kind, pkg_mix: payload.pkg_mix, daily: payload.daily, sales_data: payload.sales_data };
+  const row = { snapshot_date: dateIso, kind: kind, pkg_mix: payload.pkg_mix, daily: payload.daily, sales_data: payload.sales_data, updated_at: new Date().toISOString() };
   await supabaseUpsert('mtd_meta', [row], 'snapshot_date,kind');
   console.log('  ☁️  Synced ' + kind + ' report meta (Tariff Mix / Daily Trend) to Supabase');
 }
