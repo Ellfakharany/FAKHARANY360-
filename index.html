@@ -5180,6 +5180,8 @@ var MTD_DAY_PKG_EXPANDED = {};     // which package category cards are expanded 
 var MTD_SELECTED_STORE = '';       // exact store name chosen from the search dropdown
 var MTD_MOBILE_DATE_LABEL = '';    // date parsed from the Mobile MTD file name
 var MTD_WALLET_DATE_LABEL = '';    // date parsed from the Wallet file name
+var MTD_MOBILE_SYNCED_AT = null;   // ISO timestamp of the last actual sync to Supabase
+var MTD_WALLET_SYNCED_AT = null;
 var MTD_SOURCE_MOBILE = null;      // 'auto' | 'manual' | null — where the current Mobile MTD data came from
 var MTD_SOURCE_WALLET = null;      // 'auto' | 'manual' | null — where the current WE Pay data came from
 var MTD_AUTO_LOADING  = false;
@@ -5209,10 +5211,59 @@ function openUploadModal() {
     dateInput.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
   }
   if (overlay) overlay.style.display = 'flex';
+  loadRecentUploads();
 }
 function closeUploadModal() {
   var overlay = document.getElementById('upload-modal-overlay');
   if (overlay) overlay.style.display = 'none';
+}
+
+async function loadRecentUploads() {
+  var container = document.getElementById('upload-modal-recent');
+  if (!container) return;
+  container.innerHTML = '⏳ جاري التحميل...';
+  try {
+    function distinctDates(rows) {
+      var seen = {}, out = [];
+      (rows || []).forEach(function (r) { if (!seen[r.snapshot_date]) { seen[r.snapshot_date] = true; out.push(r.snapshot_date); } });
+      return out.slice(0, 8);
+    }
+    var mobileRes = await sb.from('mtd_mobile').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
+    var walletRes = await sb.from('mtd_wallet').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
+    var mDates = distinctDates(mobileRes.data);
+    var wDates = distinctDates(walletRes.data);
+
+    function section(label, dates, kind) {
+      var html = '<div style="font-weight:700;color:#16a34a;margin:6px 0 4px">' + label + '</div>';
+      if (dates.length === 0) { html += '<div style="color:#9ca3af;margin-bottom:6px">مفيش بيانات</div>'; return html; }
+      dates.forEach(function (d) {
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6">' +
+          '<span>' + d + '</span>' +
+          '<button onclick="deleteSnapshot(\'' + kind + '\',\'' + d + '\')" style="color:#dc2626;background:none;border:1px solid #fecaca;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer"><i class="fas fa-trash-alt"></i> امسح</button>' +
+          '</div>';
+      });
+      return html;
+    }
+    container.innerHTML = section('📱 Mobile', mDates, 'mobile') + section('💰 Wallet', wDates, 'wallet');
+  } catch (e) {
+    container.innerHTML = '❌ فشل التحميل: ' + e.message;
+  }
+}
+
+async function deleteSnapshot(kind, dateIso) {
+  if (!confirm('متأكد إنك عايز تمسح بيانات ' + (kind === 'mobile' ? 'Mobile' : 'Wallet') + ' ليوم ' + dateIso + '؟ الخطوة دي مش هترجع.')) return;
+  var table = kind === 'mobile' ? 'mtd_mobile' : 'mtd_wallet';
+  var statusEl = document.getElementById('upload-modal-status');
+  try {
+    var res = await sb.from(table).delete().eq('snapshot_date', dateIso);
+    if (res.error) throw new Error(res.error.message);
+    await sb.from('mtd_meta').delete().eq('snapshot_date', dateIso).eq('kind', kind);
+    await loadRecentUploads();
+    await fetchAutoMTDData({ force: true });
+    if (statusEl) { statusEl.style.color = '#16a34a'; statusEl.textContent = '✅ اتمسحت بيانات ' + (kind === 'mobile' ? 'Mobile' : 'Wallet') + ' ليوم ' + dateIso; }
+  } catch (e) {
+    if (statusEl) { statusEl.style.color = '#dc2626'; statusEl.textContent = '❌ فشل المسح: ' + e.message; }
+  }
 }
 
 async function fetchHierarchyMapForDate(dateIso) {
@@ -5286,11 +5337,11 @@ async function handleAdminUpload(kind) {
 
       statusEl.textContent = '⏳ جاري الرفع لـ Supabase...';
       var rows = parsed.filter(function (r) { return r.storeCode; }).map(function (r) {
-        return { snapshot_date: dateIso, store_code: r.storeCode, regional_manager: r.regionalManager || null, area_manager: r.areaManager || null, supervisor: r.supervisor || null, region: r.region || null, row: r };
+        return { snapshot_date: dateIso, store_code: r.storeCode, regional_manager: r.regionalManager || null, area_manager: r.areaManager || null, supervisor: r.supervisor || null, region: r.region || null, row: r, updated_at: new Date().toISOString() };
       });
       var up1 = await sb.from('mtd_mobile').upsert(rows, { onConflict: 'snapshot_date,store_code' });
       if (up1.error) throw new Error('mtd_mobile: ' + up1.error.message);
-      var up2 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'mobile', pkg_mix: pkgMix, daily: daily, sales_data: mtdSalesData }], { onConflict: 'snapshot_date,kind' });
+      var up2 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'mobile', pkg_mix: pkgMix, daily: daily, sales_data: mtdSalesData, updated_at: new Date().toISOString() }], { onConflict: 'snapshot_date,kind' });
       if (up2.error) throw new Error('mtd_meta: ' + up2.error.message);
 
       statusEl.style.color = '#16a34a';
@@ -5298,7 +5349,7 @@ async function handleAdminUpload(kind) {
       await fetchAutoMTDData({ force: true });
 
     } else {
-      var walletData = parseWalletSheet(wb);
+      var walletData = parseWalletSheetBrowser(wb).walletData;
       if (!walletData || Object.keys(walletData).length === 0) throw new Error('لم يتم العثور على بيانات Wallet صالحة');
       var walletDaily = null;
       try { walletDaily = parseDailySheet(wb); } catch (e) { console.warn('[Admin Upload] Wallet Daily parse failed:', e.message); }
@@ -5307,11 +5358,11 @@ async function handleAdminUpload(kind) {
       var hierarchyMap = await fetchHierarchyMapForDate(dateIso);
       var wRows = Object.keys(walletData).map(function (code) {
         var h = hierarchyMap[code] || {};
-        return { snapshot_date: dateIso, store_code: code, regional_manager: h.regional_manager || null, area_manager: h.area_manager || null, supervisor: h.supervisor || null, region: h.region || null, row: walletData[code] };
+        return { snapshot_date: dateIso, store_code: code, regional_manager: h.regional_manager || null, area_manager: h.area_manager || null, supervisor: h.supervisor || null, region: h.region || null, row: walletData[code], updated_at: new Date().toISOString() };
       });
       var up3 = await sb.from('mtd_wallet').upsert(wRows, { onConflict: 'snapshot_date,store_code' });
       if (up3.error) throw new Error('mtd_wallet: ' + up3.error.message);
-      var up4 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'wallet', pkg_mix: null, daily: walletDaily, sales_data: null }], { onConflict: 'snapshot_date,kind' });
+      var up4 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'wallet', pkg_mix: null, daily: walletDaily, sales_data: null, updated_at: new Date().toISOString() }], { onConflict: 'snapshot_date,kind' });
       if (up4.error) throw new Error('mtd_meta: ' + up4.error.message);
 
       statusEl.style.color = '#16a34a';
@@ -5346,9 +5397,10 @@ async function fetchAutoMTDData(opts) {
         var maxM = await sb.from('mtd_mobile').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
         if (maxM.data && maxM.data.snapshot_date) {
           var dateIsoM = maxM.data.snapshot_date;
-          var rowsM = await sb.from('mtd_mobile').select('row').eq('snapshot_date', dateIsoM);
+          var rowsM = await sb.from('mtd_mobile').select('row,updated_at').eq('snapshot_date', dateIsoM);
           if (!rowsM.error && rowsM.data && rowsM.data.length) {
             MTD_DATA = rowsM.data.map(function (r) { return r.row; });
+            MTD_MOBILE_SYNCED_AT = rowsM.data.reduce(function(mx,r){ return (!mx || (r.updated_at && r.updated_at > mx)) ? r.updated_at : mx; }, null);
             MTD_FILTERED = MTD_DATA.slice();
             MTD_MOBILE_DATE_LABEL = isoToArabicLabel(dateIsoM);
             MTD_SOURCE_MOBILE = 'auto';
@@ -5374,11 +5426,12 @@ async function fetchAutoMTDData(opts) {
         var maxW = await sb.from('mtd_wallet').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(1).maybeSingle();
         if (maxW.data && maxW.data.snapshot_date) {
           var dateIsoW = maxW.data.snapshot_date;
-          var rowsW = await sb.from('mtd_wallet').select('store_code,row').eq('snapshot_date', dateIsoW);
+          var rowsW = await sb.from('mtd_wallet').select('store_code,row,updated_at').eq('snapshot_date', dateIsoW);
           if (!rowsW.error && rowsW.data && rowsW.data.length) {
             var wd = {};
             rowsW.data.forEach(function (r) { wd[String(r.store_code || '').toUpperCase()] = r.row; });
             WALLET_DATA = wd;
+            MTD_WALLET_SYNCED_AT = rowsW.data.reduce(function(mx,r){ return (!mx || (r.updated_at && r.updated_at > mx)) ? r.updated_at : mx; }, null);
             MTD_WALLET_DATE_LABEL = isoToArabicLabel(dateIsoW);
             MTD_SOURCE_WALLET = 'auto';
             var wCount = Object.keys(WALLET_DATA).length;
@@ -5936,6 +5989,59 @@ function loadMTDFile(file) {
 }
 
 // ── Load Wallet file ───────────────────────────────────────────
+// Reusable Wallet sheet parser (extracted so both the manual "Upload
+// Wallet" button and the admin direct-to-Supabase upload use the exact
+// same logic — no drift between the two paths).
+function parseWalletSheetBrowser(wb) {
+  var sheetName = wb.SheetNames.find(function(s){ return /sales\s*vs\s*target/i.test(s); });
+  if (!sheetName) {
+    sheetName = wb.SheetNames.find(function(s){
+      var test = XLSX.utils.sheet_to_json(wb.Sheets[s], {defval:null, raw:true, range:0});
+      if (!test || !test.length) return false;
+      var keys = Object.keys(test[0]).map(function(k){return k.toLowerCase();});
+      return keys.some(function(k){return k.indexOf('storecode')>=0 || k.indexOf('wallet target')>=0;});
+    });
+  }
+  if (!sheetName) sheetName = wb.SheetNames[0];
+
+  var ws = wb.Sheets[sheetName];
+  var raw = XLSX.utils.sheet_to_json(ws, {defval:null, raw:true});
+  if (!raw || raw.length===0) throw new Error('الشيت "'+sheetName+'" فاضي');
+
+  var WCOL = {
+    'storecodebss':'storeCode','storecodebs':'storeCode',
+    'branchnameasbss':'store',
+    'wallettarget':'walletTarget','target':'walletTarget',
+    'sales':'walletSales','walletsales':'walletSales',
+    'ach%':'walletPct','%':'walletPct','wallet%':'walletPct',
+    'proj':'walletProj','walletproj':'walletProj',
+    'proj%':'walletProjPct','walletproj%':'walletProjPct',
+  };
+  function normKey(k){ return String(k).trim().toLowerCase().replace(/\s+/g,''); }
+
+  var walletData = {};
+  raw.forEach(function(row){
+    var obj = {};
+    Object.keys(row).forEach(function(k){
+      var mapped = WCOL[normKey(k)];
+      if (!mapped) return;
+      var v = row[k];
+      if (mapped==='store' || mapped==='storeCode') {
+        obj[mapped] = (v===null||v===undefined) ? '' : String(v).trim();
+      } else {
+        obj[mapped] = (v===null||v===undefined||v==='') ? 0 : (isNaN(Number(v)) ? 0 : Number(v));
+      }
+    });
+    var key = String(obj.storeCode||'').trim().toUpperCase();
+    if (key) walletData[key] = obj;
+  });
+
+  var count = Object.keys(walletData).length;
+  if (count===0) throw new Error('مش لاقي بيانات Wallet في شيت "'+sheetName+'" — تأكد إن فيه عمود StoreCodeBSS و Wallet Target. الشيتات الموجودة: '+wb.SheetNames.join(', '));
+
+  return { walletData: walletData, sheetName: sheetName };
+}
+
 function loadWalletFile(file) {
   if (!file) return;
   MTD_WALLET_DATE_LABEL = extractDateFromFilename(file.name);
@@ -5949,57 +6055,10 @@ function loadWalletFile(file) {
       var data = new Uint8Array(cleanedBuffer);
       var wb = XLSX.read(data, {type:'array', cellDates:false, raw:true});
 
-      // Find the right sheet — prefer "Sales VS Target", else any sheet containing
-      // a "Wallet Target" or "StoreCodeBSS" column, else fallback to first sheet
-      var sheetName = wb.SheetNames.find(function(s){
-        return /sales\s*vs\s*target/i.test(s);
-      });
-      if (!sheetName) {
-        sheetName = wb.SheetNames.find(function(s){
-          var test = XLSX.utils.sheet_to_json(wb.Sheets[s], {defval:null, raw:true, range:0});
-          if (!test || !test.length) return false;
-          var keys = Object.keys(test[0]).map(function(k){return k.toLowerCase();});
-          return keys.some(function(k){return k.indexOf('storecode')>=0 || k.indexOf('wallet target')>=0;});
-        });
-      }
-      if (!sheetName) sheetName = wb.SheetNames[0];
-
-      var ws = wb.Sheets[sheetName];
-      var raw = XLSX.utils.sheet_to_json(ws, {defval:null, raw:true});
-      if (!raw || raw.length===0) throw new Error('الشيت "'+sheetName+'" فاضي');
-
-      // Flexible column mapping (case-insensitive, trimmed, spaces removed)
-      var WCOL = {
-        'storecodebss':'storeCode','storecodebs':'storeCode',
-        'branchnameasbss':'store',
-        'wallettarget':'walletTarget','target':'walletTarget',
-        'sales':'walletSales','walletsales':'walletSales',
-        'ach%':'walletPct','%':'walletPct','wallet%':'walletPct',
-        'proj':'walletProj','walletproj':'walletProj',
-        'proj%':'walletProjPct','walletproj%':'walletProjPct',
-      };
-      function normKey(k){ return String(k).trim().toLowerCase().replace(/\s+/g,''); }
-
-      WALLET_DATA = {};
-      raw.forEach(function(row){
-        var obj = {};
-        Object.keys(row).forEach(function(k){
-          var mapped = WCOL[normKey(k)];
-          if (!mapped) return;
-          var v = row[k];
-          if (mapped==='store' || mapped==='storeCode') {
-            obj[mapped] = (v===null||v===undefined) ? '' : String(v).trim();
-          } else {
-            obj[mapped] = (v===null||v===undefined||v==='') ? 0 : (isNaN(Number(v)) ? 0 : Number(v));
-          }
-        });
-        // Normalize store code: trim, uppercase (matches MTD storeCode normalization)
-        var key = String(obj.storeCode||'').trim().toUpperCase();
-        if (key) WALLET_DATA[key] = obj;
-      });
-
+      var parsedWallet = parseWalletSheetBrowser(wb);
+      var sheetName = parsedWallet.sheetName;
+      WALLET_DATA = parsedWallet.walletData;
       var count = Object.keys(WALLET_DATA).length;
-      if (count===0) throw new Error('مش لاقي بيانات Wallet في شيت "'+sheetName+'" — تأكد إن فيه عمود StoreCodeBSS و Wallet Target. الشيتات الموجودة: '+wb.SheetNames.join(', '));
 
       // Sanity check: how many MTD stores actually match a wallet record?
       var matchCount = 0;
@@ -6100,18 +6159,25 @@ function updateMTDFreshnessNote() {
   var txt  = document.getElementById('mtd-data-freshness-text');
   if (!wrap || !txt) return;
   function srcTag(src) {
-    if (src === 'manual') return '<span style="color:#c0392b;font-weight:700">📤 رفع يدوي</span>';
-    if (src === 'auto')   return '<span style="color:#16a34a;font-weight:700">🤖 تحديث تلقائي</span>';
+    if (src === 'manual') return '<span style="color:#c0392b;font-weight:700">📤 رفع يدوي (المتصفح فقط)</span>';
+    if (src === 'auto')   return '<span style="color:#16a34a;font-weight:700">☁️ Supabase</span>';
     return '';
+  }
+  function syncTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    var dd = String(d.getDate()).padStart(2,'0'), mm = String(d.getMonth()+1).padStart(2,'0'), yyyy = d.getFullYear();
+    var hh = String(d.getHours()).padStart(2,'0'), min = String(d.getMinutes()).padStart(2,'0');
+    return ' <span style="color:#6b7280">(آخر مزامنة ' + hh + ':' + min + ' — ' + dd + '/' + mm + '/' + yyyy + ')</span>';
   }
   var parts = [];
   if (MTD_MOBILE_DATE_LABEL) {
     var t = srcTag(MTD_SOURCE_MOBILE);
-    parts.push('📱 بيانات <b>Mobile</b> حتى <b>' + MTD_MOBILE_DATE_LABEL + '</b>' + (t ? ' — ' + t : ''));
+    parts.push('📱 بيانات <b>Mobile</b> حتى <b>' + MTD_MOBILE_DATE_LABEL + '</b>' + (t ? ' — ' + t : '') + syncTime(MTD_MOBILE_SYNCED_AT));
   }
   if (MTD_WALLET_DATE_LABEL) {
     var t2 = srcTag(MTD_SOURCE_WALLET);
-    parts.push('💰 بيانات <b>WE Pay</b> حتى <b>' + MTD_WALLET_DATE_LABEL + '</b>' + (t2 ? ' — ' + t2 : ''));
+    parts.push('💰 بيانات <b>WE Pay</b> حتى <b>' + MTD_WALLET_DATE_LABEL + '</b>' + (t2 ? ' — ' + t2 : '') + syncTime(MTD_WALLET_SYNCED_AT));
   }
   if (parts.length) { txt.innerHTML = parts.join(' &nbsp;&nbsp;|&nbsp;&nbsp; '); wrap.style.display = ''; }
   else { wrap.style.display = 'none'; }
@@ -8413,6 +8479,14 @@ function renderMTDTable() {
       </div>
 
       <div id="upload-modal-status" style="font-size:12px;font-weight:600;color:#374151;min-height:18px;margin-top:8px"></div>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:800;color:#374151"><i class="fas fa-history mr-1"></i>إدارة آخر الرفعات (تصحيح/رجوع)</div>
+          <button onclick="loadRecentUploads()" style="font-size:10px;color:#5E2D91;background:none;border:none;cursor:pointer;font-weight:700"><i class="fas fa-sync-alt mr-1"></i>تحديث</button>
+        </div>
+        <div id="upload-modal-recent" style="font-size:11px;color:#6b7280">دوس "تحديث" لعرض آخر الرفعات</div>
+      </div>
     </div>
   </div>
 
