@@ -873,6 +873,9 @@ function applyRolePermissions() {
     badge.className = 'user-badge ' + (currentRole === 'admin' ? 'admin' : 'viewer');
   }
 
+  const uploadBtn = document.getElementById('admin-upload-btn');
+  if (uploadBtn) uploadBtn.style.display = currentRole === 'admin' ? 'inline-flex' : 'none';
+
   // Hide export buttons for viewer
   if (currentRole === 'viewer') {
     document.querySelectorAll('.export-restricted').forEach(el => {
@@ -959,6 +962,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <button onclick="toggleDarkMode()" class="header-btn" title="Dark Mode"><i class="fas fa-moon"></i></button>
         <button onclick="toggleFullscreen()" class="header-btn" title="Fullscreen"><i class="fas fa-expand"></i></button>
         <a href="https://www.linkedin.com/in/m-elfakharany" target="_blank" rel="noopener" class="header-btn" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><i class="fab fa-linkedin" style="color:#0077B5"></i></a>
+        <button onclick="openUploadModal()" id="admin-upload-btn" class="header-btn-accent" title="Upload Data to Supabase" style="display:none;background:linear-gradient(135deg,#16a34a,#15803d)"><i class="fas fa-cloud-upload-alt mr-1"></i><span class="hidden sm:inline">Upload Data</span></button>
         <button onclick="generateExecutiveReport()" class="header-btn-accent export-restricted" title="Executive Report" style="background:linear-gradient(135deg,#5E2D91,#e91e8c)"><i class="fas fa-crown mr-1"></i><span class="hidden sm:inline">Exec Report</span></button>
         <button onclick="exportPDF()" class="header-btn-accent export-restricted" title="Full Page Snapshot (PDF)"><i class="fas fa-file-pdf mr-1"></i><span class="hidden sm:inline">Snapshot</span></button>
         <button onclick="exportExcel()" class="header-btn-accent export-restricted" title="Export Excel"><i class="fas fa-file-excel mr-1"></i><span class="hidden sm:inline">Excel</span></button>
@@ -5189,6 +5193,138 @@ var MTD_AUTO_LOADING  = false;
 //  before and simply take over for the rest of the session once used.
 // ══════════════════════════════════════════════════════════════
 var AR_MONTHS_FULL = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+// ══════════════════════════════════════════════════════════════
+//  ADMIN: DIRECT UPLOAD TO SUPABASE — reuses the exact same in-browser
+//  parsing functions as the manual "Upload MTD"/"Upload Wallet" buttons
+//  (parseMTDWorkbook, parseIDLESheet, parsePkgMixSheet, parseDailySheet,
+//  parseWalletSheet, stripXlsbMetadata) but pushes straight to Supabase
+//  instead of only setting local variables — no GitHub raw/ folder or
+//  Action needed anymore for MTD updates.
+// ══════════════════════════════════════════════════════════════
+function openUploadModal() {
+  var overlay = document.getElementById('upload-modal-overlay');
+  var dateInput = document.getElementById('upload-modal-date');
+  if (dateInput && !dateInput.value) {
+    var today = new Date();
+    dateInput.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  }
+  if (overlay) overlay.style.display = 'flex';
+}
+function closeUploadModal() {
+  var overlay = document.getElementById('upload-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function fetchHierarchyMapForDate(dateIso) {
+  var map = {};
+  try {
+    var res = await sb.from('mtd_mobile').select('store_code,regional_manager,area_manager,supervisor,region').eq('snapshot_date', dateIso);
+    if (res.data && res.data.length) { res.data.forEach(function(r){ map[r.store_code] = r; }); return map; }
+    var res2 = await sb.from('mtd_mobile').select('store_code,regional_manager,area_manager,supervisor,region').order('snapshot_date', { ascending: false }).limit(2000);
+    if (res2.data) res2.data.forEach(function(r){ if (!map[r.store_code]) map[r.store_code] = r; });
+  } catch (e) { console.warn('[Admin Upload] hierarchy lookup failed:', e.message); }
+  return map;
+}
+
+async function handleAdminUpload(kind) {
+  var dateInput = document.getElementById('upload-modal-date');
+  var fileInput = document.getElementById(kind === 'mobile' ? 'upload-modal-mobile' : 'upload-modal-wallet');
+  var statusEl = document.getElementById('upload-modal-status');
+  var dateIso = dateInput ? dateInput.value : '';
+  var file = fileInput && fileInput.files[0];
+
+  if (!dateIso) { statusEl.textContent = '⚠️ اختار التاريخ الأول'; return; }
+  if (!file) { statusEl.textContent = '⚠️ اختار ملف الأول'; return; }
+
+  statusEl.style.color = '#374151';
+  statusEl.textContent = '⏳ جاري القراءة...';
+
+  try {
+    var arrayBuffer = await file.arrayBuffer();
+    var cleaned = await stripXlsbMetadata(arrayBuffer);
+    var wb = XLSX.read(new Uint8Array(cleaned), { type: 'array', cellDates: false, raw: true });
+
+    if (kind === 'mobile') {
+      var parsed = parseMTDWorkbook(wb);
+      if (!parsed || parsed.length === 0) throw new Error('لم يتم العثور على بيانات صالحة في شيت Database');
+
+      var idleData = null;
+      try { idleData = parseIDLESheet(wb); } catch (e) { console.warn('[Admin Upload] IDLE parse failed:', e.message); }
+
+      var mtdSalesData = [];
+      if (idleData) {
+        mtdSalesData = parsed.map(function (r) {
+          var code = String(r.storeCode || '').trim().toUpperCase();
+          var idle = idleData[code];
+          var sr = Object.assign({}, r);
+          if (idle) {
+            sr.mobileSubs = idle.mobileSales; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
+            sr.fixedSubs = idle.fixedSales; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
+            sr.fbbSubs = idle.fbbSales; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
+            if (idle.goldSales !== null) { sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0; }
+            if (idle.wemixSales !== null) { sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0; }
+          }
+          return sr;
+        });
+        parsed = parsed.map(function (r) {
+          var code = String(r.storeCode || '').trim().toUpperCase();
+          var idle = idleData[code];
+          if (!idle) return r;
+          var sr = Object.assign({}, r);
+          sr.mobileSubs = idle.mobileAct; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
+          sr.fixedSubs = idle.fixedAct; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
+          sr.fbbSubs = idle.fbbAct; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
+          if (idle.goldAct !== null) { sr.goldSubs = idle.goldAct; sr.goldPct = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0; }
+          if (idle.wemixAct !== null) { sr.weMixSubs = idle.wemixAct; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0; }
+          return sr;
+        });
+      }
+
+      var pkgMix = null, daily = null;
+      try { pkgMix = parsePkgMixSheet(wb); } catch (e) { console.warn('[Admin Upload] PkgMix parse failed:', e.message); }
+      try { daily = parseDailySheet(wb); } catch (e) { console.warn('[Admin Upload] Daily parse failed:', e.message); }
+
+      statusEl.textContent = '⏳ جاري الرفع لـ Supabase...';
+      var rows = parsed.filter(function (r) { return r.storeCode; }).map(function (r) {
+        return { snapshot_date: dateIso, store_code: r.storeCode, regional_manager: r.regionalManager || null, area_manager: r.areaManager || null, supervisor: r.supervisor || null, region: r.region || null, row: r };
+      });
+      var up1 = await sb.from('mtd_mobile').upsert(rows, { onConflict: 'snapshot_date,store_code' });
+      if (up1.error) throw new Error('mtd_mobile: ' + up1.error.message);
+      var up2 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'mobile', pkg_mix: pkgMix, daily: daily, sales_data: mtdSalesData }], { onConflict: 'snapshot_date,kind' });
+      if (up2.error) throw new Error('mtd_meta: ' + up2.error.message);
+
+      statusEl.style.color = '#16a34a';
+      statusEl.textContent = '✅ اتحمل ' + rows.length + ' فرع (Mobile) لتاريخ ' + dateIso;
+      await fetchAutoMTDData({ force: true });
+
+    } else {
+      var walletData = parseWalletSheet(wb);
+      if (!walletData || Object.keys(walletData).length === 0) throw new Error('لم يتم العثور على بيانات Wallet صالحة');
+      var walletDaily = null;
+      try { walletDaily = parseDailySheet(wb); } catch (e) { console.warn('[Admin Upload] Wallet Daily parse failed:', e.message); }
+
+      statusEl.textContent = '⏳ جاري الرفع لـ Supabase...';
+      var hierarchyMap = await fetchHierarchyMapForDate(dateIso);
+      var wRows = Object.keys(walletData).map(function (code) {
+        var h = hierarchyMap[code] || {};
+        return { snapshot_date: dateIso, store_code: code, regional_manager: h.regional_manager || null, area_manager: h.area_manager || null, supervisor: h.supervisor || null, region: h.region || null, row: walletData[code] };
+      });
+      var up3 = await sb.from('mtd_wallet').upsert(wRows, { onConflict: 'snapshot_date,store_code' });
+      if (up3.error) throw new Error('mtd_wallet: ' + up3.error.message);
+      var up4 = await sb.from('mtd_meta').upsert([{ snapshot_date: dateIso, kind: 'wallet', pkg_mix: null, daily: walletDaily, sales_data: null }], { onConflict: 'snapshot_date,kind' });
+      if (up4.error) throw new Error('mtd_meta: ' + up4.error.message);
+
+      statusEl.style.color = '#16a34a';
+      statusEl.textContent = '✅ اتحمل ' + wRows.length + ' فرع (Wallet) لتاريخ ' + dateIso;
+      await fetchAutoMTDData({ force: true });
+    }
+  } catch (err) {
+    statusEl.style.color = '#dc2626';
+    statusEl.textContent = '❌ ' + err.message;
+    console.error('[Admin Upload]', err);
+  }
+}
+
 function isoToArabicLabel(iso) {
   var parts = String(iso).split('-');
   if (parts.length !== 3) return iso;
@@ -8245,6 +8381,40 @@ function renderMTDTable() {
   </div>
 
 </div>
+
+  <!-- ── Admin: Direct Upload to Supabase Modal ── -->
+  <div id="upload-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:16px;max-width:480px;width:100%;padding:24px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="font-size:16px;font-weight:800;color:#1a1a2e"><i class="fas fa-cloud-upload-alt mr-2" style="color:#16a34a"></i>Upload Data to Supabase</h3>
+        <button onclick="closeUploadModal()" style="background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer">&times;</button>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:6px">التاريخ اللي البيانات دي بتاعته</label>
+        <input type="date" id="upload-modal-date" style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:13px">
+      </div>
+
+      <div style="border:1.5px dashed #16a34a;border-radius:10px;padding:14px;margin-bottom:12px;background:#f0fdf4">
+        <div style="font-size:12px;font-weight:800;color:#15803d;margin-bottom:8px"><i class="fas fa-mobile-alt mr-1"></i>MTD Dashboard — Mobile</div>
+        <input type="file" id="upload-modal-mobile" accept=".xlsx,.xls,.xlsb" style="font-size:11px;width:100%">
+        <button onclick="handleAdminUpload('mobile')" style="margin-top:8px;width:100%;padding:7px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-upload mr-1"></i>ارفع لـ Supabase</button>
+      </div>
+
+      <div style="border:1.5px dashed #16a34a;border-radius:10px;padding:14px;margin-bottom:12px;background:#f0fdf4">
+        <div style="font-size:12px;font-weight:800;color:#15803d;margin-bottom:8px"><i class="fas fa-wallet mr-1"></i>MTD Dashboard — WE Pay (Wallet)</div>
+        <input type="file" id="upload-modal-wallet" accept=".xlsx,.xls,.xlsb" style="font-size:11px;width:100%">
+        <button onclick="handleAdminUpload('wallet')" style="margin-top:8px;width:100%;padding:7px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-upload mr-1"></i>ارفع لـ Supabase</button>
+      </div>
+
+      <div style="border:1.5px dashed #d1d5db;border-radius:10px;padding:14px;margin-bottom:12px;background:#f9fafb;opacity:0.6">
+        <div style="font-size:12px;font-weight:800;color:#6b7280;margin-bottom:4px"><i class="fas fa-calendar-alt mr-1"></i>Closure Dashboard (الداشبورد الشهرية)</div>
+        <div style="font-size:11px;color:#9ca3af">قريباً — لسه بترفع عن طريق GitHub raw/ folder</div>
+      </div>
+
+      <div id="upload-modal-status" style="font-size:12px;font-weight:600;color:#374151;min-height:18px;margin-top:8px"></div>
+    </div>
+  </div>
 
 </body>
 </html>
