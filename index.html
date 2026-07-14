@@ -5223,44 +5223,54 @@ async function loadRecentUploads() {
   if (!container) return;
   container.innerHTML = '⏳ جاري التحميل...';
   try {
-    function distinctDates(rows) {
+    function distinctVals(rows, field) {
       var seen = {}, out = [];
-      (rows || []).forEach(function (r) { if (!seen[r.snapshot_date]) { seen[r.snapshot_date] = true; out.push(r.snapshot_date); } });
+      (rows || []).forEach(function (r) { if (!seen[r[field]]) { seen[r[field]] = true; out.push(r[field]); } });
       return out.slice(0, 8);
     }
     var mobileRes = await sb.from('mtd_mobile').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
     var walletRes = await sb.from('mtd_wallet').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
-    var mDates = distinctDates(mobileRes.data);
-    var wDates = distinctDates(walletRes.data);
+    var closureRes = await sb.from('monthly_closure').select('month').order('month', { ascending: false }).limit(1000);
+    var mDates = distinctVals(mobileRes.data, 'snapshot_date');
+    var wDates = distinctVals(walletRes.data, 'snapshot_date');
+    var cMonths = distinctVals(closureRes.data, 'month');
 
-    function section(label, dates, kind) {
+    function section(label, values, kind) {
       var html = '<div style="font-weight:700;color:#16a34a;margin:6px 0 4px">' + label + '</div>';
-      if (dates.length === 0) { html += '<div style="color:#9ca3af;margin-bottom:6px">مفيش بيانات</div>'; return html; }
-      dates.forEach(function (d) {
+      if (values.length === 0) { html += '<div style="color:#9ca3af;margin-bottom:6px">مفيش بيانات</div>'; return html; }
+      values.forEach(function (v) {
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6">' +
-          '<span>' + d + '</span>' +
-          '<button onclick="deleteSnapshot(\'' + kind + '\',\'' + d + '\')" style="color:#dc2626;background:none;border:1px solid #fecaca;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer"><i class="fas fa-trash-alt"></i> امسح</button>' +
+          '<span>' + v + '</span>' +
+          '<button onclick="deleteSnapshot(\'' + kind + '\',\'' + v + '\')" style="color:#dc2626;background:none;border:1px solid #fecaca;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer"><i class="fas fa-trash-alt"></i> امسح</button>' +
           '</div>';
       });
       return html;
     }
-    container.innerHTML = section('📱 Mobile', mDates, 'mobile') + section('💰 Wallet', wDates, 'wallet');
+    container.innerHTML = section('📱 Mobile (MTD)', mDates, 'mobile') + section('💰 Wallet (MTD)', wDates, 'wallet') + section('🗓️ Closure (شهري)', cMonths, 'closure');
   } catch (e) {
     container.innerHTML = '❌ فشل التحميل: ' + e.message;
   }
 }
 
-async function deleteSnapshot(kind, dateIso) {
-  if (!confirm('متأكد إنك عايز تمسح بيانات ' + (kind === 'mobile' ? 'Mobile' : 'Wallet') + ' ليوم ' + dateIso + '؟ الخطوة دي مش هترجع.')) return;
-  var table = kind === 'mobile' ? 'mtd_mobile' : 'mtd_wallet';
+async function deleteSnapshot(kind, value) {
+  var label = kind === 'mobile' ? 'Mobile' : kind === 'wallet' ? 'Wallet' : 'Closure';
+  if (!confirm('متأكد إنك عايز تمسح بيانات ' + label + ' لـ ' + value + '؟ الخطوة دي مش هترجع.')) return;
   var statusEl = document.getElementById('upload-modal-status');
   try {
-    var res = await sb.from(table).delete().eq('snapshot_date', dateIso);
-    if (res.error) throw new Error(res.error.message);
-    await sb.from('mtd_meta').delete().eq('snapshot_date', dateIso).eq('kind', kind);
+    if (kind === 'closure') {
+      var resC = await sb.from('monthly_closure').delete().eq('month', value);
+      if (resC.error) throw new Error(resC.error.message);
+      RAW_DATA = await fetchAllMonthsData();
+      if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
+    } else {
+      var table = kind === 'mobile' ? 'mtd_mobile' : 'mtd_wallet';
+      var res = await sb.from(table).delete().eq('snapshot_date', value);
+      if (res.error) throw new Error(res.error.message);
+      await sb.from('mtd_meta').delete().eq('snapshot_date', value).eq('kind', kind);
+      await fetchAutoMTDData({ force: true });
+    }
     await loadRecentUploads();
-    await fetchAutoMTDData({ force: true });
-    if (statusEl) { statusEl.style.color = '#16a34a'; statusEl.textContent = '✅ اتمسحت بيانات ' + (kind === 'mobile' ? 'Mobile' : 'Wallet') + ' ليوم ' + dateIso; }
+    if (statusEl) { statusEl.style.color = '#16a34a'; statusEl.textContent = '✅ اتمسحت بيانات ' + label + ' لـ ' + value; }
   } catch (e) {
     if (statusEl) { statusEl.style.color = '#dc2626'; statusEl.textContent = '❌ فشل المسح: ' + e.message; }
   }
@@ -5275,6 +5285,54 @@ async function fetchHierarchyMapForDate(dateIso) {
     if (res2.data) res2.data.forEach(function(r){ if (!map[r.store_code]) map[r.store_code] = r; });
   } catch (e) { console.warn('[Admin Upload] hierarchy lookup failed:', e.message); }
   return map;
+}
+
+async function handleAdminClosureUpload() {
+  var monthInput = document.getElementById('upload-modal-closure-month'); // yields "YYYY-MM"
+  var mobileInput = document.getElementById('upload-modal-closure-mobile');
+  var walletInput = document.getElementById('upload-modal-closure-wallet');
+  var statusEl = document.getElementById('upload-modal-status');
+
+  if (!monthInput || !monthInput.value) { statusEl.textContent = '⚠️ اختار الشهر الأول'; return; }
+  var mobileFile = mobileInput && mobileInput.files[0];
+  var walletFile = walletInput && walletInput.files[0];
+  if (!mobileFile || !walletFile) { statusEl.textContent = '⚠️ لازم ترفع ملف Mobile وملف WE Pay مع بعض'; return; }
+
+  var ymParts = monthInput.value.split('-'); // ["YYYY","MM"]
+  var monthStr = ymParts[1] + '-' + ymParts[0]; // "MM-YYYY" — matches the existing row schema
+
+  statusEl.style.color = '#374151';
+  statusEl.textContent = '⏳ جاري القراءة...';
+
+  try {
+    var mobileBuf = await mobileFile.arrayBuffer();
+    var mobileCleaned = await stripXlsbMetadata(mobileBuf);
+    var mobileWb = XLSX.read(new Uint8Array(mobileCleaned), { type: 'array', cellDates: false, raw: true });
+
+    var walletBuf = await walletFile.arrayBuffer();
+    var walletCleaned = await stripXlsbMetadata(walletBuf);
+    var walletWb = XLSX.read(new Uint8Array(walletCleaned), { type: 'array', cellDates: false, raw: true });
+
+    var rows = buildMonthRowsClosure(mobileWb, walletWb, monthStr);
+    if (!rows.length) throw new Error('لم يتم العثور على أي فروع في الملف');
+
+    statusEl.textContent = '⏳ جاري الرفع لـ Supabase...';
+    var payload = rows.map(function (r) {
+      return { month: r.month, store_code: r.storeCode, regional_manager: r.regionalManager || null, area_manager: r.areaManager || null, supervisor: r.supervisor || null, region: r.region || null, row: r, updated_at: new Date().toISOString() };
+    });
+    var up = await sb.from('monthly_closure').upsert(payload, { onConflict: 'month,store_code' });
+    if (up.error) throw new Error(up.error.message);
+
+    statusEl.style.color = '#16a34a';
+    statusEl.textContent = '✅ اتحمل ' + rows.length + ' فرع لشهر ' + monthStr;
+    RAW_DATA = await fetchAllMonthsData();
+    if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
+    await loadRecentUploads();
+  } catch (err) {
+    statusEl.style.color = '#dc2626';
+    statusEl.textContent = '❌ ' + err.message;
+    console.error('[Admin Closure Upload]', err);
+  }
 }
 
 async function handleAdminUpload(kind) {
@@ -5992,6 +6050,216 @@ function loadMTDFile(file) {
 // Reusable Wallet sheet parser (extracted so both the manual "Upload
 // Wallet" button and the admin direct-to-Supabase upload use the exact
 // same logic — no drift between the two paths).
+// ══════════════════════════════════════════════════════════════
+//  CLOSURE (Monthly) PARSER — browser port of scripts/convert_closure.py
+//  so the admin can upload the monthly closure files directly, same as
+//  MTD. Keep in sync with convert_closure.py if the workbook layout ever
+//  changes there.
+// ══════════════════════════════════════════════════════════════
+function findTotalColClosure(headerRow, productLabel, fieldLabel) {
+  var target = (productLabel + ' ' + fieldLabel).trim().toLowerCase();
+  for (var j = 0; j < headerRow.length; j++) {
+    var label = headerRow[j];
+    if (label === null || label === undefined) continue;
+    if (String(label).trim().toLowerCase() === target) return j;
+  }
+  throw new Error("مش لاقي عمود '" + target + "' في شيت Database — شكل الملف اتغيّر، راجع الصف 6 في شيت Database.");
+}
+function classifyTierClosure(n) {
+  var LOW_SET = [25,29,32,37], MID_SET = [40,45,46,52];
+  if (LOW_SET.indexOf(n) !== -1) return 'low';
+  if (MID_SET.indexOf(n) !== -1) return 'mid';
+  return 'high';
+}
+function normCodeClosure(x) { return String(x).trim().toUpperCase(); }
+function normalizeNameClosure(s) {
+  if (s === null || s === undefined) return s;
+  return String(s).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function parseDatabaseSheetClosure(wb) {
+  var ws = wb.Sheets['Database'];
+  if (!ws) throw new Error('مش لاقي شيت Database. الشيتات الموجودة: ' + wb.SheetNames.join(', '));
+  var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+  var totalHeader = aoa[5] || [];
+
+  var mobileTCol = findTotalColClosure(totalHeader, 'Mobile', 'Target');
+  var mobileACol = findTotalColClosure(totalHeader, 'Mobile', 'Subscriptions');
+  var fwaTCol = findTotalColClosure(totalHeader, 'FWA', 'Target');
+  var fwaACol = findTotalColClosure(totalHeader, 'FWA', 'Subscriptions');
+  var fixedTCol = findTotalColClosure(totalHeader, 'Fixed', 'Target');
+  var fixedACol = findTotalColClosure(totalHeader, 'Fixed', 'Subscriptions');
+  var fbbTCol = findTotalColClosure(totalHeader, 'FBB', 'Target');
+  var fbbACol = findTotalColClosure(totalHeader, 'FBB', 'Subscriptions');
+
+  var rows = {};
+  for (var i = 8; i < aoa.length; i++) {
+    var r = aoa[i];
+    if (!r) continue;
+    var code = r[0];
+    if (code === null || code === undefined) continue;
+    code = normCodeClosure(code);
+    if (r[1] === null || r[1] === undefined || code.toLowerCase().indexOf('grand total') >= 0 || code.toLowerCase() === 'total') continue;
+
+    (function () {
+      function num(col) { var v = r[col]; return (v === null || v === undefined) ? 0 : Number(v); }
+      rows[code] = {
+        storeCode: code, store: normalizeNameClosure(r[1]), partner: r[2], classification: r[3], region: r[4],
+        accountManager: r[5], channelManager: r[6], areaManager: r[7], supervisor: r[8], regionalManager: r[10],
+        kixTarget: num(12), kixSubs: num(13), tazbeetTarget: num(15), tazbeetSubs: num(16),
+        dataSimMifiTarget: num(18), dataSimMifiSubs: num(19), paygTarget: num(21), paygSubs: num(22),
+        prepaidTarget: num(24), prepaidSubs: num(25), weClubTarget: num(27), weClubSubs: num(28),
+        goldTarget: num(30), goldSubs: num(31), weMixTarget: num(33), weMixSubs: num(34),
+        mobileTarget: num(mobileTCol), mobileSubs: num(mobileACol),
+        fwaTarget: num(fwaTCol), fwaSubs: num(fwaACol),
+        fixedTarget: num(fixedTCol), fixedSubs: num(fixedACol),
+        fbbTarget: num(fbbTCol), fbbSubs: num(fbbACol),
+      };
+    })();
+  }
+  return rows;
+}
+
+function parseIdleSheetClosure(wb) {
+  var ws = wb.Sheets['IDLE'];
+  if (!ws) return {};
+  try {
+    var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+    var header = aoa[5] || [];
+    var cols = {};
+    ['Mobile', 'Fixed', 'FBB'].forEach(function (prod) {
+      cols[prod + 'Sales'] = findTotalColClosure(header, prod, 'All Sales');
+      cols[prod + 'Act'] = findTotalColClosure(header, prod, 'All Activation');
+    });
+    var out = {};
+    for (var i = 8; i < aoa.length; i++) {
+      var r = aoa[i];
+      if (!r) continue;
+      var code = r[0];
+      if (code === null || code === undefined || r[1] === null || r[1] === undefined) continue;
+      code = normCodeClosure(code);
+      (function () {
+        function num(col) { var v = r[col]; return (v === null || v === undefined) ? 0 : Number(v); }
+        out[code] = { mobileSubsAct: num(cols['MobileAct']), fixedSubsAct: num(cols['FixedAct']), fbbSubsAct: num(cols['FBBAct']) };
+      })();
+    }
+    return out;
+  } catch (e) { return {}; } // older workbooks without the Sales/Activation split — fall back gracefully
+}
+
+function parseTariffsSheetClosure(wb) {
+  var ws = wb.Sheets['Tariffs Per Stoers'];
+  if (!ws) throw new Error('مش لاقي شيت Tariffs Per Stoers. الشيتات الموجودة: ' + wb.SheetNames.join(', '));
+  var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+  var header = aoa[6] || [];
+  var codeCol = null, colLabels = {};
+  for (var j = 0; j < header.length; j++) {
+    var label = header[j];
+    if (label === null || label === undefined) continue;
+    label = String(label).trim();
+    if (label === 'StoreCodeBSS') codeCol = j; else colLabels[j] = label;
+  }
+  var out = {};
+  for (var i = 7; i < aoa.length; i++) {
+    var r = aoa[i];
+    if (!r) continue;
+    var code = r[codeCol];
+    if (code === null || code === undefined) continue;
+    code = normCodeClosure(code);
+    var low = 0, mid = 0, high = 0, pt12 = 0;
+    var kixFields = {}, tazFields = {};
+    for (var jj in colLabels) {
+      var label2 = colLabels[jj];
+      var v = r[jj];
+      if (v === null || v === undefined || v === 0) continue;
+      var lowLabel = label2.toLowerCase();
+      if (lowLabel === '12 pt') { pt12 += Number(v); continue; }
+      if (lowLabel.indexOf('grand total') >= 0) continue;
+      var isKix = lowLabel.indexOf('kix') >= 0;
+      var isTaz = lowLabel.indexOf('tazbeet') >= 0;
+      if (!isKix && !isTaz) continue;
+      v = Number(v);
+      var m = label2.match(/(\d+)(?!.*\d)/);
+      if (!m) {
+        high += v;
+        var key = (isKix ? 'kix' : 'taz') + 'Other';
+        if (isKix) kixFields[key] = (kixFields[key] || 0) + v; else tazFields[key] = (tazFields[key] || 0) + v;
+        continue;
+      }
+      var n = parseInt(m[1], 10);
+      var tier = classifyTierClosure(n);
+      if (tier === 'low') low += v; else if (tier === 'mid') mid += v; else high += v;
+      if (isKix) kixFields['kix' + n] = (kixFields['kix' + n] || 0) + v;
+      else tazFields['taz' + n] = (tazFields['taz' + n] || 0) + v;
+    }
+    out[code] = Object.assign({ lowT: low, midT: mid, highT: high, pt12: pt12 }, kixFields, tazFields);
+  }
+  return out;
+}
+
+function parseWalletSheetClosure(wb) {
+  var ws = wb.Sheets['Sales VS Target'];
+  if (!ws) throw new Error('مش لاقي شيت Sales VS Target. الشيتات الموجودة: ' + wb.SheetNames.join(', '));
+  var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+  var header = aoa[0] || [];
+  var col = {};
+  for (var j = 0; j < header.length; j++) { var v = header[j]; if (v !== null && v !== undefined) col[String(v).trim()] = j; }
+  var out = {};
+  for (var i = 1; i < aoa.length; i++) {
+    var r = aoa[i];
+    if (!r) continue;
+    var code = r[col['StoreCodeBSS']];
+    if (code === null || code === undefined) continue;
+    code = normCodeClosure(code);
+    var t = r[col['Wallet Target']], s = r[col['Sales']];
+    out[code] = { walletTarget: (t === null || t === undefined) ? 0 : Number(t), walletSales: (s === null || s === undefined) ? 0 : Number(s) };
+  }
+  return out;
+}
+
+var MONTH_ABBR_CLOSURE = { 1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec' };
+
+function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
+  var parts = monthStr.split('-'); var mm = parts[0];
+  var month2 = MONTH_ABBR_CLOSURE[parseInt(mm, 10)];
+
+  var db = parseDatabaseSheetClosure(mobileWb);
+  var tariffs = parseTariffsSheetClosure(mobileWb);
+  var wallet = parseWalletSheetClosure(wepayWb);
+  var idle = parseIdleSheetClosure(mobileWb);
+
+  var rows = [];
+  Object.keys(db).forEach(function (code) {
+    var base = db[code];
+    var t = tariffs[code] || {};
+    var w = wallet[code] || { walletTarget: 0, walletSales: 0 };
+    var idl = idle[code] || null;
+    var row = {
+      month: monthStr, month2: month2,
+      store: base.store, partner: base.partner, classification: base.classification, region: base.region,
+      accountManager: base.accountManager, channelManager: base.channelManager,
+      areaManager: base.areaManager, supervisor: base.supervisor, regionalManager: base.regionalManager, storeCode: code,
+      mobileTarget: base.mobileTarget, mobileSubs: base.mobileSubs,
+      goldTarget: base.goldTarget, goldSubs: base.goldSubs,
+      fbbTarget: base.fbbTarget, fbbSubs: base.fbbSubs,
+      fixedTarget: base.fixedTarget, fixedSubs: base.fixedSubs,
+      walletTarget: w.walletTarget, walletSales: w.walletSales,
+      fwaTarget: base.fwaTarget, fwaSubs: base.fwaSubs,
+      lowT: t.lowT || 0, midT: t.midT || 0, highT: t.highT || 0, pt12: t.pt12 || 0,
+      kixTarget: base.kixTarget, kixSubs: base.kixSubs,
+      tazbeetTarget: base.tazbeetTarget, tazbeetSubs: base.tazbeetSubs,
+      dataSimTarget: base.dataSimMifiTarget, dataSimSubs: base.dataSimMifiSubs,
+      weMixTarget: base.weMixTarget, weMixSubs: base.weMixSubs,
+      weClubTarget: base.weClubTarget, weClubSubs: base.weClubSubs,
+      paygTarget: base.paygTarget, paygSubs: base.paygSubs,
+    };
+    if (idl) { row.mobileSubsAct = idl.mobileSubsAct; row.fixedSubsAct = idl.fixedSubsAct; row.fbbSubsAct = idl.fbbSubsAct; }
+    Object.keys(t).forEach(function (k) { if (k.indexOf('kix') === 0 || k.indexOf('taz') === 0) row[k] = t[k]; });
+    rows.push(row);
+  });
+  return rows;
+}
+
 function parseWalletSheetBrowser(wb) {
   var sheetName = wb.SheetNames.find(function(s){ return /sales\s*vs\s*target/i.test(s); });
   if (!sheetName) {
@@ -8473,9 +8741,15 @@ function renderMTDTable() {
         <button onclick="handleAdminUpload('wallet')" style="margin-top:8px;width:100%;padding:7px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-upload mr-1"></i>ارفع لـ Supabase</button>
       </div>
 
-      <div style="border:1.5px dashed #d1d5db;border-radius:10px;padding:14px;margin-bottom:12px;background:#f9fafb;opacity:0.6">
-        <div style="font-size:12px;font-weight:800;color:#6b7280;margin-bottom:4px"><i class="fas fa-calendar-alt mr-1"></i>Closure Dashboard (الداشبورد الشهرية)</div>
-        <div style="font-size:11px;color:#9ca3af">قريباً — لسه بترفع عن طريق GitHub raw/ folder</div>
+      <div style="border:1.5px dashed #5E2D91;border-radius:10px;padding:14px;margin-bottom:12px;background:#faf5ff">
+        <div style="font-size:12px;font-weight:800;color:#5E2D91;margin-bottom:8px"><i class="fas fa-calendar-alt mr-1"></i>Closure Dashboard — الداشبورد الشهرية</div>
+        <label style="display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:4px">الشهر</label>
+        <input type="month" id="upload-modal-closure-month" style="width:100%;padding:6px 8px;border:1.5px solid #d1d5db;border-radius:8px;font-size:12px;margin-bottom:8px">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">ملف Mobile Closure</div>
+        <input type="file" id="upload-modal-closure-mobile" accept=".xlsx,.xls,.xlsb" style="font-size:11px;width:100%;margin-bottom:8px">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">ملف WE Pay Closure</div>
+        <input type="file" id="upload-modal-closure-wallet" accept=".xlsx,.xls,.xlsb" style="font-size:11px;width:100%">
+        <button onclick="handleAdminClosureUpload()" style="margin-top:8px;width:100%;padding:7px;background:#5E2D91;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-upload mr-1"></i>ارفع لـ Supabase</button>
       </div>
 
       <div id="upload-modal-status" style="font-size:12px;font-weight:600;color:#374151;min-height:18px;margin-top:8px"></div>
