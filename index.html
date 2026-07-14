@@ -6081,7 +6081,25 @@ function parseDatabaseSheetClosure(wb) {
   var ws = wb.Sheets['Database'];
   if (!ws) throw new Error('مش لاقي شيت Database. الشيتات الموجودة: ' + wb.SheetNames.join(', '));
   var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-  var totalHeader = aoa[5] || [];
+
+  // Dynamically locate the "StoreCodeBSS" field-header row instead of assuming
+  // a fixed row index. WE occasionally adds/removes leading rows (e.g. the
+  // "Kind / Tariff Type Final / Values" row added June 2026), which shifts
+  // every row below it — a hardcoded index breaks silently whenever that
+  // happens. This mirrors the same anchor-based approach parseMTDMultiLevel
+  // already uses successfully.
+  var fieldRowIdx = -1;
+  for (var fi = 0; fi < Math.min(20, aoa.length); fi++) {
+    if (aoa[fi] && aoa[fi][0] === 'StoreCodeBSS') { fieldRowIdx = fi; break; }
+  }
+  if (fieldRowIdx < 0) throw new Error('مش لاقي صف الهيدر (StoreCodeBSS) في شيت Database — شكل الملف اتغيّر.');
+
+  // The "Mobile Target" style total-header row sits 2 rows above the field
+  // row (field row itself has "Target"/"Subscriptions"/"%"; the row right
+  // above has the sub-category like "Control Kix"; the row above that has
+  // the combined "Mobile Target" label).
+  var totalHeaderIdx = fieldRowIdx - 2;
+  var totalHeader = (totalHeaderIdx >= 0 ? aoa[totalHeaderIdx] : null) || [];
 
   var mobileTCol = findTotalColClosure(totalHeader, 'Mobile', 'Target');
   var mobileACol = findTotalColClosure(totalHeader, 'Mobile', 'Subscriptions');
@@ -6092,8 +6110,9 @@ function parseDatabaseSheetClosure(wb) {
   var fbbTCol = findTotalColClosure(totalHeader, 'FBB', 'Target');
   var fbbACol = findTotalColClosure(totalHeader, 'FBB', 'Subscriptions');
 
+  var dataStartRow = fieldRowIdx + 1;
   var rows = {};
-  for (var i = 8; i < aoa.length; i++) {
+  for (var i = dataStartRow; i < aoa.length; i++) {
     var r = aoa[i];
     if (!r) continue;
     var code = r[0];
