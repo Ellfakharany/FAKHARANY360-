@@ -811,6 +811,7 @@ async function doLogin() {
 
   currentSupabaseUserId = authData.user.id;
   currentUser = uname;
+  localStorage.setItem('fakharany_uname', uname);
 
   const { data: profile, error: profileError } = await sb.from('profiles').select('role').eq('id', currentSupabaseUserId).single();
   if (profileError || !profile) {
@@ -862,6 +863,84 @@ async function fetchAllMonthsData() {
   return all;
 }
 
+async function doLogout() {
+  if (!confirm('متأكد إنك عايز تسجّل خروج؟')) return;
+  try { await sb.auth.signOut(); } catch (e) { console.warn('[Auth] signOut error:', e.message); }
+  localStorage.removeItem('fakharany_uname');
+  currentUser = null; currentRole = null; currentSupabaseUserId = null;
+  location.reload();
+}
+
+async function refreshAllData() {
+  var btn = document.getElementById('refresh-data-btn');
+  var icon = btn ? btn.querySelector('i') : null;
+  if (icon) icon.classList.add('fa-spin');
+  if (btn) btn.disabled = true;
+  try {
+    RAW_DATA = await fetchAllMonthsData();
+    try { await fetchAutoMTDData({ force: true }); } catch (e) { console.warn('[MTD Auto] refresh failed:', e.message); }
+    if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
+  } catch (e) {
+    console.error('[Refresh] failed:', e);
+    alert('⚠️ تعذر تحديث البيانات: ' + e.message);
+  } finally {
+    if (icon) icon.classList.remove('fa-spin');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SESSION PERSISTENCE — Supabase Auth already persists the session in
+//  localStorage by default, but this app never checked for an existing
+//  session on load, so every reload showed the login screen again even
+//  though the user was technically still authenticated server-side. This
+//  restores the session silently on load so a page reload no longer
+//  feels like a forced logout.
+// ══════════════════════════════════════════════════════════════
+async function tryRestoreSession() {
+  try {
+    const { data: sessionData } = await sb.auth.getSession();
+    const session = sessionData && sessionData.session;
+    if (!session || !session.user) return false;
+
+    currentSupabaseUserId = session.user.id;
+    const storedUname = localStorage.getItem('fakharany_uname');
+    currentUser = storedUname || (session.user.email || '').split('@')[0];
+
+    const { data: profile, error: profileError } = await sb.from('profiles').select('role').eq('id', currentSupabaseUserId).single();
+    currentRole = (!profileError && profile && profile.role === 'admin') ? 'admin' : 'viewer';
+
+    try {
+      RAW_DATA = await fetchAllMonthsData();
+    } catch (e) {
+      console.error('[Data] Failed to load monthly data from Supabase:', e);
+      RAW_DATA = [];
+    }
+    try { await fetchAutoMTDData(); } catch (e) { console.warn('[MTD Auto] init load failed:', e.message); }
+
+    document.getElementById('login-screen').style.display = 'none';
+    applyRolePermissions();
+    initAppWithData(RAW_DATA);
+    return true;
+  } catch (e) {
+    console.warn('[Session] restore failed, showing login screen:', e.message);
+    return false;
+  }
+}
+
+// Best-effort native warning if the user reloads/closes the tab manually.
+// Browsers do NOT allow a custom-styled popup (with logo, Yes/No buttons)
+// to block navigation for security reasons — only their own generic
+// "Leave site?" dialog can be shown here, and only if there's something
+// to warn about. Since sessions now persist across reload (see above),
+// this is just an extra safety net, not the primary fix.
+window.addEventListener('beforeunload', function (e) {
+  if (currentUser) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
 function applyRolePermissions() {
   // Show user badge in header after login (injected later)
   const badge = document.getElementById('user-role-badge');
@@ -875,6 +954,9 @@ function applyRolePermissions() {
 
   const uploadBtn = document.getElementById('admin-upload-btn');
   if (uploadBtn) uploadBtn.style.display = currentRole === 'admin' ? 'inline-flex' : 'none';
+
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.style.display = 'inline-flex';
 
   // Hide export buttons for viewer
   if (currentRole === 'viewer') {
@@ -897,9 +979,15 @@ document.addEventListener('DOMContentLoaded', function() {
       if (e.key === 'Enter') doLogin();
     });
   });
-  // Focus username on load
-  setTimeout(function(){ var u=document.getElementById('login-username'); if(u) u.focus(); }, 300);
   var ly = document.getElementById('login-year'); if(ly) ly.textContent = new Date().getFullYear();
+
+  // Try to silently resume an existing session before showing the login
+  // screen — this is what actually stops "reload = logout".
+  tryRestoreSession().then(function(restored){
+    if (!restored) {
+      setTimeout(function(){ var u=document.getElementById('login-username'); if(u) u.focus(); }, 300);
+    }
+  });
 });
 </script>
 
@@ -958,7 +1046,9 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div class="flex items-center gap-2">
         <span id="live-badge" class="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-full animate-pulse">● LIVE</span>
+        <button onclick="refreshAllData()" id="refresh-data-btn" class="header-btn" title="تحديث البيانات (من غير خروج)"><i class="fas fa-sync-alt"></i></button>
         <span id="user-role-badge" class="user-badge admin" style="display:none"></span>
+        <button onclick="doLogout()" id="logout-btn" class="header-btn" title="تسجيل خروج" style="display:none"><i class="fas fa-sign-out-alt"></i></button>
         <button onclick="toggleDarkMode()" class="header-btn" title="Dark Mode"><i class="fas fa-moon"></i></button>
         <button onclick="toggleFullscreen()" class="header-btn" title="Fullscreen"><i class="fas fa-expand"></i></button>
         <a href="https://www.linkedin.com/in/m-elfakharany" target="_blank" rel="noopener" class="header-btn" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><i class="fab fa-linkedin" style="color:#0077B5"></i></a>
@@ -5258,14 +5348,20 @@ async function deleteSnapshot(kind, value) {
   var statusEl = document.getElementById('upload-modal-status');
   try {
     if (kind === 'closure') {
-      var resC = await sb.from('monthly_closure').delete().eq('month', value);
+      var resC = await sb.from('monthly_closure').delete().eq('month', value).select('store_code');
       if (resC.error) throw new Error(resC.error.message);
+      if (!resC.data || resC.data.length === 0) {
+        throw new Error('السيرفر رجّع نجاح لكن مافيش صفوف اتمسحت فعليًا — الأغلب إن فيه RLS policy على جدول monthly_closure بتسمح بالقراءة بس مش بالمسح (DELETE). راجع Supabase → Authentication → Policies وضيف policy تسمح بالـ DELETE للـ role اللي بيستخدمه الداشبورد.');
+      }
       RAW_DATA = await fetchAllMonthsData();
       if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
     } else {
       var table = kind === 'mobile' ? 'mtd_mobile' : 'mtd_wallet';
-      var res = await sb.from(table).delete().eq('snapshot_date', value);
+      var res = await sb.from(table).delete().eq('snapshot_date', value).select('store_code');
       if (res.error) throw new Error(res.error.message);
+      if (!res.data || res.data.length === 0) {
+        throw new Error('السيرفر رجّع نجاح لكن مافيش صفوف اتمسحت فعليًا — الأغلب إن فيه RLS policy على جدول ' + table + ' بتسمح بالقراءة بس مش بالمسح (DELETE). راجع Supabase → Authentication → Policies.');
+      }
       await sb.from('mtd_meta').delete().eq('snapshot_date', value).eq('kind', kind);
       await fetchAutoMTDData({ force: true });
     }
