@@ -5463,11 +5463,34 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           var sr = Object.assign({}, r);
           if (idle) {
+            var mobRatio = idle.mobileAct > 0 ? (idle.mobileSales / idle.mobileAct) : 1;
+            var fixRatio = idle.fixedAct  > 0 ? (idle.fixedSales  / idle.fixedAct)  : 1;
+            var fbbRatio = idle.fbbAct    > 0 ? (idle.fbbSales    / idle.fbbAct)    : 1;
+
             sr.mobileSubs = idle.mobileSales; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
+            sr.mobileProj = (r.mobileProj || 0) * mobRatio;
+            sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
+
             sr.fixedSubs = idle.fixedSales; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
+            sr.fixedProj = (r.fixedProj || 0) * fixRatio;
+            sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
+
             sr.fbbSubs = idle.fbbSales; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            if (idle.goldSales !== null) { sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0; }
-            if (idle.wemixSales !== null) { sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0; }
+            sr.fbbProj = (r.fbbProj || 0) * fbbRatio;
+            sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
+
+            if (idle.goldSales !== null) {
+              var goldRatio = idle.goldAct > 0 ? (idle.goldSales / idle.goldAct) : 1;
+              sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
+              sr.goldProj = (r.goldProj || 0) * goldRatio;
+              sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
+            }
+            if (idle.wemixSales !== null) {
+              var wemixRatio = idle.wemixAct > 0 ? (idle.wemixSales / idle.wemixAct) : 1;
+              sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
+              sr.weMixProj = (r.weMixProj || 0) * wemixRatio;
+              sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
+            }
           }
           return sr;
         });
@@ -5476,11 +5499,34 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           if (!idle) return r;
           var sr = Object.assign({}, r);
+          var mobRatioA = r.mobileSubs > 0 ? (idle.mobileAct / r.mobileSubs) : 1;
+          var fixRatioA = r.fixedSubs  > 0 ? (idle.fixedAct  / r.fixedSubs)  : 1;
+          var fbbRatioA = r.fbbSubs    > 0 ? (idle.fbbAct    / r.fbbSubs)    : 1;
+
           sr.mobileSubs = idle.mobileAct; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
+          sr.mobileProj = (r.mobileProj || 0) * mobRatioA;
+          sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
+
           sr.fixedSubs = idle.fixedAct; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
+          sr.fixedProj = (r.fixedProj || 0) * fixRatioA;
+          sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
+
           sr.fbbSubs = idle.fbbAct; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
-          if (idle.goldAct !== null) { sr.goldSubs = idle.goldAct; sr.goldPct = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0; }
-          if (idle.wemixAct !== null) { sr.weMixSubs = idle.wemixAct; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0; }
+          sr.fbbProj = (r.fbbProj || 0) * fbbRatioA;
+          sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
+
+          if (idle.goldAct !== null) {
+            var goldRatioA = r.goldSubs > 0 ? (idle.goldAct / r.goldSubs) : 1;
+            sr.goldSubs = idle.goldAct; sr.goldPct = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0;
+            sr.goldProj = (r.goldProj || 0) * goldRatioA;
+            sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
+          }
+          if (idle.wemixAct !== null) {
+            var wemixRatioA = r.weMixSubs > 0 ? (idle.wemixAct / r.weMixSubs) : 1;
+            sr.weMixSubs = idle.wemixAct; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0;
+            sr.weMixProj = (r.weMixProj || 0) * wemixRatioA;
+            sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
+          }
           return sr;
         });
       }
