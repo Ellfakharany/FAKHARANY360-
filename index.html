@@ -6457,10 +6457,19 @@ function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
   // parser). This lets same-period comparisons ("as of day 13") for closed
   // months use actual historical numbers instead of a prorated estimate.
   var dailyMobile = null;
-  try { dailyMobile = parseDailySheet(mobileWb); } catch (e) { console.warn('[Closure Upload] Stoers Daily parse failed:', e.message); }
+  try { dailyMobile = parseDailySheet(mobileWb); } catch (e) { console.warn('[Closure Upload] Stoers Daily (Mobile) parse failed:', e.message); }
   var dailyByCode = {};
   if (dailyMobile && dailyMobile.rows) {
     dailyMobile.rows.forEach(function (r) { dailyByCode[r.storeCode] = r.days; });
+  }
+
+  // Same idea, but for Wallet — the WE Pay closure file has its own daily
+  // sheet ("Sales Daily"), same shape, reused via the same generic parser.
+  var dailyWallet = null;
+  try { dailyWallet = parseDailySheet(wepayWb); } catch (e) { console.warn('[Closure Upload] Sales Daily (Wallet) parse failed:', e.message); }
+  var dailyWalletByCode = {};
+  if (dailyWallet && dailyWallet.rows) {
+    dailyWallet.rows.forEach(function (r) { dailyWalletByCode[r.storeCode] = r.days; });
   }
 
   var rows = [];
@@ -6490,6 +6499,7 @@ function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
     };
     if (idl) { row.mobileSubsAct = idl.mobileSubsAct; row.fixedSubsAct = idl.fixedSubsAct; row.fbbSubsAct = idl.fbbSubsAct; }
     if (dailyByCode[code]) { row.dailyMobile = dailyByCode[code]; }
+    if (dailyWalletByCode[code]) { row.dailyWallet = dailyWalletByCode[code]; }
     Object.keys(t).forEach(function (k) { if (k.indexOf('kix') === 0 || k.indexOf('taz') === 0) row[k] = t[k]; });
     rows.push(row);
   });
@@ -7353,6 +7363,7 @@ function mtdQcProrateGroup(g, day, totalDays) {
 function mtdQcSamePeriodGroup(rows, g, day, totalDays) {
   var out = mtdQcProrateGroup(g, day, totalDays); // baseline: everything prorated
   var realSum = 0, fallbackSum = 0, realCount = 0;
+  var realWalletSum = 0, fallbackWalletSum = 0, realWalletCount = 0;
   rows.forEach(function (r) {
     if (r.dailyMobile) {
       var cum = 0;
@@ -7362,12 +7373,27 @@ function mtdQcSamePeriodGroup(rows, g, day, totalDays) {
     } else {
       fallbackSum += (Number(r.mobileSubs) || 0) * (totalDays > 0 ? Math.min(1, day / totalDays) : 1);
     }
+    var wk = String(r.storeCode || '').trim().toUpperCase();
+    if (r.dailyWallet) {
+      var wcum = 0;
+      for (var d2 = 1; d2 <= day; d2++) wcum += Number(r.dailyWallet[d2]) || 0;
+      realWalletSum += wcum;
+      realWalletCount++;
+    } else {
+      fallbackWalletSum += (Number(r.walletSales) || 0) * (totalDays > 0 ? Math.min(1, day / totalDays) : 1);
+    }
   });
   if (realCount > 0) {
     out.mobile.act = realSum + fallbackSum;
     out._mobileRealCoverage = rows.length ? (realCount / rows.length) : 0;
   } else {
     out._mobileRealCoverage = 0;
+  }
+  if (realWalletCount > 0) {
+    out.wallet.act = realWalletSum + fallbackWalletSum;
+    out._walletRealCoverage = rows.length ? (realWalletCount / rows.length) : 0;
+  } else {
+    out._walletRealCoverage = 0;
   }
   return out;
 }
@@ -7423,7 +7449,13 @@ function mtdQcRun() {
           var pTotalDays = daysInMonthKey(closedMonth);
           kB = mtdQcSamePeriodGroup(rB, kB, pDay, pTotalDays);
           var covPct = Math.round((kB._mobileRealCoverage || 0) * 100);
-          var covNote = covPct >= 99 ? 'Mobile: بيانات فعلية' : (covPct > 0 ? 'Mobile: '+covPct+'% بيانات فعلية والباقي تقديري' : 'Mobile: تقديري بالكامل');
+          var wCovPct = Math.round((kB._walletRealCoverage || 0) * 100);
+          function covText(name, pct) {
+            if (pct >= 99) return name+': فعلي';
+            if (pct > 0) return name+': '+pct+'% فعلي';
+            return name+': تقديري';
+          }
+          var covNote = covText('Mobile', covPct) + ' · ' + covText('Wallet', wCovPct);
           labelA = valA + ' — لحد يوم ' + pDay + ' (Live MTD)';
           labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' لحد يوم ' + pDay + ' ('+covNote+', الباقي تقديري)';
         } else {
@@ -8996,7 +9028,7 @@ function renderMTDTable() {
         <span style="font-size:10px;color:#9ca3af">من الشهرين</span>
       </div>
       <div style="font-size:10px;color:#9ca3af;line-height:1.5;margin-bottom:8px">
-        ℹ️ لو الشهر ده اترفع بعد ما بقى الموقع بيسجل شيت "Stoers Daily"، رقم <strong>Mobile</strong> هيكون فعلي 100% ليوم بيومه. باقي المنتجات (FBB/Fixed/Wallet/WE Gold) مفيهاش تفصيل يومي محفوظ، فبتفضل <strong>تقديرية تناسبية</strong> (إجمالي الشهر ÷ عدد أيامه × اليوم المختار).
+        ℹ️ لو الشهر ده اترفع بعد ما بقى الموقع بيسجل شيتات "Stoers Daily" و"Sales Daily"، أرقام <strong>Mobile وWallet</strong> هتكون فعلية 100% ليوم بيومه. FBB وFixed وWE Gold مفيهمش تفصيل يومي محفوظ، فبتفضل <strong>تقديرية تناسبية</strong> (إجمالي الشهر ÷ عدد أيامه × اليوم المختار).
       </div>
     </div>
 
