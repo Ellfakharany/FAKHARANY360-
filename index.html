@@ -855,7 +855,22 @@ async function fetchAllMonthsData() {
     const { data, error } = await sb.from('monthly_closure').select('row').order('month', { ascending: true }).range(from, from + pageSize - 1);
     if (error) throw new Error('Supabase monthly_closure query failed: ' + error.message);
     if (!data || data.length === 0) break;
-    data.forEach(function (r) { all.push(r.row); });
+    data.forEach(function (r) {
+      var row = r.row;
+      // Capture pristine, NEVER-mutated copies of the Sales fields the
+      // instant they arrive from Supabase. setDashMode() below swaps
+      // row.mobileSubs/fixedSubs/fbbSubs in place between Sales/Activation
+      // for rendering — if that ever ran on a row before this capture, or
+      // if the backup function ran twice on an already-toggled row, the
+      // original Sales number would be lost for good until a hard reload.
+      // Keeping a dedicated immutable copy means the backup step can always
+      // safely restore the correct value no matter how many times toggles
+      // or refreshes happen in between.
+      row._rawMobileSubs = row.mobileSubs;
+      row._rawFixedSubs = row.fixedSubs;
+      row._rawFbbSubs = row.fbbSubs;
+      all.push(row);
+    });
     if (data.length < pageSize) break;
     from += pageSize;
   }
@@ -1769,16 +1784,25 @@ var DASH_MODE = 'sales'; // 'sales' | 'activation' — main dashboard Data Type 
 // Backs up each row's Sales figure (the JSON default) and resolves its
 // Activation figure (falls back to Sales if the month has no IDLE split),
 // so setDashMode() can swap between them without ever losing the original.
+//
+// IMPORTANT: this always derives the Sales number from row._rawMobileSubs
+// (captured once, immediately after fetch, in fetchAllMonthsData — never
+// touched again by anything) rather than from row.mobileSubs directly.
+// row.mobileSubs itself gets overwritten in place every time the user
+// toggles Sales/Activation (see setDashMode), so re-deriving from it here
+// would risk baking in an already-toggled value as the new "original" —
+// that's what caused numbers to intermittently collapse to 0 after
+// clicking around Sales/Activation and filters for a while. Deriving from
+// the immutable _raw copy instead makes this function safe to call any
+// number of times, on any RAW_DATA state, with no risk of corruption.
 function backupSalesActivationFields(rows) {
   rows.forEach(function(r){
-    if (r._salesMobile === undefined) {
-      r._salesMobile = r.mobileSubs || 0;
-      r._salesFixed  = r.fixedSubs  || 0;
-      r._salesFbb    = r.fbbSubs    || 0;
-      r._actMobile = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ? r.mobileSubsAct : r._salesMobile;
-      r._actFixed  = (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ? r.fixedSubsAct  : r._salesFixed;
-      r._actFbb    = (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null) ? r.fbbSubsAct    : r._salesFbb;
-    }
+    r._salesMobile = (r._rawMobileSubs !== undefined ? r._rawMobileSubs : r.mobileSubs) || 0;
+    r._salesFixed  = (r._rawFixedSubs  !== undefined ? r._rawFixedSubs  : r.fixedSubs)  || 0;
+    r._salesFbb    = (r._rawFbbSubs    !== undefined ? r._rawFbbSubs    : r.fbbSubs)    || 0;
+    r._actMobile = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ? r.mobileSubsAct : r._salesMobile;
+    r._actFixed  = (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ? r.fixedSubsAct  : r._salesFixed;
+    r._actFbb    = (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null) ? r.fbbSubsAct    : r._salesFbb;
   });
 }
 
