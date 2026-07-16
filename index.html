@@ -6375,7 +6375,21 @@ function parseTariffsSheetClosure(wb) {
   var ws = wb.Sheets['Tariffs Per Stoers'];
   if (!ws) throw new Error('مش لاقي شيت Tariffs Per Stoers. الشيتات الموجودة: ' + wb.SheetNames.join(', '));
   var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-  var header = aoa[6] || [];
+
+  // Same bug class as the other closure parsers: this used to assume the
+  // header row always sits at a fixed aoa[6] and data always starts at row
+  // 7. SheetJS can trim/shift leading blank rows differently depending on
+  // the sheet's exact layout, so those fixed indices silently pointed at a
+  // data row instead of the header for some files — producing 0 for every
+  // tariff tier with no visible error. Anchor off "StoreCodeBSS" dynamically
+  // instead, exactly like the Database/IDLE parsers.
+  var headerRowIdx = -1;
+  for (var hi = 0; hi < Math.min(20, aoa.length); hi++) {
+    if (aoa[hi] && aoa[hi].indexOf('StoreCodeBSS') >= 0) { headerRowIdx = hi; break; }
+  }
+  if (headerRowIdx < 0) throw new Error('مش لاقي صف الهيدر (StoreCodeBSS) في شيت Tariffs Per Stoers — شكل الملف اتغيّر.');
+
+  var header = aoa[headerRowIdx] || [];
   var codeCol = null, colLabels = {};
   for (var j = 0; j < header.length; j++) {
     var label = header[j];
@@ -6384,7 +6398,7 @@ function parseTariffsSheetClosure(wb) {
     if (label === 'StoreCodeBSS') codeCol = j; else colLabels[j] = label;
   }
   var out = {};
-  for (var i = 7; i < aoa.length; i++) {
+  for (var i = headerRowIdx + 1; i < aoa.length; i++) {
     var r = aoa[i];
     if (!r) continue;
     var code = r[codeCol];
