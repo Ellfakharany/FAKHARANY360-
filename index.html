@@ -7208,6 +7208,50 @@ function mtdQcCalcGroupFromRaw(rows) {
   return g;
 }
 
+// Live-MTD side of a same-period comparison. mtdQcCalcGroup() always uses
+// whatever day the MTD file was last uploaded on (e.g. day 13) — it has no
+// concept of "as of an earlier day". This uses the real day-by-day data
+// (MTD_DAILY / MTD_WALLET_DAILY — same "Stoers Daily"/"Sales Daily" sheets
+// as the closed-month side) to reconstruct the actual cumulative Mobile/
+// Wallet total up to the chosen day, so the Live side actually moves when
+// you change the day, not just the closed-month side.
+function mtdQcCalcGroupSamePeriod(rows, day) {
+  var g = mtdQcCalcGroup(rows); // baseline: current snapshot + targets + tariffs
+  var currentDay = (MTD_DAILY && MTD_DAILY.dayCols && MTD_DAILY.dayCols.length) ? Math.max.apply(null, MTD_DAILY.dayCols) : null;
+  var codeSet = {};
+  rows.forEach(function (r) { codeSet[String(r.storeCode || '').trim().toUpperCase()] = true; });
+
+  function sumUpToDay(dailySource, uploadCap) {
+    if (!dailySource || !dailySource.rows) return null;
+    var effDay = uploadCap ? Math.min(day, uploadCap) : day;
+    var seen = {}, total = 0;
+    dailySource.rows.forEach(function (r) {
+      if (!codeSet[r.storeCode]) return;
+      seen[r.storeCode] = 1;
+      var cum = 0;
+      for (var d = 1; d <= effDay; d++) cum += Number(r.days[d]) || 0;
+      total += cum;
+    });
+    return { total: total, coverage: Object.keys(seen).length, effDay: effDay };
+  }
+
+  var mobRes = sumUpToDay(MTD_DAILY, currentDay);
+  if (mobRes) {
+    g.mobile.act = mobRes.total;
+    g._mobileEffDay = mobRes.effDay;
+    g._mobileRealCoverage = rows.length ? (mobRes.coverage / rows.length) : 0;
+  }
+  var wCurrentDay = (MTD_WALLET_DAILY && MTD_WALLET_DAILY.dayCols && MTD_WALLET_DAILY.dayCols.length) ? Math.max.apply(null, MTD_WALLET_DAILY.dayCols) : null;
+  var wRes = sumUpToDay(MTD_WALLET_DAILY, wCurrentDay);
+  if (wRes) {
+    g.wallet.act = wRes.total;
+    g._walletEffDay = wRes.effDay;
+    g._walletRealCoverage = rows.length ? (wRes.coverage / rows.length) : 0;
+  }
+  g._currentUploadDay = currentDay;
+  return g;
+}
+
 function mtdQcCalcGroup(rows) {
   var g = { storeCount: rows.length };
   Object.keys(MTD_PRODS).forEach(function(key){
@@ -7441,13 +7485,16 @@ function mtdQcRun() {
         var samePeriod = document.getElementById('mtd-qc-sameperiod').checked;
         rA = pool.filter(function(r){ return r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
         rB = RAW_DATA.filter(function(r){ return r.month === closedMonth && r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
-        kA = mtdQcCalcGroup(rA);
-        kB = mtdQcCalcGroupFromRaw(rB);
-        labelA = valA + ' (Live MTD)';
         if (samePeriod) {
           var pDay = Math.max(1, Number(document.getElementById('mtd-qc-sameperiod-day').value) || 1);
           var pTotalDays = daysInMonthKey(closedMonth);
-          kB = mtdQcSamePeriodGroup(rB, kB, pDay, pTotalDays);
+          kA = mtdQcCalcGroupSamePeriod(rA, pDay);
+          kB = mtdQcSamePeriodGroup(rB, mtdQcCalcGroupFromRaw(rB), pDay, pTotalDays);
+
+          var clampNote = '';
+          if (kA._currentUploadDay && pDay > kA._currentUploadDay) {
+            clampNote = ' ⚠️ آخر يوم مرفوع فعليًا لشهر يوليو هو '+kA._currentUploadDay+'، فالـ Live MTD اتوقف عنده';
+          }
           var covPct = Math.round((kB._mobileRealCoverage || 0) * 100);
           var wCovPct = Math.round((kB._walletRealCoverage || 0) * 100);
           function covText(name, pct) {
@@ -7456,9 +7503,12 @@ function mtdQcRun() {
             return name+': تقديري';
           }
           var covNote = covText('Mobile', covPct) + ' · ' + covText('Wallet', wCovPct);
-          labelA = valA + ' — لحد يوم ' + pDay + ' (Live MTD)';
+          labelA = valA + ' — لحد يوم ' + (kA._mobileEffDay || pDay) + ' (Live MTD)' + clampNote;
           labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' لحد يوم ' + pDay + ' ('+covNote+', الباقي تقديري)';
         } else {
+          kA = mtdQcCalcGroup(rA);
+          kB = mtdQcCalcGroupFromRaw(rB);
+          labelA = valA + ' (Live MTD)';
           labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' (مقفول، الشهر كامل)';
         }
       } else {
