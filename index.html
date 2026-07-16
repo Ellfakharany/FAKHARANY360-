@@ -5802,7 +5802,7 @@ function parseMTDFlat(raw) {
       if (!mapped) return;
       var v = row[k];
       if (MTD_TEXT_KEYS.indexOf(mapped) >= 0)
-        obj[mapped] = (v===null||v===undefined||v==='(blank)') ? '' : String(v).trim();
+        obj[mapped] = (v===null||v===undefined||v==='(blank)') ? '' : normalizeNameClosure(v);
       else
         obj[mapped] = (v===null||v===undefined||v==='') ? 0 : (isNaN(Number(v)) ? 0 : Number(v));
     });
@@ -6333,8 +6333,8 @@ function parseDatabaseSheetClosure(wb) {
     (function () {
       function num(col) { var v = r[col]; return (v === null || v === undefined) ? 0 : Number(v); }
       rows[code] = {
-        storeCode: code, store: normalizeNameClosure(r[1]), partner: r[2], classification: r[3], region: r[4],
-        accountManager: r[5], channelManager: r[6], areaManager: r[7], supervisor: r[8], regionalManager: r[10],
+        storeCode: code, store: normalizeNameClosure(r[1]), partner: normalizeNameClosure(r[2]), classification: normalizeNameClosure(r[3]), region: normalizeNameClosure(r[4]),
+        accountManager: normalizeNameClosure(r[5]), channelManager: normalizeNameClosure(r[6]), areaManager: normalizeNameClosure(r[7]), supervisor: normalizeNameClosure(r[8]), regionalManager: normalizeNameClosure(r[10]),
         kixTarget: num(12), kixSubs: num(13), tazbeetTarget: num(15), tazbeetSubs: num(16),
         dataSimMifiTarget: num(18), dataSimMifiSubs: num(19), paygTarget: num(21), paygSubs: num(22),
         prepaidTarget: num(24), prepaidSubs: num(25), weClubTarget: num(27), weClubSubs: num(28),
