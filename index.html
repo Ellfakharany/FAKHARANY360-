@@ -6452,6 +6452,17 @@ function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
   var wallet = parseWalletSheetClosure(wepayWb);
   var idle = parseIdleSheetClosure(mobileWb);
 
+  // Real per-store daily Mobile activity, if the closure workbook has a
+  // "Stoers Daily" sheet (same shape as the MTD one — reusing the same
+  // parser). This lets same-period comparisons ("as of day 13") for closed
+  // months use actual historical numbers instead of a prorated estimate.
+  var dailyMobile = null;
+  try { dailyMobile = parseDailySheet(mobileWb); } catch (e) { console.warn('[Closure Upload] Stoers Daily parse failed:', e.message); }
+  var dailyByCode = {};
+  if (dailyMobile && dailyMobile.rows) {
+    dailyMobile.rows.forEach(function (r) { dailyByCode[r.storeCode] = r.days; });
+  }
+
   var rows = [];
   Object.keys(db).forEach(function (code) {
     var base = db[code];
@@ -6478,6 +6489,7 @@ function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
       paygTarget: base.paygTarget, paygSubs: base.paygSubs,
     };
     if (idl) { row.mobileSubsAct = idl.mobileSubsAct; row.fixedSubsAct = idl.fixedSubsAct; row.fbbSubsAct = idl.fbbSubsAct; }
+    if (dailyByCode[code]) { row.dailyMobile = dailyByCode[code]; }
     Object.keys(t).forEach(function (k) { if (k.indexOf('kix') === 0 || k.indexOf('taz') === 0) row[k] = t[k]; });
     rows.push(row);
   });
@@ -7089,10 +7101,18 @@ function mtdQcBuildSelectors() {
 
   var closedWrap = document.getElementById('mtd-qc-closedmonth-wrap');
   var selBWrap   = document.getElementById('mtd-qc-sel-b-wrap');
+  var samePeriodWrap = document.getElementById('mtd-qc-sameperiod-wrap');
   if (vsChecked) {
     closedWrap.style.display = '';
     selBWrap.style.display = 'none';
+    samePeriodWrap.style.display = '';
     document.getElementById('mtd-qc-vs-label').textContent = 'vs (نفس العنصر)';
+    var dayInput = document.getElementById('mtd-qc-sameperiod-day');
+    if (!dayInput.dataset.filled) {
+      var curDay = (MTD_DAILY && MTD_DAILY.dayCols && MTD_DAILY.dayCols.length) ? Math.max.apply(null, MTD_DAILY.dayCols) : new Date().getDate();
+      dayInput.value = curDay;
+      dayInput.dataset.filled = '1';
+    }
     var cmSel = document.getElementById('mtd-qc-closedmonth');
     if (!cmSel.dataset.filled) {
       var months = Array.from(new Set(RAW_DATA.map(function(r){ return r.month; }))).filter(Boolean);
@@ -7107,6 +7127,7 @@ function mtdQcBuildSelectors() {
     }
   } else {
     closedWrap.style.display = 'none';
+    samePeriodWrap.style.display = 'none';
     selBWrap.style.display = '';
     document.getElementById('mtd-qc-vs-label').textContent = 'vs';
   }
@@ -7294,6 +7315,63 @@ function renderMTDQcProductChart(kA, kB, labelA, labelB) {
   });
 }
 
+// "MM-YYYY" -> number of days in that month
+function daysInMonthKey(monthKey) {
+  var parts = String(monthKey||'').split('-');
+  if (parts.length !== 2) return 30;
+  var mm = Number(parts[0]), yyyy = Number(parts[1]);
+  if (!mm || !yyyy) return 30;
+  return new Date(yyyy, mm, 0).getDate();
+}
+
+// Scale only the "act" (achieved) side of a closed-month group down to an
+// estimated same-day-of-month figure. Targets are left untouched (monthly
+// targets aren't day-dependent, and comparing "achievement as of day X"
+// against the full month's target is the same convention the live MTD side
+// already uses). This is a linear estimate — closed months only have a
+// single end-of-month snapshot, there's no real historical daily data to
+// pull an exact same-day figure from.
+function mtdQcProrateGroup(g, day, totalDays) {
+  var ratio = totalDays > 0 ? Math.min(1, day / totalDays) : 1;
+  var out = { storeCount: g.storeCount };
+  Object.keys(MTD_PRODS).forEach(function(key){
+    out[key] = { tgt: g[key].tgt, act: g[key].act * ratio };
+  });
+  out.wallet = { tgt: g.wallet.tgt, act: g.wallet.act * ratio };
+  out.lowT = g.lowT * ratio; out.midT = g.midT * ratio; out.highT = g.highT * ratio; out.pt12 = g.pt12 * ratio;
+  return out;
+}
+
+// Same-period estimate for a closed month, using REAL per-store daily Mobile
+// numbers where the closure upload captured a "Stoers Daily" sheet (see
+// buildMonthRowsClosure / dailyMobile). Falls back to simple proration:
+//  - per-store, if that specific store has no daily breakdown saved
+//  - for every other product (FBB/Fixed/Wallet/WE Gold), since only Mobile
+//    has day-level history in the source file.
+// Returns the group plus a coverage ratio so the UI can be honest about how
+// much of the Mobile figure is real vs estimated.
+function mtdQcSamePeriodGroup(rows, g, day, totalDays) {
+  var out = mtdQcProrateGroup(g, day, totalDays); // baseline: everything prorated
+  var realSum = 0, fallbackSum = 0, realCount = 0;
+  rows.forEach(function (r) {
+    if (r.dailyMobile) {
+      var cum = 0;
+      for (var d = 1; d <= day; d++) cum += Number(r.dailyMobile[d]) || 0;
+      realSum += cum;
+      realCount++;
+    } else {
+      fallbackSum += (Number(r.mobileSubs) || 0) * (totalDays > 0 ? Math.min(1, day / totalDays) : 1);
+    }
+  });
+  if (realCount > 0) {
+    out.mobile.act = realSum + fallbackSum;
+    out._mobileRealCoverage = rows.length ? (realCount / rows.length) : 0;
+  } else {
+    out._mobileRealCoverage = 0;
+  }
+  return out;
+}
+
 function mtdQcRun() {
   var type = document.getElementById('mtd-qc-type').value;
   var valA = document.getElementById('mtd-qc-sel-a').value;
@@ -7334,12 +7412,23 @@ function mtdQcRun() {
       var kA, kB, rA, rB;
       if (vsMonthChecked) {
         var closedMonth = document.getElementById('mtd-qc-closedmonth').value;
+        var samePeriod = document.getElementById('mtd-qc-sameperiod').checked;
         rA = pool.filter(function(r){ return r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
         rB = RAW_DATA.filter(function(r){ return r.month === closedMonth && r[field] === valA && (!partnerFilter || r.partner === partnerFilter); });
         kA = mtdQcCalcGroup(rA);
         kB = mtdQcCalcGroupFromRaw(rB);
         labelA = valA + ' (Live MTD)';
-        labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' (مقفول)';
+        if (samePeriod) {
+          var pDay = Math.max(1, Number(document.getElementById('mtd-qc-sameperiod-day').value) || 1);
+          var pTotalDays = daysInMonthKey(closedMonth);
+          kB = mtdQcSamePeriodGroup(rB, kB, pDay, pTotalDays);
+          var covPct = Math.round((kB._mobileRealCoverage || 0) * 100);
+          var covNote = covPct >= 99 ? 'Mobile: بيانات فعلية' : (covPct > 0 ? 'Mobile: '+covPct+'% بيانات فعلية والباقي تقديري' : 'Mobile: تقديري بالكامل');
+          labelA = valA + ' — لحد يوم ' + pDay + ' (Live MTD)';
+          labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' لحد يوم ' + pDay + ' ('+covNote+', الباقي تقديري)';
+        } else {
+          labelB = valA + ' — ' + (MONTH_LABELS[closedMonth] || closedMonth) + ' (مقفول، الشهر كامل)';
+        }
       } else {
         rA=[]; rB=[];
         pool.forEach(function(r){
@@ -8893,6 +8982,22 @@ function renderMTDTable() {
     <div id="mtd-qc-closedmonth-wrap" style="display:none">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:4px">الشهر المقفول</div>
       <select id="mtd-qc-closedmonth" onchange="mtdQcBuildSelectors()" style="padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:600;min-width:120px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;color:#1a1a2e;background:white"></select>
+    </div>
+
+    <!-- Same-period (day-for-day) toggle — only relevant when comparing vs a closed month -->
+    <div id="mtd-qc-sameperiod-wrap" style="display:none">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#5E2D91;cursor:pointer;padding-bottom:6px">
+        <input type="checkbox" id="mtd-qc-sameperiod" checked onchange="mtdQcBuildSelectors()">
+        قارن بنفس الفترة بس (يوم مقابل يوم) بدل إجمالي الشهر كله
+      </label>
+      <div id="mtd-qc-sameperiod-daywrap" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280">لحد يوم</span>
+        <input type="number" id="mtd-qc-sameperiod-day" min="1" max="31" style="width:64px;padding:6px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:700;text-align:center;font-family:'Inter',sans-serif;outline:none;color:#1a1a2e;background:white">
+        <span style="font-size:10px;color:#9ca3af">من الشهرين</span>
+      </div>
+      <div style="font-size:10px;color:#9ca3af;line-height:1.5;margin-bottom:8px">
+        ℹ️ لو الشهر ده اترفع بعد ما بقى الموقع بيسجل شيت "Stoers Daily"، رقم <strong>Mobile</strong> هيكون فعلي 100% ليوم بيومه. باقي المنتجات (FBB/Fixed/Wallet/WE Gold) مفيهاش تفصيل يومي محفوظ، فبتفضل <strong>تقديرية تناسبية</strong> (إجمالي الشهر ÷ عدد أيامه × اليوم المختار).
+      </div>
     </div>
 
     <!-- Partner filter -->
