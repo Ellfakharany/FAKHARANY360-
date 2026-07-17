@@ -32,6 +32,19 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node scripts/convert_mtd.js --scan raw_mtd data/mtd
 
+      - name: Set up Python (for the summary email)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Send MTD summary email
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MTD_EMAIL_TO: ${{ secrets.MTD_EMAIL_TO }}
+        run: python scripts/send_mtd_email.py
+
       - name: Commit and push updated MTD data
         run: |
           git config user.name "github-actions[bot]"

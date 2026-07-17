@@ -31,6 +31,14 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python scripts/convert_closure.py --scan raw data
 
+      - name: Send monthly closure summary email
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MTD_EMAIL_TO: ${{ secrets.MTD_EMAIL_TO }}
+        run: python scripts/send_closure_email.py
+
       - name: Archive processed raw files
         run: |
           mkdir -p raw/processed
