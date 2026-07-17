@@ -37,6 +37,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Python dependencies (email + PDF)
+        run: pip install reportlab arabic-reshaper python-bidi
+
       - name: Send MTD summary email
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

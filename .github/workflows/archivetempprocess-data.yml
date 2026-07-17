@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pandas pyxlsb
+        run: pip install pandas pyxlsb reportlab arabic-reshaper python-bidi
 
       - name: Convert any new Closure files in raw/
         env:
