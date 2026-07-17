@@ -9,6 +9,14 @@ itself — it reads the already-parsed rows straight from Supabase, so the
 numbers here are guaranteed to match what the dashboard's MTD tab shows
 (same `row.mobileProj` / `row.mobileProjPct` fields the browser uses).
 
+Hierarchy in the data (3 levels — see convert_mtd.js):
+  regional_manager  -> the small number of senior Area Managers (what the
+                        email calls "المناطق" — this is the level the email
+                        body summarizes).
+  area_manager      -> a mid-level supervisor covering several branches.
+  store              -> the actual branch (this is the level the attached
+                        PDF lists in full, grouped under its regional_manager).
+
 Required environment variables (all already exist as GitHub Secrets, except
 the two new ones marked NEW):
   SUPABASE_URL, SUPABASE_SERVICE_KEY   (existing)
@@ -19,11 +27,10 @@ Usage:
   python scripts/send_mtd_email.py
 """
 import os
-import sys
 import json
+import base64
 import subprocess
 import urllib.request
-import urllib.error
 from datetime import datetime
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
@@ -32,7 +39,7 @@ RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 MTD_EMAIL_TO = [e.strip() for e in os.environ.get('MTD_EMAIL_TO', '').split(',') if e.strip()]
 RESEND_FROM = os.environ.get('RESEND_FROM', 'FAKHARANY360 <onboarding@resend.dev>')
 
-WATCHLIST_SIZE = 5  # how many weakest branches to show in the email body
+WATCHLIST_SIZE = 5  # weakest branches shown in the email body (full list goes in the PDF)
 
 PRODUCTS = [
     {'key': 'mobile', 'label': 'Mobile', 'tKey': 'mobileTarget', 'aKey': 'mobileSubs', 'projKey': 'mobileProj', 'color': '#5E2D91', 'bg': '#f5f0fa'},
@@ -55,7 +62,6 @@ def supabase_get(path):
 
 
 def fetch_latest_snapshot():
-    """Find the most recent snapshot_date in mtd_mobile, then fetch all its rows."""
     latest = supabase_get('mtd_mobile?select=snapshot_date&order=snapshot_date.desc&limit=1')
     if not latest:
         raise RuntimeError('No rows found in mtd_mobile — has any MTD file been processed yet?')
@@ -76,39 +82,72 @@ def pct(a, t):
     return (a / t * 100) if t else 0.0
 
 
+def status_label_color(p):
+    if p >= 95:
+        return 'ممتاز', '#16a34a'
+    if p >= 80:
+        return 'متابعة', '#f5a623'
+    return 'تدخل عاجل', '#c0392b'
+
+
+def status_color(p):
+    return status_label_color(p)[1]
+
+
+def store_name(r):
+    return (r.get('row') or {}).get('store') or r.get('store_code') or '-'
+
+
 def build_product_grid(rows):
     cells = []
     for p in PRODUCTS:
         t = sum(num(r, p['tKey']) for r in rows)
         proj = sum(num(r, p['projKey']) for r in rows)
-        projPct = pct(proj, t)
-        cells.append({**p, 'projPct': projPct})
+        cells.append({**p, 'projPct': pct(proj, t)})
     return cells
 
 
-def build_area_manager_table(rows):
+def build_regional_manager_table(rows):
+    """Top-level grouping = regional_manager (the small set of senior Area
+    Managers). This is what the email body calls "المناطق"."""
     groups = {}
     for r in rows:
-        am = r.get('area_manager') or 'Unassigned'
-        groups.setdefault(am, []).append(r)
+        rm = r.get('regional_manager') or r.get('area_manager') or 'غير محدد'
+        groups.setdefault(rm, []).append(r)
 
     out = []
-    for am, grs in groups.items():
+    for rm, grs in groups.items():
         t = sum(num(r, 'mobileTarget') for r in grs)
         a = sum(num(r, 'mobileSubs') for r in grs)
         proj = sum(num(r, 'mobileProj') for r in grs)
-        achPct = pct(a, t)
-        projPct = pct(proj, t)
+        achPct, projPct = pct(a, t), pct(proj, t)
+        status, color = status_label_color(projPct)
         stores = len(set(r.get('store_code') for r in grs))
-        if projPct >= 95:
-            status, color = 'ممتاز', '#16a34a'
-        elif projPct >= 80:
-            status, color = 'متابعة', '#f5a623'
-        else:
-            status, color = 'تدخل عاجل', '#c0392b'
-        out.append({'name': am, 'stores': stores, 'achPct': achPct, 'projPct': projPct, 'status': status, 'color': color})
+        out.append({'name': rm, 'stores': stores, 'achPct': achPct, 'projPct': projPct, 'status': status, 'color': color})
     out.sort(key=lambda x: x['projPct'])
     return out
+
+
+def build_branch_detail(rows):
+    """Full branch-level list, grouped by regional_manager — this feeds the PDF."""
+    groups = {}
+    for r in rows:
+        t = num(r, 'mobileTarget')
+        if t <= 0:
+            continue
+        rm = r.get('regional_manager') or r.get('area_manager') or 'غير محدد'
+        a = num(r, 'mobileSubs')
+        proj = num(r, 'mobileProj')
+        groups.setdefault(rm, []).append({
+            'store': store_name(r),
+            'area_manager': r.get('area_manager') or '-',
+            'supervisor': r.get('supervisor') or '-',
+            'achPct': pct(a, t),
+            'projPct': pct(proj, t),
+        })
+    for rm in groups:
+        groups[rm].sort(key=lambda x: x['projPct'])
+    return groups
 
 
 def build_watchlist(rows):
@@ -120,7 +159,7 @@ def build_watchlist(rows):
         a = num(r, 'mobileSubs')
         proj = num(r, 'mobileProj')
         items.append({
-            'store': (r.get('row') or {}).get('store', r.get('store_code')),
+            'store': store_name(r),
             'supervisor': r.get('supervisor') or '-',
             'achPct': pct(a, t),
             'projPct': pct(proj, t),
@@ -129,17 +168,9 @@ def build_watchlist(rows):
     return items[:WATCHLIST_SIZE]
 
 
-def status_color(p):
-    if p >= 95:
-        return '#16a34a'
-    if p >= 80:
-        return '#f5a623'
-    return '#c0392b'
-
-
-def render_html(date_iso, rows, region_label='Cairo & Canal'):
+def render_html(date_iso, rows, region_label='Cairo & Canal', pdf_attached=False):
     grid = build_product_grid(rows)
-    ams = build_area_manager_table(rows)
+    rms = build_regional_manager_table(rows)
     watch = build_watchlist(rows)
 
     mobile = next(p for p in grid if p['key'] == 'mobile')
@@ -155,14 +186,14 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
           <div style="font-size:17px;font-weight:800;color:{p['color']};">{p['projPct']:.0f}%</div>
         </td>""" for p in grid)
 
-    am_rows = ''.join(f"""
-        <tr style="background:{'#fff5f5' if am['color']=='#c0392b' else '#ffffff'};">
-          <td style="padding:8px 10px;color:#1a1a2e;">{am['name']}</td>
-          <td style="padding:8px 10px;" align="center">{am['stores']}</td>
-          <td style="padding:8px 10px;font-weight:700;" align="center">{am['achPct']:.0f}%</td>
-          <td style="padding:8px 10px;font-weight:800;color:{am['color']};" align="center">{am['projPct']:.0f}%</td>
-          <td align="center"><span style="background:{am['color']};color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">{am['status']}</span></td>
-        </tr>""" for am in ams)
+    rm_rows = ''.join(f"""
+        <tr style="background:{'#fff5f5' if rm['color']=='#c0392b' else '#ffffff'};">
+          <td style="padding:8px 10px;color:#1a1a2e;">{rm['name']}</td>
+          <td style="padding:8px 10px;" align="center">{rm['stores']}</td>
+          <td style="padding:8px 10px;font-weight:700;" align="center">{rm['achPct']:.0f}%</td>
+          <td style="padding:8px 10px;font-weight:800;color:{rm['color']};" align="center">{rm['projPct']:.0f}%</td>
+          <td align="center"><span style="background:{rm['color']};color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">{rm['status']}</span></td>
+        </tr>""" for rm in rms)
 
     watch_rows = ''.join(f"""
         <tr style="background:#fdf3ea;">
@@ -171,6 +202,15 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
           <td style="padding:8px 10px;color:{status_color(w['projPct'])};font-weight:800;" align="center">{w['projPct']:.0f}%</td>
           <td style="padding:8px 10px;color:#7a2020;font-size:11px;" align="left">{w['supervisor']}</td>
         </tr>""" for w in watch)
+
+    pdf_btn = """
+  <tr><td style="padding:22px 28px;">
+    <table role="presentation" width="100%"><tr>
+      <td>
+        <span style="display:inline-block;background:#5E2D91;color:#fff;font-size:12px;font-weight:700;padding:9px 18px;border-radius:8px;">📎 تفاصيل كل الفروع (PDF مرفق)</span>
+      </td>
+    </tr></table>
+  </td></tr>""" if pdf_attached else ""
 
     return f"""<!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="UTF-8"></head>
@@ -205,7 +245,7 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
   </td></tr>
 
   <tr><td style="padding:20px 28px 4px 28px;">
-    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">🗺️ أداء المناطق</div>
+    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">🗺️ أداء المناطق ({len(rms)})</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;font-size:12px;">
       <tr style="background:#5E2D91;color:#fff;">
         <td style="padding:8px 10px;font-weight:700;">المنطقة</td>
@@ -214,12 +254,12 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
         <td style="padding:8px 10px;font-weight:700;" align="center">Proj%</td>
         <td style="padding:8px 10px;font-weight:700;" align="center">الحالة</td>
       </tr>
-      {am_rows}
+      {rm_rows}
     </table>
   </td></tr>
 
   <tr><td style="padding:20px 28px 4px 28px;">
-    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">⚠️ فروع تحتاج نظرك (أضعف {WATCHLIST_SIZE})</div>
+    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">⚠️ فروع تحتاج نظرك (أضعف {WATCHLIST_SIZE} من إجمالي الفروع)</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;font-size:12px;">
       <tr style="background:#5E2D91;">
         <td style="padding:6px 10px;color:#fff;font-size:10px;font-weight:700;">الفرع</td>
@@ -230,8 +270,9 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
       {watch_rows}
     </table>
   </td></tr>
+  {pdf_btn}
 
-  <tr><td style="padding:22px 28px;">
+  <tr><td style="padding:0 28px 22px 28px;">
     <div style="color:#9ca3af;font-size:10px;">FAKHARANY360 · تقرير تلقائي يومي · لا ترد على هذا الإيميل</div>
   </td></tr>
 </table>
@@ -239,7 +280,82 @@ def render_html(date_iso, rows, region_label='Cairo & Canal'):
 </body></html>"""
 
 
-def send_via_resend(html, subject):
+def build_pdf(date_iso, rows, region_label='Cairo & Canal'):
+    """Full branch-level breakdown, grouped by regional manager. Returns raw
+    PDF bytes, or None if the PDF/Arabic-text dependencies aren't installed
+    (in that case the email is still sent, just without the attachment)."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+    except ImportError as e:
+        print(f'  ⚠️  PDF skipped — missing dependency: {e}')
+        return None
+
+    font_path = os.path.join(os.path.dirname(__file__), 'assets', 'Amiri-Regular.ttf')
+    pdfmetrics.registerFont(TTFont('Amiri', font_path))
+
+    def ar(text):
+        """Reshape + reorder Arabic text for correct rendering in the PDF."""
+        return get_display(arabic_reshaper.reshape(str(text)))
+
+    branches = build_branch_detail(rows)
+    buf_path = '/tmp/fakharany360_mtd_detail.pdf'
+    c = canvas.Canvas(buf_path, pagesize=A4)
+    W, H = A4
+    y = H - 20 * mm
+
+    def header():
+        nonlocal y
+        c.setFillColorRGB(0.37, 0.18, 0.57)
+        c.rect(0, H - 25 * mm, W, 25 * mm, fill=1, stroke=0)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Amiri', 16)
+        c.drawRightString(W - 15 * mm, H - 12 * mm, ar(f'تفاصيل الفروع — MTD {date_iso}'))
+        c.setFont('Amiri', 10)
+        c.drawRightString(W - 15 * mm, H - 19 * mm, ar(f'منطقة {region_label} — محمد الفخراني'))
+        c.setFillColorRGB(0, 0, 0)
+        y = H - 32 * mm
+
+    def new_page():
+        c.showPage()
+        header()
+
+    def row_line(cells, bold=False, bg=None, text_color=(0, 0, 0)):
+        nonlocal y
+        if y < 20 * mm:
+            new_page()
+        if bg:
+            c.setFillColorRGB(*bg)
+            c.rect(15 * mm, y - 5.5 * mm, W - 30 * mm, 7 * mm, fill=1, stroke=0)
+        c.setFillColorRGB(*text_color)
+        c.setFont('Amiri', 10)
+        x = W - 18 * mm
+        widths = [70 * mm, 30 * mm, 30 * mm, 30 * mm]
+        for text, wdt in zip(cells, widths):
+            c.drawRightString(x, y, ar(text) if any('\u0600' <= ch <= '\u06FF' for ch in str(text)) else str(text))
+            x -= wdt
+        y -= 7 * mm
+
+    header()
+    for rm_name, brs in branches.items():
+        row_line([f'المنطقة: {rm_name}  ({len(brs)} فرع)', '', '', ''], bg=(0.95, 0.94, 0.98))
+        row_line(['الفرع', 'المشرف', 'Ach%', 'Proj%'], bg=(0.37, 0.18, 0.57), text_color=(1, 1, 1))
+        for b in brs:
+            bg = (1, 0.96, 0.96) if b['projPct'] < 80 else None
+            row_line([b['store'], b['supervisor'], f"{b['achPct']:.0f}%", f"{b['projPct']:.0f}%"], bg=bg)
+        y -= 3 * mm
+
+    c.save()
+    with open(buf_path, 'rb') as f:
+        return f.read()
+
+
+def send_via_resend(html, subject, pdf_bytes=None, pdf_filename='fakharany360_branches.pdf'):
     if not RESEND_API_KEY:
         print('  ⚠️  RESEND_API_KEY not set — skipping send, printing HTML length only.')
         print(f'  (HTML length: {len(html)} chars)')
@@ -247,17 +363,24 @@ def send_via_resend(html, subject):
     if not MTD_EMAIL_TO:
         print('  ⚠️  MTD_EMAIL_TO not set — no recipients, skipping send.')
         return
-    payload = json.dumps({
+
+    email_payload = {
         'from': RESEND_FROM,
         'to': MTD_EMAIL_TO,
         'subject': subject,
         'html': html,
-    })
+    }
+    if pdf_bytes:
+        email_payload['attachments'] = [{
+            'filename': pdf_filename,
+            'content': base64.b64encode(pdf_bytes).decode('ascii'),
+        }]
+
+    payload = json.dumps(email_payload)
     # Using curl instead of urllib: Cloudflare (which fronts api.resend.com) blocks
-    # some requests based on the TLS/HTTP client fingerprint, and plain Python
-    # urllib requests get flagged (HTTP 403 / Cloudflare error 1010) regardless of
-    # the User-Agent header. curl's fingerprint is not flagged, and it's what
-    # Resend's own docs use, so we shell out to it here instead.
+    # plain Python urllib requests based on their TLS/HTTP client fingerprint
+    # (HTTP 403 / Cloudflare error 1010), regardless of headers set. curl's
+    # fingerprint is not flagged, and it's what Resend's own docs use.
     result = subprocess.run(
         ['curl', '-sS', '-w', '\n%{http_code}', '-X', 'POST', 'https://api.resend.com/emails',
          '-H', f'Authorization: Bearer {RESEND_API_KEY}',
@@ -281,9 +404,11 @@ def main():
     if not rows:
         print('  ℹ️  No rows for latest snapshot — skipping email.')
         return
-    html = render_html(date_iso, rows)
+
+    pdf_bytes = build_pdf(date_iso, rows)
+    html = render_html(date_iso, rows, pdf_attached=bool(pdf_bytes))
     subject = f'📊 FAKHARANY360 — ملخص MTD ليوم {date_iso}'
-    send_via_resend(html, subject)
+    send_via_resend(html, subject, pdf_bytes=pdf_bytes, pdf_filename=f'fakharany360_branches_{date_iso}.pdf')
 
 
 if __name__ == '__main__':

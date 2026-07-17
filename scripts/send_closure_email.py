@@ -18,9 +18,9 @@ Usage:
 """
 import os
 import json
+import base64
 import subprocess
 import urllib.request
-import urllib.error
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', '')
@@ -100,20 +100,49 @@ def build_tariff_mix(rows):
     }
 
 
-def build_area_manager_table(rows):
+def status_label(p):
+    return 'ممتاز' if p >= 95 else 'متابعة' if p >= 80 else 'تدخل عاجل'
+
+
+def store_name(r):
+    return (r.get('row') or {}).get('store') or r.get('store_code') or '-'
+
+
+def build_regional_manager_table(rows):
+    """Top-level grouping = regional_manager (the small set of senior Area
+    Managers) — this is what the email body calls "المناطق"."""
     groups = {}
     for r in rows:
-        am = r.get('area_manager') or 'Unassigned'
-        groups.setdefault(am, []).append(r)
+        rm = r.get('regional_manager') or r.get('area_manager') or 'غير محدد'
+        groups.setdefault(rm, []).append(r)
     out = []
-    for am, grs in groups.items():
+    for rm, grs in groups.items():
         t = sum(num(r, 'mobileTarget') for r in grs)
         a = sum(num(r, 'mobileSubs') for r in grs)
         achPct = pct(a, t)
         stores = len(set(r.get('store_code') for r in grs))
-        out.append({'name': am, 'stores': stores, 'achPct': achPct, 'color': status_color(achPct)})
+        out.append({'name': rm, 'stores': stores, 'achPct': achPct, 'color': status_color(achPct)})
     out.sort(key=lambda x: x['achPct'])
     return out
+
+
+def build_branch_detail(rows):
+    """Full branch-level list, grouped by regional_manager — feeds the PDF."""
+    groups = {}
+    for r in rows:
+        t = num(r, 'mobileTarget')
+        if t <= 0:
+            continue
+        rm = r.get('regional_manager') or r.get('area_manager') or 'غير محدد'
+        a = num(r, 'mobileSubs')
+        groups.setdefault(rm, []).append({
+            'store': store_name(r),
+            'supervisor': r.get('supervisor') or '-',
+            'achPct': pct(a, t),
+        })
+    for rm in groups:
+        groups[rm].sort(key=lambda x: x['achPct'])
+    return groups
 
 
 def build_watchlist(rows):
@@ -132,10 +161,10 @@ def build_watchlist(rows):
     return items[:WATCHLIST_SIZE]
 
 
-def render_html(month, rows, region_label='Cairo & Canal'):
+def render_html(month, rows, region_label='Cairo & Canal', pdf_attached=False):
     grid = build_product_grid(rows)
     tariff = build_tariff_mix(rows)
-    ams = build_area_manager_table(rows)
+    rms = build_regional_manager_table(rows)
     watch = build_watchlist(rows)
     mobile = next(p for p in grid if p['key'] == 'mobile')
 
@@ -163,13 +192,13 @@ def render_html(month, rows, region_label='Cairo & Canal'):
     </tr></table>
   </td></tr>"""
 
-    am_rows = ''.join(f"""
-        <tr style="background:{'#fff5f5' if am['color']=='#c0392b' else '#ffffff'};">
-          <td style="padding:8px 10px;color:#1a1a2e;">{am['name']}</td>
-          <td style="padding:8px 10px;" align="center">{am['stores']}</td>
-          <td style="padding:8px 10px;font-weight:800;color:{am['color']};" align="center">{am['achPct']:.0f}%</td>
-          <td align="center"><span style="background:{am['color']};color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">{'ممتاز' if am['achPct']>=95 else 'متابعة' if am['achPct']>=80 else 'تدخل عاجل'}</span></td>
-        </tr>""" for am in ams)
+    rm_rows = ''.join(f"""
+        <tr style="background:{'#fff5f5' if rm['color']=='#c0392b' else '#ffffff'};">
+          <td style="padding:8px 10px;color:#1a1a2e;">{rm['name']}</td>
+          <td style="padding:8px 10px;" align="center">{rm['stores']}</td>
+          <td style="padding:8px 10px;font-weight:800;color:{rm['color']};" align="center">{rm['achPct']:.0f}%</td>
+          <td align="center"><span style="background:{rm['color']};color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">{status_label(rm['achPct'])}</span></td>
+        </tr>""" for rm in rms)
 
     watch_rows = ''.join(f"""
         <tr style="background:#fdf3ea;">
@@ -197,7 +226,7 @@ def render_html(month, rows, region_label='Cairo & Canal'):
       <tr><td style="padding:14px 16px;" dir="ltr" align="left">
         <div style="color:#5E2D91;font-size:13px;font-weight:800;margin-bottom:4px;">💡 Final Result</div>
         <div style="color:#3a1d5c;font-size:13px;line-height:1.7;">
-          Mobile closed the month at <b style="color:{status_color(mobile['achPct'])};">{mobile['achPct']:.0f}%</b> of target across {sum(a['stores'] for a in ams)} branches.
+          Mobile closed the month at <b style="color:{status_color(mobile['achPct'])};">{mobile['achPct']:.0f}%</b> of target across {sum(a['stores'] for a in rms)} branches.
         </div>
       </td></tr>
     </table>
@@ -210,7 +239,7 @@ def render_html(month, rows, region_label='Cairo & Canal'):
   {tariff_block}
 
   <tr><td style="padding:20px 28px 4px 28px;">
-    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">🗺️ نتيجة المناطق</div>
+    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">🗺️ نتيجة المناطق ({len(rms)})</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;font-size:12px;">
       <tr style="background:#5E2D91;color:#fff;">
         <td style="padding:8px 10px;font-weight:700;">المنطقة</td>
@@ -218,12 +247,12 @@ def render_html(month, rows, region_label='Cairo & Canal'):
         <td style="padding:8px 10px;font-weight:700;" align="center">Ach%</td>
         <td style="padding:8px 10px;font-weight:700;" align="center">الحالة</td>
       </tr>
-      {am_rows}
+      {rm_rows}
     </table>
   </td></tr>
 
   <tr><td style="padding:20px 28px 4px 28px;">
-    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">⚠️ أضعف {WATCHLIST_SIZE} فروع الشهر ده</div>
+    <div style="color:#1a1a2e;font-size:14px;font-weight:800;margin-bottom:8px;">⚠️ أضعف {WATCHLIST_SIZE} فروع الشهر ده (من إجمالي الفروع)</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;font-size:12px;">
       <tr style="background:#5E2D91;">
         <td style="padding:6px 10px;color:#fff;font-size:10px;font-weight:700;">الفرع</td>
@@ -233,8 +262,9 @@ def render_html(month, rows, region_label='Cairo & Canal'):
       {watch_rows}
     </table>
   </td></tr>
+  {"<tr><td style='padding:22px 28px;'><span style='display:inline-block;background:#5E2D91;color:#fff;font-size:12px;font-weight:700;padding:9px 18px;border-radius:8px;'>📎 تفاصيل كل الفروع (PDF مرفق)</span></td></tr>" if pdf_attached else ""}
 
-  <tr><td style="padding:22px 28px;">
+  <tr><td style="padding:0 28px 22px 28px;">
     <div style="color:#9ca3af;font-size:10px;">FAKHARANY360 · تقرير إغلاق شهري تلقائي · لا ترد على هذا الإيميل</div>
   </td></tr>
 </table>
@@ -242,19 +272,98 @@ def render_html(month, rows, region_label='Cairo & Canal'):
 </body></html>"""
 
 
-def send_via_resend(html, subject):
+def build_pdf(month, rows, region_label='Cairo & Canal'):
+    """Full branch-level breakdown, grouped by regional manager. Returns raw
+    PDF bytes, or None if the PDF/Arabic-text dependencies aren't installed."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+    except ImportError as e:
+        print(f'  ⚠️  PDF skipped — missing dependency: {e}')
+        return None
+
+    font_path = os.path.join(os.path.dirname(__file__), 'assets', 'Amiri-Regular.ttf')
+    pdfmetrics.registerFont(TTFont('Amiri', font_path))
+
+    def ar(text):
+        return get_display(arabic_reshaper.reshape(str(text)))
+
+    branches = build_branch_detail(rows)
+    buf_path = '/tmp/fakharany360_closure_detail.pdf'
+    c = canvas.Canvas(buf_path, pagesize=A4)
+    W, H = A4
+    y = H - 20 * mm
+
+    def header():
+        nonlocal y
+        c.setFillColorRGB(0.37, 0.18, 0.57)
+        c.rect(0, H - 25 * mm, W, 25 * mm, fill=1, stroke=0)
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Amiri', 16)
+        c.drawRightString(W - 15 * mm, H - 12 * mm, ar(f'تفاصيل الفروع — إغلاق {month}'))
+        c.setFont('Amiri', 10)
+        c.drawRightString(W - 15 * mm, H - 19 * mm, ar(f'منطقة {region_label} — محمد الفخراني'))
+        c.setFillColorRGB(0, 0, 0)
+        y = H - 32 * mm
+
+    def new_page():
+        c.showPage()
+        header()
+
+    def row_line(cells, bg=None, text_color=(0, 0, 0)):
+        nonlocal y
+        if y < 20 * mm:
+            new_page()
+        if bg:
+            c.setFillColorRGB(*bg)
+            c.rect(15 * mm, y - 5.5 * mm, W - 30 * mm, 7 * mm, fill=1, stroke=0)
+        c.setFillColorRGB(*text_color)
+        c.setFont('Amiri', 10)
+        x = W - 18 * mm
+        widths = [90 * mm, 40 * mm, 30 * mm]
+        for text, wdt in zip(cells, widths):
+            c.drawRightString(x, y, ar(text) if any('\u0600' <= ch <= '\u06FF' for ch in str(text)) else str(text))
+            x -= wdt
+        y -= 7 * mm
+
+    header()
+    for rm_name, brs in branches.items():
+        row_line([f'المنطقة: {rm_name}  ({len(brs)} فرع)', '', ''], bg=(0.95, 0.94, 0.98))
+        row_line(['الفرع', 'المشرف', 'Ach%'], bg=(0.37, 0.18, 0.57), text_color=(1, 1, 1))
+        for b in brs:
+            bg = (1, 0.96, 0.96) if b['achPct'] < 80 else None
+            row_line([b['store'], b['supervisor'], f"{b['achPct']:.0f}%"], bg=bg)
+        y -= 3 * mm
+
+    c.save()
+    with open(buf_path, 'rb') as f:
+        return f.read()
+
+
+def send_via_resend(html, subject, pdf_bytes=None, pdf_filename='fakharany360_branches.pdf'):
     if not RESEND_API_KEY:
         print('  ⚠️  RESEND_API_KEY not set — skipping send.')
         return
     if not MTD_EMAIL_TO:
         print('  ⚠️  MTD_EMAIL_TO not set — no recipients, skipping send.')
         return
-    payload = json.dumps({
+    email_payload = {
         'from': RESEND_FROM,
         'to': MTD_EMAIL_TO,
         'subject': subject,
         'html': html,
-    })
+    }
+    if pdf_bytes:
+        email_payload['attachments'] = [{
+            'filename': pdf_filename,
+            'content': base64.b64encode(pdf_bytes).decode('ascii'),
+        }]
+    payload = json.dumps(email_payload)
     result = subprocess.run(
         ['curl', '-sS', '-w', '\n%{http_code}', '-X', 'POST', 'https://api.resend.com/emails',
          '-H', f'Authorization: Bearer {RESEND_API_KEY}',
@@ -278,9 +387,10 @@ def main():
     if not rows:
         print('  ℹ️  No rows for latest month — skipping email.')
         return
-    html = render_html(month, rows)
+    pdf_bytes = build_pdf(month, rows)
+    html = render_html(month, rows, pdf_attached=bool(pdf_bytes))
     subject = f'📅 FAKHARANY360 — تقرير إغلاق شهر {month}'
-    send_via_resend(html, subject)
+    send_via_resend(html, subject, pdf_bytes=pdf_bytes, pdf_filename=f'fakharany360_branches_{month}.pdf')
 
 
 if __name__ == '__main__':
