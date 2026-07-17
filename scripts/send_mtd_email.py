@@ -21,6 +21,7 @@ Usage:
 import os
 import sys
 import json
+import subprocess
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -251,18 +252,25 @@ def send_via_resend(html, subject):
         'to': MTD_EMAIL_TO,
         'subject': subject,
         'html': html,
-    }).encode('utf-8')
-    req = urllib.request.Request('https://api.resend.com/emails', data=payload, method='POST', headers={
-        'Authorization': f'Bearer {RESEND_API_KEY}',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; FAKHARANY360-bot/1.0)',
     })
-    try:
-        with urllib.request.urlopen(req) as resp:
-            print('  ✅ Email sent:', resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode('utf-8', errors='replace')
-        raise RuntimeError(f'Resend send failed (HTTP {e.code}): {body}')
+    # Using curl instead of urllib: Cloudflare (which fronts api.resend.com) blocks
+    # some requests based on the TLS/HTTP client fingerprint, and plain Python
+    # urllib requests get flagged (HTTP 403 / Cloudflare error 1010) regardless of
+    # the User-Agent header. curl's fingerprint is not flagged, and it's what
+    # Resend's own docs use, so we shell out to it here instead.
+    result = subprocess.run(
+        ['curl', '-sS', '-w', '\n%{http_code}', '-X', 'POST', 'https://api.resend.com/emails',
+         '-H', f'Authorization: Bearer {RESEND_API_KEY}',
+         '-H', 'Content-Type: application/json',
+         '--data-binary', '@-'],
+        input=payload, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'curl failed to run: {result.stderr}')
+    body, _, status_code = result.stdout.rpartition('\n')
+    if not status_code.strip().isdigit() or not (200 <= int(status_code.strip()) < 300):
+        raise RuntimeError(f'Resend send failed (HTTP {status_code.strip()}): {body}')
+    print('  ✅ Email sent:', body)
 
 
 def main():
