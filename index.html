@@ -8354,6 +8354,11 @@ function renderMTDPkgDetail(rows, colSums, totalMobile) {
 // see the AUTH SYSTEM comment above: this deters casual viewing of the
 // source but isn't real security since there's no server backend).
 var EXPORT_PASSWORD_HASH = '4f50430238a8434dba760a243d54c4f46e554de0f1f637fba823ec9fa62b3530'; // 84127
+async function sha256Hex(str) {
+  var enc = new TextEncoder().encode(str);
+  var buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+}
 async function exportWithPassword(wb2, baseName) {
   var pw = prompt('🔐 أدخل كلمة المرور لتحميل الملف:', '');
   if (pw === null) return;             // cancelled
