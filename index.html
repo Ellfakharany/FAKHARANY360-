@@ -1633,6 +1633,34 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="section-title"><i class="fas fa-boxes mr-2"></i>Product Performance — Actual · Perc% · Projection</div>
       <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-6" id="mtd-product-grid"></div>
 
+      <!-- ── Team Performance Pivot (MTD) ── -->
+      <div class="chart-card mb-6" style="padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+          <h3 style="font-size:14px;font-weight:800;color:#1a1a2e;display:flex;align-items:center;gap:6px">
+            <i class="fas fa-users" style="color:#5E2D91"></i> TEAM PERFORMANCE PIVOT (MTD)
+          </h3>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <button id="mtd-tp-mode-summary" onclick="setMTDTeamPivotMode('summary')"
+              style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #5E2D91;background:#5E2D91;color:white;transition:all .2s">
+              <i class="fas fa-list mr-1"></i>Summary
+            </button>
+            <button id="mtd-tp-mode-details" onclick="setMTDTeamPivotMode('details')"
+              style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
+              <i class="fas fa-th-large mr-1"></i>Details
+            </button>
+            <button onclick="exportMTDTeamPivot()"
+              style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #5E2D91;background:white;color:#5E2D91">
+              <i class="fas fa-file-export mr-1"></i>Export
+            </button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">اضغط على اسم أي Regional Manager عشان تطوي/تفتح الفريق بتاعه · بيحترم كل الفلاتر الحالية (يوم/فرع/شهر...) · Summary = النسبة بس لكل منتج · Details = Target/Achievement/% كامل</div>
+        <div style="overflow-x:auto">
+          <div id="mtd-team-pivot-table"></div>
+        </div>
+      </div>
+
+
       <!-- ── Daily Trend ── -->
       <div id="mtd-daily-wrap" style="display:none">
         <div class="section-title"><i class="fas fa-chart-line mr-2"></i>Daily Trend (MTD)</div>
@@ -2400,6 +2428,175 @@ function exportTeamPivot() {
   XLSX.utils.book_append_sheet(wb2, wsFull, 'Full Data');
 
   exportWithPassword(wb2, 'TeamPerformancePivot');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TEAM PERFORMANCE PIVOT (MTD) — same idea as the Overview one, but built
+//  from the live MTD dataset (respects the MTD tab's own filters: day,
+//  store, Sales/Activation, etc.) and aggregated with mtdQcCalcGroup so
+//  Wallet (which isn't in PRODUCTS/MTD_PRODS the same way) is included.
+// ══════════════════════════════════════════════════════════════
+var MTD_TEAM_PIVOT_MODE = 'summary'; // 'summary' | 'details'
+var MTD_TEAM_PIVOT_COLLAPSED = {};
+
+var MTD_TP_PRODUCTS = [
+  { key:'mobile', label:'Mobile' }, { key:'fbb', label:'FBB' }, { key:'fixed', label:'Fixed' },
+  { key:'fwa', label:'WE Air' }, { key:'gold', label:'WE Gold' }, { key:'wallet', label:'Wallet' }
+];
+
+function setMTDTeamPivotMode(mode) {
+  MTD_TEAM_PIVOT_MODE = mode;
+  var sEl = document.getElementById('mtd-tp-mode-summary'), dEl = document.getElementById('mtd-tp-mode-details');
+  if (sEl) { sEl.style.background = mode==='summary' ? '#5E2D91' : 'white'; sEl.style.color = mode==='summary' ? 'white' : '#6b7280'; sEl.style.borderColor = mode==='summary' ? '#5E2D91' : '#e5e7eb'; }
+  if (dEl) { dEl.style.background = mode==='details' ? '#5E2D91' : 'white'; dEl.style.color = mode==='details' ? 'white' : '#6b7280'; dEl.style.borderColor = mode==='details' ? '#5E2D91' : '#e5e7eb'; }
+  renderMTDTeamPivot();
+}
+
+function toggleMTDTeamPivotRM(rm) {
+  MTD_TEAM_PIVOT_COLLAPSED[rm] = !MTD_TEAM_PIVOT_COLLAPSED[rm];
+  renderMTDTeamPivot();
+}
+
+function mtdBuildTeamPivotTree(rows) {
+  var tree = {};
+  rows.forEach(function(r){
+    var rm = r.regionalManager || 'Unassigned', sv = r.supervisor || 'Unassigned', am = r.areaManager || 'Unassigned';
+    if (!tree[rm]) tree[rm] = { rows: [], supervisors: {} };
+    tree[rm].rows.push(r);
+    if (!tree[rm].supervisors[sv]) tree[rm].supervisors[sv] = { rows: [], areaManagers: {} };
+    tree[rm].supervisors[sv].rows.push(r);
+    if (!tree[rm].supervisors[sv].areaManagers[am]) tree[rm].supervisors[sv].areaManagers[am] = [];
+    tree[rm].supervisors[sv].areaManagers[am].push(r);
+  });
+  return tree;
+}
+
+function mtdTpProductCellsHTML(k, valueColor) {
+  return MTD_TP_PRODUCTS.map(function(p){
+    var t = k[p.key].tgt||0, a = k[p.key].act||0;
+    var pc = t>0 ? Math.round(a/t*100) : 0;
+    var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
+    if (MTD_TEAM_PIVOT_MODE === 'details') {
+      return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(t)+'</td>'+
+             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(a)+'</td>'+
+             '<td style="padding:8px 10px;text-align:right;font-size:11.5px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
+    }
+    return '<td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
+  }).join('');
+}
+
+function mtdTpRow(label, indent, rows, style, isLast) {
+  var k = mtdQcCalcGroup(rows);
+  var pad = 14 + indent*22;
+  var bg = style.bg, color = style.color || '#1a1a2e', fw = style.fw || 600, fs = style.fs || 12;
+  var tr = '<tr style="background:'+bg+';'+(style.borderTop?'border-top:'+style.borderTop+';':'')+(isLast?'border-bottom:2px solid #d1d5db;':'')+'">';
+  tr += '<td style="padding:8px '+(style.clickable?'8px':'14px')+' 8px '+pad+'px;font-size:'+fs+'px;font-weight:'+fw+';color:'+color+';white-space:nowrap'+(style.clickable?';cursor:pointer':'')+'"'+(style.clickable?' onclick="toggleMTDTeamPivotRM(\''+label.replace(/'/g,"\\'")+'\')"':'')+'>'+
+    (style.clickable ? '<i class="fas fa-chevron-'+(MTD_TEAM_PIVOT_COLLAPSED[label]?'left':'down')+' mr-2" style="font-size:9px;opacity:.8"></i>' : '') + label +
+  '</td>';
+  tr += mtdTpProductCellsHTML(k, bg==='transparent' ? null : color);
+  tr += '</tr>';
+  return tr;
+}
+
+function renderMTDTeamPivot() {
+  var el = document.getElementById('mtd-team-pivot-table');
+  if (!el) return;
+  var rows = (typeof MTD_FILTERED !== 'undefined' && MTD_FILTERED.length) ? MTD_FILTERED : (typeof getMTDFiltered === 'function' ? getMTDFiltered() : []);
+  if (!rows.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">مفيش بيانات في العرض الحالي</div>'; return; }
+
+  var tree = mtdBuildTeamPivotTree(rows);
+  var rmNames = Object.keys(tree).sort(function(a,b){ return mtdQcCalcGroup(tree[b].rows).mobile.tgt - mtdQcCalcGroup(tree[a].rows).mobile.tgt; });
+
+  var colsPerProduct = MTD_TEAM_PIVOT_MODE === 'details' ? 3 : 1;
+  var productHeaderCells = MTD_TP_PRODUCTS.map(function(p){
+    return '<th colspan="'+colsPerProduct+'" style="padding:8px 10px;font-size:10px;font-weight:800;color:white;text-align:center;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid rgba(255,255,255,.15)">'+p.label+'</th>';
+  }).join('');
+  var subHeaderCells = MTD_TEAM_PIVOT_MODE === 'details'
+    ? MTD_TP_PRODUCTS.map(function(){
+        return '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">TGT</th>'+
+               '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">ACH</th>'+
+               '<th style="padding:5px 10px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15)">%</th>';
+      }).join('')
+    : '';
+
+  var thead = '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
+    '<thead>' +
+      '<tr style="background:#1a1a2e">' +
+        '<th rowspan="'+(MTD_TEAM_PIVOT_MODE==='details'?2:1)+'" style="padding:9px 14px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.05em;text-align:left;vertical-align:bottom">Regional Manager / Supervisor / Area Manager</th>' +
+        productHeaderCells +
+      '</tr>' +
+      (MTD_TEAM_PIVOT_MODE==='details' ? '<tr style="background:#2a2a45">'+subHeaderCells+'</tr>' : '') +
+    '</thead><tbody>';
+
+  var body = '';
+  rmNames.forEach(function(rm){
+    var rmData = tree[rm];
+    body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true });
+    if (!MTD_TEAM_PIVOT_COLLAPSED[rm]) {
+      var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
+      svNames.forEach(function(sv){
+        var svData = rmData.supervisors[sv];
+        var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
+        amNames.forEach(function(am){
+          body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+        });
+        body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+      });
+    }
+    body += mtdTpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
+  });
+  body += mtdTpRow('GRAND TOTAL', 0, rows, { bg:'#1a1a2e', color:'white', fw:900, fs:13, isLast:true });
+
+  el.innerHTML = thead + body + '</tbody></table>';
+}
+
+function exportMTDTeamPivot() {
+  var rows = (typeof MTD_FILTERED !== 'undefined' && MTD_FILTERED.length) ? MTD_FILTERED : (typeof getMTDFiltered === 'function' ? getMTDFiltered() : []);
+  if (!rows.length) { alert('⚠️ مفيش بيانات في العرض الحالي'); return; }
+  var tree = mtdBuildTeamPivotTree(rows);
+  var rmNames = Object.keys(tree).sort(function(a,b){ return mtdQcCalcGroup(tree[b].rows).mobile.tgt - mtdQcCalcGroup(tree[a].rows).mobile.tgt; });
+
+  var aoa = [];
+  var headerRow = ['Regional Manager', 'Supervisor', 'Area Manager'];
+  MTD_TP_PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' ACH', p.label+' %'); });
+  aoa.push(['Team Performance Pivot (MTD)']);
+  aoa.push([]);
+  aoa.push(headerRow);
+
+  function productCells(k) {
+    var out = [];
+    MTD_TP_PRODUCTS.forEach(function(p){
+      var t=k[p.key].tgt||0, a=k[p.key].act||0;
+      out.push(t, a, (t>0?Math.round(a/t*100):0)+'%');
+    });
+    return out;
+  }
+
+  rmNames.forEach(function(rm){
+    var rmData = tree[rm];
+    var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
+    svNames.forEach(function(sv){
+      var svData = rmData.supervisors[sv];
+      var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
+      amNames.forEach(function(am){
+        var k = mtdQcCalcGroup(svData.areaManagers[am]);
+        aoa.push([rm, sv, am].concat(productCells(k)));
+      });
+      var ks = mtdQcCalcGroup(svData.rows);
+      aoa.push(['', sv+' Total *', ''].concat(productCells(ks)));
+    });
+    var kr = mtdQcCalcGroup(rmData.rows);
+    aoa.push([rm+' Total *', '', ''].concat(productCells(kr)));
+  });
+  var kg = mtdQcCalcGroup(rows);
+  aoa.push(['GRAND TOTAL *', '', ''].concat(productCells(kg)));
+
+  var wb2 = XLSX.utils.book_new();
+  var wsSummary = XLSX.utils.aoa_to_sheet(aoa);
+  wsSummary['!cols'] = [{wch:22},{wch:24},{wch:24}].concat(MTD_TP_PRODUCTS.map(function(){ return [{wch:10},{wch:10},{wch:8}]; }).flat());
+  XLSX.utils.book_append_sheet(wb2, wsSummary, 'Summary');
+
+  exportWithPassword(wb2, 'MTD_TeamPerformancePivot');
 }
 
 // ── Executive Banner ──────────────────────────────────────────────────────────
@@ -7764,6 +7961,7 @@ function renderMTD() {
     renderMTDLowPerf();
     renderMTDPkgMix();
     renderMTDTariffMix();
+    renderMTDTeamPivot();
     applyMTDView();
     renderMTDTable();
   }
