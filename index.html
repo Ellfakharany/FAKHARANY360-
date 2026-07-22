@@ -9045,5 +9045,994 @@ function renderMTDTable() {
     </div>
   </div>
 
+
+<style>
+/* ============================================================
+   ASK FAKHARANYAI — Premium AI Copilot
+   ============================================================ */
+:root{
+  --fai-purple:#5E2D91; --fai-purple2:#7b3dbf; --fai-pink:#e91e8c; --fai-gold:#f5a623;
+  --fai-glass-bg:rgba(255,255,255,0.72); --fai-glass-border:rgba(255,255,255,0.35);
+  --fai-panel-bg:rgba(248,247,252,0.86);
+  --fai-msg-bg:#ffffff; --fai-msg-border:#ece7f7;
+}
+.dark{
+  --fai-glass-bg:rgba(26,22,40,0.72); --fai-glass-border:rgba(255,255,255,0.08);
+  --fai-panel-bg:rgba(15,13,26,0.92);
+  --fai-msg-bg:#1a1628; --fai-msg-border:#2d2545;
+}
+
+/* ---------- Floating Launcher ---------- */
+#fai-launcher{
+  position:fixed; right:26px; bottom:26px; z-index:9990;
+  width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
+  background:linear-gradient(135deg,var(--fai-purple) 0%,var(--fai-purple2) 45%,var(--fai-pink) 100%);
+  background-size:200% 200%; animation:faiGradientShift 6s ease infinite;
+  box-shadow:0 8px 28px rgba(94,45,145,0.45), 0 2px 8px rgba(233,30,140,0.25);
+  display:flex; align-items:center; justify-content:center;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s ease;
+}
+#fai-launcher:hover{ transform:translateY(-3px) scale(1.06); box-shadow:0 14px 34px rgba(94,45,145,0.55), 0 4px 12px rgba(233,30,140,0.35); }
+#fai-launcher:active{ transform:scale(0.96); }
+#fai-launcher i{ color:#fff; font-size:22px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.2)); }
+#fai-launcher .fai-pulse{
+  position:absolute; inset:0; border-radius:50%;
+  box-shadow:0 0 0 0 rgba(233,30,140,0.55);
+  animation:faiPulse 2.6s ease-out infinite;
+  pointer-events:none;
+}
+#fai-launcher .fai-dot{
+  position:absolute; top:2px; right:2px; width:12px; height:12px; border-radius:50%;
+  background:#22c55e; border:2px solid #fff; display:none;
+}
+#fai-launcher.has-unread .fai-dot{ display:block; }
+@keyframes faiPulse{ 0%{box-shadow:0 0 0 0 rgba(233,30,140,0.45);} 70%{box-shadow:0 0 0 16px rgba(233,30,140,0);} 100%{box-shadow:0 0 0 0 rgba(233,30,140,0);} }
+@keyframes faiGradientShift{ 0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;} }
+#fai-launcher.fai-hide{ transform:scale(0) translateY(20px); opacity:0; pointer-events:none; }
+
+/* ---------- Overlay (mobile only, dims dashboard) ---------- */
+#fai-overlay{
+  position:fixed; inset:0; background:rgba(15,13,26,0.28); backdrop-filter:blur(2px);
+  z-index:9985; opacity:0; pointer-events:none; transition:opacity .3s ease;
+}
+#fai-overlay.fai-visible{ opacity:1; pointer-events:auto; }
+
+/* ---------- Slide Panel ---------- */
+#fai-panel{
+  position:fixed; top:0; right:0; height:100vh; width:420px; max-width:94vw;
+  background:var(--fai-panel-bg); backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  border-left:1px solid var(--fai-glass-border);
+  box-shadow:-12px 0 48px rgba(20,10,40,0.18);
+  z-index:9995; display:flex; flex-direction:column;
+  transform:translateX(100%); transition:transform .38s cubic-bezier(.16,1,.3,1);
+}
+#fai-panel.fai-open{ transform:translateX(0); }
+
+/* ---------- Panel Header ---------- */
+.fai-header{
+  padding:18px 18px 16px; position:relative; overflow:hidden;
+  background:linear-gradient(120deg,var(--fai-purple) 0%,#4a2172 55%,var(--fai-pink) 130%);
+  color:#fff; flex-shrink:0;
+}
+.fai-header::after{
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(circle at 85% -10%, rgba(255,255,255,0.25), transparent 55%);
+  pointer-events:none;
+}
+.fai-header-top{ display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1; }
+.fai-title-row{ display:flex; align-items:center; gap:10px; }
+.fai-orb{
+  width:38px; height:38px; border-radius:12px; flex-shrink:0;
+  background:linear-gradient(135deg,#fff,#e9d5ff 40%,var(--fai-gold));
+  background-size:200% 200%; animation:faiGradientShift 5s ease infinite;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 3px 10px rgba(0,0,0,0.2);
+}
+.fai-orb i{ color:var(--fai-purple); font-size:17px; }
+.fai-title{ font-size:16px; font-weight:800; line-height:1.15; letter-spacing:-0.2px; }
+.fai-subtitle{ font-size:11px; font-weight:600; color:rgba(255,255,255,0.78); margin-top:1px; }
+.fai-header-actions{ display:flex; align-items:center; gap:4px; }
+.fai-hbtn{
+  width:30px; height:30px; border-radius:9px; border:none; cursor:pointer;
+  background:rgba(255,255,255,0.14); color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:13px; transition:background .18s ease;
+}
+.fai-hbtn:hover{ background:rgba(255,255,255,0.26); }
+
+/* ---------- Body / Messages ---------- */
+.fai-body{ flex:1; overflow-y:auto; padding:16px 14px 10px; scroll-behavior:smooth; }
+.fai-body::-webkit-scrollbar{ width:6px; }
+.fai-body::-webkit-scrollbar-thumb{ background:rgba(94,45,145,0.28); border-radius:3px; }
+
+.fai-greeting{
+  background:var(--fai-glass-bg); border:1px solid var(--fai-glass-border);
+  border-radius:16px; padding:16px; margin-bottom:14px;
+  box-shadow:0 4px 18px rgba(94,45,145,0.08);
+}
+.fai-greeting-text{ font-size:13.5px; font-weight:700; color:var(--text-primary); line-height:1.5; }
+.fai-greeting-sub{ font-size:11.5px; color:var(--text-muted); margin-top:4px; font-weight:500; }
+
+.fai-chip-label{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin:14px 2px 8px; }
+.fai-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:6px; }
+.fai-chip{
+  border:1px solid var(--fai-msg-border); background:var(--fai-msg-bg); color:var(--text-primary);
+  font-size:11.5px; font-weight:600; padding:7px 12px; border-radius:20px; cursor:pointer;
+  transition:all .16s ease; white-space:nowrap;
+}
+.fai-chip:hover{ border-color:var(--fai-purple); color:var(--fai-purple); background:linear-gradient(0deg,rgba(94,45,145,0.06),rgba(94,45,145,0.06)),var(--fai-msg-bg); transform:translateY(-1px); }
+
+/* ---------- Chat messages ---------- */
+.fai-msg{ display:flex; margin-bottom:14px; animation:faiFadeUp .28s ease; }
+@keyframes faiFadeUp{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+.fai-msg.user{ justify-content:flex-end; }
+.fai-msg.assistant{ justify-content:flex-start; }
+
+.fai-bubble-user{
+  max-width:82%; background:linear-gradient(135deg,var(--fai-purple),var(--fai-purple2));
+  color:#fff; padding:10px 14px; border-radius:16px 16px 4px 16px; font-size:13px; font-weight:600;
+  box-shadow:0 3px 10px rgba(94,45,145,0.28); line-height:1.45;
+}
+
+.fai-assistant-wrap{ display:flex; gap:8px; max-width:96%; }
+.fai-avatar{
+  width:26px; height:26px; border-radius:8px; flex-shrink:0; margin-top:2px;
+  background:linear-gradient(135deg,var(--fai-purple),var(--fai-pink));
+  display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(94,45,145,0.3);
+}
+.fai-avatar i{ color:#fff; font-size:11px; }
+.fai-card{
+  background:var(--fai-msg-bg); border:1px solid var(--fai-msg-border); border-radius:4px 16px 16px 16px;
+  padding:13px 14px; box-shadow:0 3px 14px rgba(20,10,40,0.06); font-size:12.5px; color:var(--text-primary); line-height:1.55; flex:1; min-width:0;
+}
+.fai-card-title{ font-weight:800; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:6px; color:var(--text-primary); }
+.fai-card-title .accent{ color:var(--fai-purple); }
+
+/* KPI row inside message */
+.fai-kpi-row{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.fai-kpi{
+  flex:1; min-width:82px; background:var(--gray-bg); border:1px solid var(--border); border-radius:11px;
+  padding:8px 10px; text-align:center;
+}
+.fai-kpi-val{ font-size:15px; font-weight:800; color:var(--fai-purple); line-height:1.2; }
+.fai-kpi-lbl{ font-size:9.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; margin-top:2px; }
+.fai-kpi.up .fai-kpi-val{ color:#16a34a; } .fai-kpi.down .fai-kpi-val{ color:#dc2626; } .fai-kpi.warn .fai-kpi-val{ color:#d97706; }
+
+/* Table inside message */
+.fai-table-wrap{ margin:8px 0; border:1px solid var(--border); border-radius:11px; overflow:hidden; }
+.fai-table{ width:100%; border-collapse:collapse; font-size:11px; }
+.fai-table th{ background:linear-gradient(135deg,var(--fai-purple),var(--fai-purple2)); color:#fff; padding:6px 8px; font-weight:700; text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.03em; }
+.fai-table td{ padding:6px 8px; border-top:1px solid var(--border); color:var(--text-primary); }
+.fai-table tr:nth-child(even) td{ background:rgba(94,45,145,0.03); }
+.fai-rank-badge{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:var(--fai-purple); color:#fff; font-size:8.5px; font-weight:800; }
+.fai-pct-red{ color:#dc2626; font-weight:800; } .fai-pct-amber{ color:#d97706; font-weight:800; } .fai-pct-green{ color:#16a34a; font-weight:800; }
+
+/* Risk meter */
+.fai-risk{ margin:10px 0; }
+.fai-risk-track{ height:8px; border-radius:5px; background:var(--border); overflow:hidden; }
+.fai-risk-fill{ height:100%; border-radius:5px; transition:width .6s ease; }
+.fai-risk-labels{ display:flex; justify-content:space-between; font-size:9.5px; font-weight:700; color:var(--text-muted); margin-top:3px; }
+
+/* Recommendation cards */
+.fai-reco{ display:flex; gap:8px; align-items:flex-start; background:var(--gray-bg); border:1px solid var(--border); border-radius:10px; padding:8px 10px; margin:6px 0; }
+.fai-reco i{ color:var(--fai-purple); margin-top:1px; font-size:11px; }
+.fai-reco-text{ font-size:11.5px; font-weight:600; color:var(--text-primary); }
+
+/* Prediction flow cards */
+.fai-flow{ display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+.fai-flow-step{ background:var(--gray-bg); border:1px solid var(--border); border-radius:10px; padding:9px 12px; display:flex; align-items:center; justify-content:space-between; }
+.fai-flow-lbl{ font-size:10.5px; font-weight:700; color:var(--text-muted); }
+.fai-flow-val{ font-size:14px; font-weight:800; color:var(--fai-purple); }
+.fai-flow-arrow{ text-align:center; color:var(--text-muted); font-size:11px; }
+
+/* Action buttons under a message */
+.fai-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.fai-action-btn{
+  border:1px solid var(--fai-msg-border); background:var(--fai-msg-bg); color:var(--fai-purple);
+  font-size:10.5px; font-weight:700; padding:6px 10px; border-radius:9px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+  transition:all .16s ease;
+}
+.fai-action-btn:hover{ background:var(--fai-purple); color:#fff; border-color:var(--fai-purple); transform:translateY(-1px); box-shadow:0 3px 8px rgba(94,45,145,0.3); }
+
+/* Message toolbar (copy/regen/export) */
+.fai-toolbar{ display:flex; gap:3px; margin-top:6px; opacity:0; transition:opacity .15s ease; }
+.fai-msg.assistant:hover .fai-toolbar{ opacity:1; }
+.fai-tbtn{ width:22px; height:22px; border:none; background:transparent; color:var(--text-muted); border-radius:6px; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; }
+.fai-tbtn:hover{ background:var(--gray-bg); color:var(--fai-purple); }
+
+/* Typing indicator */
+.fai-typing{ display:flex; gap:4px; padding:10px 14px; }
+.fai-typing span{ width:6px; height:6px; border-radius:50%; background:var(--fai-purple); opacity:.4; animation:faiTyping 1.1s ease infinite; }
+.fai-typing span:nth-child(2){ animation-delay:.15s; } .fai-typing span:nth-child(3){ animation-delay:.3s; }
+@keyframes faiTyping{ 0%,60%,100%{ transform:translateY(0); opacity:.4; } 30%{ transform:translateY(-4px); opacity:1; } }
+
+/* ---------- Input area ---------- */
+.fai-inputbar{
+  border-top:1px solid var(--border); padding:10px 12px 12px; flex-shrink:0;
+  background:var(--fai-glass-bg); backdrop-filter:blur(10px);
+}
+.fai-recent-row{ display:flex; gap:6px; overflow-x:auto; margin-bottom:8px; padding-bottom:2px; }
+.fai-recent-row::-webkit-scrollbar{ display:none; }
+.fai-recent-pill{ flex-shrink:0; font-size:10px; font-weight:600; color:var(--text-muted); background:var(--gray-bg); border:1px solid var(--border); padding:4px 9px; border-radius:20px; cursor:pointer; white-space:nowrap; }
+.fai-recent-pill:hover{ color:var(--fai-purple); border-color:var(--fai-purple); }
+.fai-input-row{ display:flex; align-items:flex-end; gap:8px; background:var(--fai-msg-bg); border:1.5px solid var(--fai-msg-border); border-radius:16px; padding:6px 6px 6px 14px; transition:border-color .15s ease; }
+.fai-input-row:focus-within{ border-color:var(--fai-purple); box-shadow:0 0 0 3px rgba(94,45,145,0.12); }
+#fai-input{ flex:1; border:none; outline:none; resize:none; background:transparent; font-size:12.5px; font-family:inherit; color:var(--text-primary); max-height:90px; line-height:1.5; padding:6px 0; }
+#fai-input::placeholder{ color:var(--text-muted); }
+.fai-send-btn, .fai-mic-btn{
+  width:32px; height:32px; border-radius:11px; border:none; cursor:pointer; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; transition:all .15s ease;
+}
+.fai-mic-btn{ background:var(--gray-bg); color:var(--text-muted); }
+.fai-mic-btn:hover{ color:var(--fai-purple); }
+.fai-mic-btn.recording{ background:#fee2e2; color:#dc2626; animation:faiPulse 1.4s ease infinite; }
+.fai-send-btn{ background:linear-gradient(135deg,var(--fai-purple),var(--fai-purple2)); color:#fff; box-shadow:0 3px 8px rgba(94,45,145,0.35); }
+.fai-send-btn:hover{ transform:scale(1.06); }
+.fai-send-btn:disabled{ opacity:.4; cursor:default; transform:none; }
+.fai-footnote{ text-align:center; font-size:9px; color:var(--text-muted); margin-top:7px; font-weight:600; opacity:.7; }
+
+/* Toast (used for nav confirmations / not-yet-available modules) */
+#fai-toast{
+  position:fixed; bottom:100px; right:26px; z-index:9998; background:var(--fai-purple); color:#fff;
+  padding:10px 16px; border-radius:11px; font-size:12px; font-weight:700; box-shadow:0 8px 24px rgba(94,45,145,0.4);
+  transform:translateY(10px); opacity:0; pointer-events:none; transition:all .25s ease;
+}
+#fai-toast.fai-show{ transform:translateY(0); opacity:1; }
+
+@media (max-width:640px){
+  #fai-panel{ width:100vw; max-width:100vw; }
+  #fai-launcher{ right:16px; bottom:16px; width:54px; height:54px; }
+}
+</style>
+
+<!-- ============================================================
+     ASK FAKHARANYAI — Floating Launcher + Slide Panel
+     ============================================================ -->
+<button id="fai-launcher" onclick="faiToggle()" title="Ask FakharanyAI — Your AI Business Copilot">
+  <span class="fai-pulse"></span>
+  <span class="fai-dot"></span>
+  <i class="fas fa-wand-magic-sparkles" id="fai-launcher-icon"></i>
+</button>
+
+<div id="fai-overlay" onclick="faiClose()"></div>
+
+<div id="fai-panel" role="dialog" aria-label="Ask FakharanyAI">
+  <div class="fai-header">
+    <div class="fai-header-top">
+      <div class="fai-title-row">
+        <div class="fai-orb"><i class="fas fa-robot"></i></div>
+        <div>
+          <div class="fai-title">Ask FakharanyAI</div>
+          <div class="fai-subtitle">Your AI Business Copilot</div>
+        </div>
+      </div>
+      <div class="fai-header-actions">
+        <button class="fai-hbtn" onclick="faiClearConversation()" title="Clear conversation"><i class="fas fa-broom"></i></button>
+        <button class="fai-hbtn" onclick="faiToggleHistory()" title="Conversation history"><i class="fas fa-history"></i></button>
+        <button class="fai-hbtn" onclick="faiClose()" title="Close"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="fai-body" id="fai-body">
+    <!-- populated by JS: greeting + chips + messages -->
+  </div>
+
+  <div class="fai-inputbar">
+    <div class="fai-recent-row" id="fai-recent-row"></div>
+    <div class="fai-input-row">
+      <textarea id="fai-input" rows="1" placeholder="Ask about performance, projections, rankings…" onkeydown="faiHandleKeydown(event)" oninput="faiAutoGrow(this)"></textarea>
+      <button class="fai-mic-btn" id="fai-mic-btn" onclick="faiToggleVoice()" title="Voice input"><i class="fas fa-microphone"></i></button>
+      <button class="fai-send-btn" id="fai-send-btn" onclick="faiSendFromInput()" title="Send"><i class="fas fa-arrow-up"></i></button>
+    </div>
+    <div class="fai-footnote">FakharanyAI reads your live filtered dashboard data · East Cairo Team</div>
+  </div>
+</div>
+
+<div id="fai-toast"></div>
+
+<script>
+/* ============================================================
+   ASK FAKHARANYAI — AI Business Copilot Engine
+   Reads live filteredData / RAW_DATA already loaded by the
+   dashboard and answers with real, grounded numbers.
+   ============================================================ */
+(function(){
+
+// ---------- State ----------
+var faiOpen = false;
+var faiBusy = false;
+var faiHistory = [];      // {role:'user'|'assistant', text, html}
+var faiRecent = [];
+var faiPinned = [];
+var faiRecognition = null;
+var faiListening = false;
+
+var FAI_SUGGESTIONS = [
+  { icon:'💧', label:'Lowest 10 Wallet stores today' },
+  { icon:'⚖️', label:'Compare East vs West' },
+  { icon:'🏆', label:'Best performing branch' },
+  { icon:'📈', label:'Show Projection' },
+  { icon:'🔮', label:'Predict End of Month' },
+  { icon:'📍', label:'Best stores for visit today' },
+  { icon:'📦', label:'Product Mix' },
+  { icon:'🥇', label:'Branch Ranking' },
+  { icon:'⚠️', label:'Why did Projection drop?' },
+  { icon:'🗺️', label:'Show Heatmap' }
+];
+
+var FAI_FOOTER_PROMPTS = [
+  { icon:'🏆', label:'Best Branch Today' },
+  { icon:'📉', label:'Lowest Wallet Stores' },
+  { icon:'📊', label:'Compare Areas' },
+  { icon:'📈', label:'Projection' },
+  { icon:'🚀', label:'Opportunity Stores' },
+  { icon:'🎯', label:'Stores to Visit Today' },
+  { icon:'⚠️', label:'Risks' },
+  { icon:'💰', label:'Revenue Prediction' }
+];
+
+// ---------- Persistence ----------
+function faiLoad(key, fallback){
+  try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch(e){ return fallback; }
+}
+function faiSave(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+
+faiRecent = faiLoad('fai_recent', []);
+faiPinned = faiLoad('fai_pinned', []);
+
+// ---------- Panel controls ----------
+window.faiToggle = function(){ faiOpen ? faiClose() : faiOpen_(); };
+
+function faiOpen_(){
+  faiOpen = true;
+  document.getElementById('fai-panel').classList.add('fai-open');
+  document.getElementById('fai-overlay').classList.add('fai-visible');
+  document.getElementById('fai-launcher').classList.remove('has-unread');
+  document.getElementById('fai-launcher').classList.add('fai-hide');
+  if (!faiHistory.length) faiRenderGreeting();
+  faiRenderRecent();
+  setTimeout(function(){ var i=document.getElementById('fai-input'); if(i) i.focus(); }, 300);
+}
+window.faiClose = function(){
+  faiOpen = false;
+  document.getElementById('fai-panel').classList.remove('fai-open');
+  document.getElementById('fai-overlay').classList.remove('fai-visible');
+  document.getElementById('fai-launcher').classList.remove('fai-hide');
+};
+
+window.faiClearConversation = function(){
+  faiHistory = [];
+  document.getElementById('fai-body').innerHTML = '';
+  faiRenderGreeting();
+};
+
+window.faiToggleHistory = function(){
+  if (!faiHistory.length){ faiShowToast('No conversation yet'); return; }
+  var body = document.getElementById('fai-body');
+  body.scrollTop = 0;
+};
+
+// ---------- Greeting + chips ----------
+function faiRenderGreeting(){
+  var body = document.getElementById('fai-body');
+  var chipsHtml = FAI_SUGGESTIONS.map(function(s){
+    return '<button class="fai-chip" onclick="faiSend(' + JSON.stringify(s.label) + ')">' + s.icon + ' ' + s.label + '</button>';
+  }).join('');
+  var userName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) ? CURRENT_USER.name : 'Mohamed';
+  body.insertAdjacentHTML('beforeend',
+    '<div class="fai-greeting">' +
+      '<div class="fai-greeting-text">Hello ' + userName + ' 👋<br>Ask me anything about your sales performance.</div>' +
+      '<div class="fai-greeting-sub">I read your live, currently-filtered dashboard data.</div>' +
+    '</div>' +
+    '<div class="fai-chip-label">Suggested for you</div>' +
+    '<div class="fai-chips">' + chipsHtml + '</div>'
+  );
+}
+
+function faiRenderRecent(){
+  var row = document.getElementById('fai-recent-row');
+  if (!row) return;
+  var items = faiPinned.map(function(p){ return { label:p, pinned:true }; })
+    .concat(faiRecent.filter(function(r){ return faiPinned.indexOf(r) === -1; }).map(function(r){ return { label:r, pinned:false }; }));
+  if (!items.length){ row.innerHTML=''; return; }
+  row.innerHTML = items.slice(0,8).map(function(it){
+    return '<span class="fai-recent-pill" onclick="faiSend(' + JSON.stringify(it.label) + ')">' + (it.pinned ? '📌 ' : '🕒 ') + it.label + '</span>';
+  }).join('');
+}
+
+// ---------- Input handling ----------
+window.faiAutoGrow = function(el){ el.style.height='auto'; el.style.height = Math.min(el.scrollHeight,90)+'px'; };
+window.faiHandleKeydown = function(e){
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); faiSendFromInput(); }
+};
+window.faiSendFromInput = function(){
+  var input = document.getElementById('fai-input');
+  var text = (input.value || '').trim();
+  if (!text || faiBusy) return;
+  input.value = '';
+  faiAutoGrow(input);
+  faiSend(text);
+};
+
+window.faiSend = function(text){
+  if (faiBusy) return;
+  faiBusy = true;
+  var body = document.getElementById('fai-body');
+  // remove greeting block on first real message
+  var greet = body.querySelector('.fai-greeting');
+  if (greet){ body.innerHTML=''; }
+
+  faiAppendUserMessage(text);
+  faiRememberPrompt(text);
+
+  var typingEl = faiAppendTyping();
+  var delay = 480 + Math.random()*420;
+  setTimeout(function(){
+    typingEl.remove();
+    var result;
+    try { result = faiHandleIntent(text); }
+    catch(err){ result = { title:'Something went wrong', html:'<div>I could not compute that from the current data. Try rephrasing, or open the relevant tab directly.</div>', actions:[] }; }
+    faiAppendAssistantMessage(result, text);
+    faiBusy = false;
+  }, delay);
+};
+
+function faiRememberPrompt(text){
+  faiRecent = faiRecent.filter(function(r){ return r !== text; });
+  faiRecent.unshift(text);
+  faiRecent = faiRecent.slice(0,8);
+  faiSave('fai_recent', faiRecent);
+  faiRenderRecent();
+}
+
+// ---------- Message rendering ----------
+function faiAppendUserMessage(text){
+  var body = document.getElementById('fai-body');
+  var div = document.createElement('div');
+  div.className = 'fai-msg user';
+  div.innerHTML = '<div class="fai-bubble-user"></div>';
+  div.querySelector('.fai-bubble-user').textContent = text;
+  body.appendChild(div);
+  faiHistory.push({ role:'user', text:text });
+  faiScrollBottom();
+}
+
+function faiAppendTyping(){
+  var body = document.getElementById('fai-body');
+  var div = document.createElement('div');
+  div.className = 'fai-msg assistant';
+  div.innerHTML = '<div class="fai-assistant-wrap"><div class="fai-avatar"><i class="fas fa-robot"></i></div>' +
+    '<div class="fai-card" style="padding:0"><div class="fai-typing"><span></span><span></span><span></span></div></div></div>';
+  body.appendChild(div);
+  faiScrollBottom();
+  return div;
+}
+
+var faiMsgCounter = 0;
+function faiAppendAssistantMessage(result, sourceQuestion){
+  var body = document.getElementById('fai-body');
+  var id = 'fai-msg-' + (++faiMsgCounter);
+  var div = document.createElement('div');
+  div.className = 'fai-msg assistant';
+  var actionsHtml = '';
+  if (result.actions && result.actions.length){
+    actionsHtml = '<div class="fai-actions">' + result.actions.map(function(a){
+      return '<button class="fai-action-btn" onclick="' + a.onclick + '">' + (a.icon||'') + ' ' + a.label + '</button>';
+    }).join('') + '</div>';
+  }
+  div.innerHTML =
+    '<div class="fai-assistant-wrap">' +
+      '<div class="fai-avatar"><i class="fas fa-robot"></i></div>' +
+      '<div class="fai-card">' +
+        (result.title ? '<div class="fai-card-title"><span class="accent"><i class="fas fa-circle-nodes"></i></span> ' + result.title + '</div>' : '') +
+        '<div id="' + id + '-content">' + result.html + '</div>' +
+        actionsHtml +
+        '<div class="fai-toolbar">' +
+          '<button class="fai-tbtn" title="Copy" onclick="faiCopyMessage(\'' + id + '\')"><i class="fas fa-copy"></i></button>' +
+          '<button class="fai-tbtn" title="Regenerate" onclick="faiRegenerate(' + JSON.stringify(sourceQuestion) + ', this)"><i class="fas fa-rotate-right"></i></button>' +
+          '<button class="fai-tbtn" title="Export" onclick="faiExportMessage(\'' + id + '\')"><i class="fas fa-file-export"></i></button>' +
+          '<button class="fai-tbtn" title="Helpful" onclick="faiReact(this,\'up\')"><i class="fas fa-thumbs-up"></i></button>' +
+          '<button class="fai-tbtn" title="Not helpful" onclick="faiReact(this,\'down\')"><i class="fas fa-thumbs-down"></i></button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  body.appendChild(div);
+  faiHistory.push({ role:'assistant', text: sourceQuestion, html: result.html });
+  faiScrollBottom();
+  if (!faiOpen) document.getElementById('fai-launcher').classList.add('has-unread');
+}
+
+function faiScrollBottom(){
+  var body = document.getElementById('fai-body');
+  requestAnimationFrame(function(){ body.scrollTop = body.scrollHeight; });
+}
+
+window.faiCopyMessage = function(id){
+  var el = document.getElementById(id + '-content');
+  if (!el) return;
+  var text = el.innerText || el.textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ faiShowToast('Copied to clipboard'); });
+};
+
+window.faiRegenerate = function(question, btn){
+  var card = btn.closest('.fai-card');
+  var contentEl = card.querySelector('[id$="-content"]');
+  contentEl.style.opacity = '0.4';
+  setTimeout(function(){
+    var result;
+    try { result = faiHandleIntent(question); } catch(e){ result = { html:'<div>Unable to regenerate.</div>' }; }
+    contentEl.innerHTML = result.html;
+    contentEl.style.opacity = '1';
+    faiShowToast('Response refreshed');
+  }, 500);
+};
+
+window.faiExportMessage = function(id){
+  var el = document.getElementById(id + '-content');
+  if (!el) return;
+  var text = 'FAKHARANY360 — Ask FakharanyAI\n' + new Date().toLocaleString() + '\n\n' + (el.innerText || el.textContent);
+  var blob = new Blob([text], { type:'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'FakharanyAI-answer.txt';
+  a.click();
+  faiShowToast('Exported');
+};
+
+window.faiReact = function(btn, dir){
+  var row = btn.parentElement;
+  row.querySelectorAll('.fai-tbtn').forEach(function(b){ b.style.color=''; });
+  btn.style.color = dir==='up' ? '#16a34a' : '#dc2626';
+  faiShowToast(dir==='up' ? 'Thanks for the feedback!' : 'Noted — I\'ll improve this');
+};
+
+// ---------- Toast ----------
+var faiToastTimer = null;
+window.faiShowToast = function(msg){
+  var t = document.getElementById('fai-toast');
+  t.textContent = msg;
+  t.classList.add('fai-show');
+  clearTimeout(faiToastTimer);
+  faiToastTimer = setTimeout(function(){ t.classList.remove('fai-show'); }, 2400);
+};
+
+// ---------- Voice input ----------
+window.faiToggleVoice = function(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ faiShowToast('Voice input not supported in this browser'); return; }
+  var btn = document.getElementById('fai-mic-btn');
+  if (faiListening){ faiRecognition && faiRecognition.stop(); return; }
+  faiRecognition = new SR();
+  faiRecognition.lang = 'en-US';
+  faiRecognition.onstart = function(){ faiListening = true; btn.classList.add('recording'); };
+  faiRecognition.onend = function(){ faiListening = false; btn.classList.remove('recording'); };
+  faiRecognition.onresult = function(e){
+    var transcript = e.results[0][0].transcript;
+    document.getElementById('fai-input').value = transcript;
+  };
+  faiRecognition.start();
+};
+
+// ---------- Smart Navigation ----------
+var FAI_NAV_MAP = {
+  dashboard: function(){ if (typeof switchTab==='function') switchTab('overview'); },
+  overview: function(){ if (typeof switchTab==='function') switchTab('overview'); },
+  rankings: function(){ if (typeof switchTab==='function') switchTab('rankings'); },
+  heatmap: function(){ if (typeof switchTab==='function') switchTab('heatmap'); },
+  compare: function(){ if (typeof openQuickCompare==='function') openQuickCompare(); else faiShowToast('Compare module unavailable'); },
+  productmix: function(){ if (typeof switchTab==='function') switchTab('products'); },
+  tariffmix: function(){ if (typeof switchTab==='function') switchTab('tariff'); },
+  reports: function(){ if (typeof generateExecutiveReport==='function') { try { generateExecutiveReport(); } catch(e){ faiShowToast('Open Reports from the top toolbar'); } } },
+  aidecisioncenter: function(){ if (typeof switchTab==='function') switchTab('insights'); },
+  alerts: function(){ faiShowToast('Alerts module is coming soon to FAKHARANY360'); },
+  dataexplorer: function(){ if (typeof switchTab==='function') switchTab('mtd'); },
+  charts: function(){ if (typeof switchTab==='function') switchTab('charts'); },
+  packages: function(){ if (typeof switchTab==='function') switchTab('packages'); }
+};
+window.faiNavigate = function(page){
+  var key = String(page).toLowerCase().replace(/[^a-z]/g,'');
+  var fn = FAI_NAV_MAP[key];
+  if (fn){ fn(); faiShowToast('Opened ' + page); }
+  else faiShowToast(page + ' is coming soon');
+};
+
+})();
+</script>
+
+<script>
+/* ============================================================
+   ASK FAKHARANYAI — Intent Engine
+   All answers are computed live from filteredData / RAW_DATA,
+   the same globals the rest of FAKHARANY360 uses.
+   ============================================================ */
+(function(){
+
+// ---------- Data access ----------
+function faiData(){
+  if (typeof filteredData !== 'undefined' && filteredData && filteredData.length) return filteredData;
+  if (typeof RAW_DATA !== 'undefined' && RAW_DATA) return RAW_DATA;
+  return [];
+}
+function faiHasData(){ return faiData().length > 0; }
+function faiNoData(){
+  return { title:'No data loaded yet', html:'<div>I don\'t see any rows in the current view. Log in / load a data period first, then ask me again.</div>', actions:[] };
+}
+function faiFmt(n){ return (typeof fmtN === 'function') ? fmtN(Math.round(n)) : Math.round(n).toLocaleString(); }
+function faiPct(a,t){ return (typeof pct === 'function') ? pct(a,t) : (t>0 ? Math.round(a/t*100) : 0); }
+function faiPctClass(p){ return p>=100 ? 'fai-pct-green' : p>=85 ? 'fai-pct-amber' : 'fai-pct-red'; }
+function faiRiskColor(p){ return p>=100 ? '#16a34a' : p>=85 ? '#eab308' : p>=70 ? '#f97316' : '#dc2626'; }
+
+// ---------- Per-store aggregation ----------
+function faiStoreGroups(rows){
+  var map = {};
+  rows.forEach(function(r){
+    if (!r.store) return;
+    var key = r.storeCode || r.store;
+    if (!map[key]) map[key] = { store:r.store, supervisor:r.supervisor||'—', areaManager:r.areaManager||'—', region:r.region||'—', rows:[] };
+    map[key].rows.push(r);
+  });
+  return Object.keys(map).map(function(k){ return map[k]; });
+}
+function faiGroupTotals(group, tKey, aKey){
+  var t=0,a=0; group.rows.forEach(function(r){ t+=(r[tKey]||0); a+=(r[aKey]||0); });
+  return { target:t, ach:a, pct: faiPct(a,t), gap:a-t };
+}
+function faiGroupOverall(group){
+  var t=0,a=0;
+  group.rows.forEach(function(r){
+    PRODUCTS.forEach(function(p){ t += (r[p.tKey]||0); a += (r[p.aKey]||0); });
+  });
+  return { target:t, ach:a, pct: faiPct(a,t), gap:a-t };
+}
+
+// ---------- Render helpers ----------
+function kpiRow(items){
+  return '<div class="fai-kpi-row">' + items.map(function(it){
+    return '<div class="fai-kpi ' + (it.cls||'') + '"><div class="fai-kpi-val">' + it.val + '</div><div class="fai-kpi-lbl">' + it.lbl + '</div></div>';
+  }).join('') + '</div>';
+}
+function dataTable(headers, rows){
+  var thead = '<tr>' + headers.map(function(h){ return '<th>'+h+'</th>'; }).join('') + '</tr>';
+  var tbody = rows.map(function(r){ return '<tr>' + r.map(function(c){ return '<td>'+c+'</td>'; }).join('') + '</tr>'; }).join('');
+  return '<div class="fai-table-wrap"><table class="fai-table"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+}
+function riskMeter(pctVal, label){
+  var color = faiRiskColor(pctVal);
+  var w = Math.max(3, Math.min(100, pctVal));
+  return '<div class="fai-risk"><div class="fai-risk-track"><div class="fai-risk-fill" style="width:'+w+'%;background:'+color+'"></div></div>' +
+    '<div class="fai-risk-labels"><span>' + (label||'Achievement') + '</span><span style="color:'+color+'">' + pctVal + '%</span></div></div>';
+}
+function recoCard(icon, text){
+  return '<div class="fai-reco"><i class="fas '+icon+'"></i><div class="fai-reco-text">'+text+'</div></div>';
+}
+function flowStep(lbl, val){
+  return '<div class="fai-flow-step"><span class="fai-flow-lbl">'+lbl+'</span><span class="fai-flow-val">'+val+'</span></div>';
+}
+function flowArrow(){ return '<div class="fai-flow-arrow"><i class="fas fa-chevron-down"></i></div>'; }
+function rankBadge(n){ return '<span class="fai-rank-badge">'+n+'</span>'; }
+function pctSpan(p){ return '<span class="'+faiPctClass(p)+'">'+p+'%</span>'; }
+
+function navBtn(label, page, icon){
+  return { label:label, icon:icon||'', onclick:"faiNavigate('" + page + "')" };
+}
+
+// ============================================================
+// INTENT: Lowest N Wallet stores
+// ============================================================
+function intentLowestWallet(){
+  if (!faiHasData()) return faiNoData();
+  var groups = faiStoreGroups(faiData());
+  var scored = groups.map(function(g){
+    var w = faiGroupTotals(g, 'walletTarget', 'walletSales');
+    return { store:g.store, supervisor:g.supervisor, target:w.target, ach:w.ach, pct:w.pct, gap:w.gap };
+  }).filter(function(s){ return s.target > 0; });
+  scored.sort(function(a,b){ return a.pct - b.pct; });
+  var bottom = scored.slice(0,10);
+  var rows = bottom.map(function(s,i){
+    return [rankBadge(i+1), s.store, s.supervisor, pctSpan(s.pct), (s.gap<0?'−':'+')+faiFmt(Math.abs(s.gap))];
+  });
+  var avgPct = scored.length ? Math.round(scored.reduce(function(s,x){return s+x.pct;},0)/scored.length) : 0;
+  var html = kpiRow([
+    { val: bottom.length, lbl:'Stores Flagged' },
+    { val: avgPct+'%', lbl:'Team Wallet Avg', cls: avgPct>=85?'up':'down' },
+    { val: bottom.length ? bottom[0].pct+'%' : '—', lbl:'Lowest Store', cls:'down' }
+  ]) + dataTable(['#','Store','Supervisor','Wallet Ach%','Gap'], rows);
+  return {
+    title:'💧 Lowest 10 Wallet Stores',
+    html: html,
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Show Trend','charts','📈'), navBtn('Open Heatmap','heatmap','📍'), navBtn('Compare Average','compare','⚖️'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+// ============================================================
+// INTENT: Compare regions (labelled East vs West on request,
+// but computed dynamically against whatever region values exist)
+// ============================================================
+function intentCompareRegions(){
+  if (!faiHasData()) return faiNoData();
+  var data = faiData();
+  var regionGroups = groupBy(data.filter(function(r){ return r.region; }), 'region');
+  var names = Object.keys(regionGroups);
+  if (names.length < 2){
+    // fall back to comparing top two Area Managers if region isn't segmented
+    var amGroups = groupBy(data.filter(function(r){ return r.areaManager; }), 'areaManager');
+    names = Object.keys(amGroups);
+    regionGroups = amGroups;
+  }
+  if (names.length < 2) return { title:'Compare', html:'<div>Not enough segmentation in the current view to compare two groups.</div>', actions:[] };
+  // pick the two largest groups by achievement volume
+  var scored = names.map(function(n){ var g = calcGroup(regionGroups[n]); return { name:n, g:g, rows: regionGroups[n].length }; });
+  scored.sort(function(a,b){ return b.rows - a.rows; });
+  var A = scored[0], B = scored[1];
+  var rows = PRODUCTS.map(function(p){
+    var aPct = faiPct(A.g[p.aKey], A.g[p.tKey]);
+    var bPct = faiPct(B.g[p.aKey], B.g[p.tKey]);
+    return [p.label, pctSpan(aPct), pctSpan(bPct), (aPct>=bPct? A.name : B.name)];
+  });
+  var html = kpiRow([
+    { val:A.g.pct+'%', lbl:A.name, cls: A.g.pct>=B.g.pct?'up':'down' },
+    { val:B.g.pct+'%', lbl:B.name, cls: B.g.pct>=A.g.pct?'up':'down' },
+    { val:(A.g.pct-B.g.pct>=0?'+':'')+(A.g.pct-B.g.pct)+'pt', lbl:'Gap' }
+  ]) + dataTable(['Product', A.name, B.name, 'Leader'], rows);
+  return {
+    title:'⚖️ ' + A.name + ' vs ' + B.name,
+    html: html,
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Open Rankings','rankings','🥇'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+// ============================================================
+// INTENT: Best performing branch
+// ============================================================
+function intentBestBranch(){
+  if (!faiHasData()) return faiNoData();
+  var groups = faiStoreGroups(faiData());
+  var best = null;
+  groups.forEach(function(g){
+    var o = faiGroupOverall(g);
+    if (o.target <= 0) return;
+    if (!best || o.pct > best.o.pct) best = { g:g, o:o };
+  });
+  if (!best) return { title:'Best Branch', html:'<div>No qualifying stores in the current view.</div>', actions:[] };
+  var prodRows = PRODUCTS.map(function(p){
+    var t=0,a=0; best.g.rows.forEach(function(r){ t+=(r[p.tKey]||0); a+=(r[p.aKey]||0); });
+    return [p.label, pctSpan(faiPct(a,t))];
+  });
+  var html = '<div style="font-size:14px;font-weight:800;color:var(--fai-purple);margin-bottom:2px">🏆 ' + best.g.store + '</div>' +
+    '<div style="font-size:10.5px;color:var(--text-muted);margin-bottom:8px">' + best.g.supervisor + ' · ' + best.g.areaManager + '</div>' +
+    kpiRow([ { val: best.o.pct+'%', lbl:'Overall Ach.', cls:'up' }, { val: faiFmt(best.o.ach), lbl:'Total Achieved' }, { val: '+'+faiFmt(best.o.gap>0?best.o.gap:0), lbl:'Surplus', cls:'up' } ]) +
+    dataTable(['Product','Achievement %'], prodRows);
+  return {
+    title:'🏆 Best Performing Branch',
+    html: html,
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Open Rankings','rankings','🥇'), navBtn('Compare Average','compare','⚖️') ]
+  };
+}
+
+// ============================================================
+// INTENT: Projection / Predict End of Month
+// ============================================================
+function faiMonthProgress(){
+  var now = new Date();
+  var dom = now.getDate();
+  var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  return { fraction: Math.min(1, dom/daysInMonth), dom:dom, daysInMonth:daysInMonth };
+}
+function intentProjection(isEOM){
+  if (!faiHasData()) return faiNoData();
+  var g = calcGroup(faiData());
+  var mp = faiMonthProgress();
+  var paceFrac = Math.max(mp.fraction, 0.15);
+  var projectedPct = Math.round(g.pct / paceFrac);
+  projectedPct = Math.min(projectedPct, 160);
+  var confidence = Math.min(95, 55 + Math.round(mp.fraction*40));
+  var html = kpiRow([
+    { val:g.pct+'%', lbl:'Current Ach.' },
+    { val:projectedPct+'%', lbl:'Projected EOM', cls: projectedPct>=100?'up':'down' },
+    { val:confidence+'%', lbl:'Confidence' }
+  ]) + riskMeter(g.pct, 'Current Achievement') +
+  '<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Based on ' + mp.dom + ' of ' + mp.daysInMonth + ' days elapsed this month, at the current daily run-rate the team is on pace to close at roughly <b style="color:var(--fai-purple)">' + projectedPct + '%</b> of target.</div>';
+  return {
+    title: isEOM ? '🔮 End of Month Prediction' : '📈 Projection',
+    html: html,
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Why did it drop?','__why__','⚠️'), navBtn('Product Mix','productmix','📦'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+// ============================================================
+// INTENT: Best stores to visit today (opportunity stores)
+// ============================================================
+function intentStoresToVisit(){
+  if (!faiHasData()) return faiNoData();
+  var groups = faiStoreGroups(faiData());
+  var scored = groups.map(function(g){ var o = faiGroupOverall(g); return { g:g, o:o }; })
+    .filter(function(s){ return s.o.target > 0 && s.o.pct >= 55 && s.o.pct < 95; });
+  scored.sort(function(a,b){ return a.o.gap - b.o.gap; }); // biggest closeable gap first, still underperforming
+  var top = scored.slice(0,8);
+  var rows = top.map(function(s,i){
+    return [rankBadge(i+1), s.g.store, s.g.supervisor, pctSpan(s.o.pct), '−'+faiFmt(Math.abs(s.o.gap))];
+  });
+  var html = (top.length ?
+    '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">These stores are close to target with a closeable gap — a visit today has the highest chance of converting.</div>' +
+    dataTable(['#','Store','Supervisor','Ach%','Gap to Target'], rows)
+    : '<div>No stores currently fall in the "close but underperforming" range — either the team is on target broadly, or gaps are too wide for a single-day visit to close.</div>');
+  return {
+    title:'📍 Best Stores To Visit Today',
+    html: html,
+    actions:[ navBtn('Open Heatmap','heatmap','🗺️'), navBtn('Open Rankings','rankings','🥇'), navBtn('Generate Action Plan','aidecisioncenter','🧭') ]
+  };
+}
+
+// ============================================================
+// INTENT: Product Mix
+// ============================================================
+function intentProductMix(){
+  if (!faiHasData()) return faiNoData();
+  var data = faiData();
+  var rows = PRODUCTS.map(function(p){
+    var t = sum(data, p.tKey), a = sum(data, p.aKey);
+    return { p:p, t:t, a:a, pct: faiPct(a,t) };
+  });
+  var tableRows = rows.map(function(r){
+    return [r.p.label, faiFmt(r.a)+' / '+faiFmt(r.t), pctSpan(r.pct)];
+  });
+  var best = rows.slice().sort(function(a,b){return b.pct-a.pct;})[0];
+  var worst = rows.slice().sort(function(a,b){return a.pct-b.pct;})[0];
+  var html = kpiRow([
+    { val: best.p.label, lbl:'Strongest Product', cls:'up' },
+    { val: worst.p.label, lbl:'Weakest Product', cls:'down' }
+  ]) + dataTable(['Product','Achieved / Target','%'], tableRows);
+  return {
+    title:'📦 Product Mix',
+    html: html,
+    actions:[ navBtn('Open Product Mix','productmix','📦'), navBtn('Open Tariff Mix','tariffmix','🧩'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+// ============================================================
+// INTENT: Branch Ranking
+// ============================================================
+function intentBranchRanking(){
+  if (!faiHasData()) return faiNoData();
+  var groups = faiStoreGroups(faiData());
+  var scored = groups.map(function(g){ var o = faiGroupOverall(g); return { g:g, o:o }; }).filter(function(s){ return s.o.target>0; });
+  scored.sort(function(a,b){ return b.o.pct - a.o.pct; });
+  var top = scored.slice(0,10);
+  var rows = top.map(function(s,i){ return [rankBadge(i+1), s.g.store, s.g.supervisor, pctSpan(s.o.pct)]; });
+  var html = dataTable(['#','Store','Supervisor','Overall Ach%'], rows);
+  return {
+    title:'🥇 Branch Ranking — Top 10',
+    html: html,
+    actions:[ navBtn('Open Full Rankings','rankings','🥇'), navBtn('View Dashboard','overview','📊') ]
+  };
+}
+
+// ============================================================
+// INTENT: Why did Projection drop?
+// ============================================================
+function intentWhyProjectionDrop(){
+  if (!faiHasData()) return faiNoData();
+  var data = faiData();
+  var rows = PRODUCTS.map(function(p){
+    var t = sum(data, p.tKey), a = sum(data, p.aKey);
+    return { p:p, gap:a-t, pct: faiPct(a,t) };
+  }).sort(function(a,b){ return a.gap - b.gap; });
+  var worst = rows.slice(0,3).filter(function(r){ return r.gap < 0; });
+  var g = calcGroup(data);
+  var reasonsHtml = worst.length
+    ? worst.map(function(r){ return recoCard('fa-triangle-exclamation', '<b>'+r.p.label+' Gap</b> — running at ' + r.pct + '% of target (' + faiFmt(Math.abs(r.gap)) + ' short)'); }).join('')
+    : recoCard('fa-circle-check', 'No single product shows a severe shortfall — the drop looks distributed rather than concentrated.');
+  var recoHtml = worst.map(function(r){
+    return recoCard('fa-lightbulb', 'Prioritize <b>'+r.p.label+'</b> coaching and store-level push in the lowest-performing branches this week.');
+  }).join('');
+  var html = '<div class="fai-card-title" style="font-size:12px;margin-top:0">Executive Summary</div>' +
+    '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Overall achievement is at ' + g.pct + '% of target. The largest contributors to the shortfall:</div>' +
+    reasonsHtml +
+    riskMeter(g.pct, 'Overall Risk') +
+    '<div class="fai-card-title" style="font-size:12px">Recommendations</div>' +
+    (recoHtml || recoCard('fa-thumbs-up','Keep current pace — no urgent action required.'));
+  return {
+    title:'⚠️ Why Did Projection Drop?',
+    html: html,
+    actions:[ navBtn('Open Product Mix','productmix','📦'), navBtn('Open Rankings','rankings','🥇'), navBtn('Generate Action Plan','aidecisioncenter','🧭') ]
+  };
+}
+
+// ============================================================
+// INTENT: Heatmap navigation
+// ============================================================
+function intentHeatmap(){
+  faiNavigate('heatmap');
+  return {
+    title:'🗺️ Heatmap',
+    html:'<div>Opening the store performance heatmap on the dashboard behind this panel — darker cells mean lower achievement.</div>',
+    actions:[ navBtn('Open Full Heatmap','heatmap','🗺️') ]
+  };
+}
+
+// ============================================================
+// INTENT: What-if prediction ("sell N Gold today")
+// ============================================================
+function intentWhatIf(match){
+  if (!faiHasData()) return faiNoData();
+  var qty = parseInt(match.qty, 10) || 0;
+  var prod = match.product;
+  var data = faiData();
+  var g = calcGroup(data);
+  var target = g[prod.tKey] || 0, ach = g[prod.aKey] || 0;
+  var newAch = ach + qty;
+  var newTotalAch = g.totalAch + qty;
+  var currentOverall = g.pct;
+  var newOverall = faiPct(newTotalAch, g.totalTarget);
+  var newProductPct = faiPct(newAch, target);
+  var revenuePerUnit = { gold:150, mobile:0, fbb:0, fixed:0, wallet:0, fwa:0 }[prod.key] || 0;
+  var expectedRevenue = qty * (revenuePerUnit || 50);
+  var confidence = qty > 0 ? Math.min(92, 60 + Math.round(qty/2)) : 50;
+  var html = '<div class="fai-flow">' +
+    flowStep('Current Overall Projection', currentOverall+'%') + flowArrow() +
+    flowStep('Expected Overall Projection', newOverall+'%') + flowArrow() +
+    flowStep('Expected ' + prod.label + ' Achievement', newProductPct+'%') + flowArrow() +
+    flowStep('Estimated Additional Revenue', 'EGP ' + faiFmt(expectedRevenue)) +
+    '</div>' +
+    kpiRow([ { val: confidence+'%', lbl:'Confidence' }, { val:'+'+qty, lbl:prod.label+' Units' } ]);
+  return {
+    title:'🔮 What If: Sell ' + qty + ' ' + prod.label + ' Today',
+    html: html,
+    actions:[ navBtn('Open Product Mix','productmix','📦'), navBtn('Show Projection','__proj__','📈') ]
+  };
+}
+
+// ============================================================
+// Intent router
+// ============================================================
+function matchWhatIf(text){
+  var re = /sell\s+(\d+)\s*(mobile|gold|we\s*gold|fbb|fixed|wallet|we\s*pay|fwa|we\s*air)?/i;
+  var m = text.match(re);
+  if (!m) return null;
+  var qty = m[1];
+  var label = (m[2]||'gold').toLowerCase().replace(/\s+/g,'');
+  var map = { mobile:'mobile', gold:'gold', wegold:'gold', fbb:'fbb', fixed:'fixed', wallet:'wallet', wepay:'wallet', fwa:'fwa', weair:'fwa' };
+  var key = map[label] || 'gold';
+  var prod = PRODUCTS.filter(function(p){ return p.key===key; })[0] || PRODUCTS.filter(function(p){return p.key==='gold';})[0];
+  return { qty:qty, product:prod };
+}
+
+window.faiHandleIntent = function(rawText){
+  var text = String(rawText).toLowerCase().trim();
+
+  var whatIf = matchWhatIf(text);
+  if (whatIf) return intentWhatIf(whatIf);
+
+  if (/lowest.*wallet|wallet.*lowest|bottom.*wallet/.test(text)) return intentLowestWallet();
+  if (/compare.*(east|west|region|area)|east.*vs.*west/.test(text)) return intentCompareRegions();
+  if (/best.*(branch|store|perform)/.test(text) && !/visit/.test(text)) return intentBestBranch();
+  if (/end of month|eom|predict/.test(text)) return intentProjection(true);
+  if (/projection/.test(text) && !/why|drop/.test(text)) return intentProjection(false);
+  if (/visit/.test(text) || /opportunity/.test(text)) return intentStoresToVisit();
+  if (/product mix/.test(text)) return intentProductMix();
+  if (/ranking/.test(text)) return intentBranchRanking();
+  if (/why.*(projection|drop)|risk/.test(text)) return intentWhyProjectionDrop();
+  if (/heatmap/.test(text)) return intentHeatmap();
+  if (/revenue/.test(text)) return intentWhatIf({ qty:10, product: PRODUCTS.filter(function(p){return p.key==='gold';})[0] });
+
+  // internal shortcut tokens used by action buttons
+  if (text === '__why__') return intentWhyProjectionDrop();
+  if (text === '__proj__') return intentProjection(false);
+
+  // fallback: generic overview
+  if (!faiHasData()) return faiNoData();
+  var g = calcGroup(faiData());
+  return {
+    title:'📊 Quick Summary',
+    html: kpiRow([ { val:g.pct+'%', lbl:'Overall Achievement' }, { val:faiFmt(g.storeCount), lbl:'Stores in View' }, { val:faiFmt(g.totalTarget), lbl:'Total Target' } ]) +
+      '<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px">I can dig deeper into wallet performance, rankings, projections, product mix, or specific stores — try one of the suggested questions below, or ask me directly.</div>',
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Open Rankings','rankings','🥇'), navBtn('Product Mix','productmix','📦') ]
+  };
+};
+
+})();
+</script>
+
 </body>
 </html>
