@@ -9984,17 +9984,78 @@ function intentWhatIf(match){
 }
 
 // ============================================================
+// Bilingual product detection (Arabic + English)
+// ============================================================
+var FAI_PRODUCT_PATTERNS = [
+  { key:'gold',   re:/(we\s*gold|gold|جولد|قولد)/i },
+  { key:'wallet', re:/(we\s*pay|wallet|محفظه|محفظة|والت|وي\s*باي)/i },
+  { key:'mobile', re:/(mobile|موبايل|موبايلات)/i },
+  { key:'fbb',    re:/(fbb|فايبر|إنترنت المنازل|انترنت المنازل)/i },
+  { key:'fixed',  re:/(fixed|فيكسد|ثابت)/i },
+  { key:'fwa',    re:/(we\s*air|fwa|وي\s*اير)/i }
+];
+function faiDetectProduct(text){
+  for (var i=0;i<FAI_PRODUCT_PATTERNS.length;i++){
+    if (FAI_PRODUCT_PATTERNS[i].re.test(text)){
+      return PRODUCTS.filter(function(p){ return p.key===FAI_PRODUCT_PATTERNS[i].key; })[0];
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// INTENT: Top / Lowest N stores for a specific product
+// (covers Arabic queries like "أعلى 5 فروع في وي جولد" and
+// "أقل 10 محلات محفظة")
+// ============================================================
+function intentProductRanking(direction, n, prod){
+  if (!faiHasData()) return faiNoData();
+  var groups = faiStoreGroups(faiData());
+  var scored = groups.map(function(g){
+    var s = faiGroupTotals(g, prod.tKey, prod.aKey);
+    return { store:g.store, supervisor:g.supervisor, target:s.target, ach:s.ach, pct:s.pct, gap:s.gap };
+  }).filter(function(s){ return s.target > 0; });
+  scored.sort(function(a,b){ return direction==='low' ? a.pct-b.pct : b.pct-a.pct; });
+  var picked = scored.slice(0, n);
+  var rows = picked.map(function(s,i){
+    return [rankBadge(i+1), s.store, s.supervisor, pctSpan(s.pct), faiFmt(s.ach)];
+  });
+  var avgPct = scored.length ? Math.round(scored.reduce(function(s,x){return s+x.pct;},0)/scored.length) : 0;
+  var html = kpiRow([
+    { val: picked.length, lbl: (direction==='low'?'Lowest':'Top')+' '+n+' Stores' },
+    { val: avgPct+'%', lbl: prod.label+' Team Avg' },
+    { val: picked.length ? picked[0].pct+'%' : '—', lbl: direction==='low' ? 'Lowest Store' : 'Best Store', cls: direction==='low'?'down':'up' }
+  ]) + dataTable(['#','Store','Supervisor', prod.label+' Ach%','Achieved'], rows);
+  return {
+    title: (direction==='low' ? '📉 Lowest ' : '🏆 Top ') + n + ' Branches — ' + prod.label,
+    html: html,
+    actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Open Rankings','rankings','🥇'), navBtn('Open Heatmap','heatmap','📍'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+function matchProductRanking(text){
+  var prod = faiDetectProduct(text);
+  if (!prod) return null;
+  var topWords = /(اعلى|أعلى|اكثر|أكثر|افضل|أفضل|top|highest|best)/i;
+  var lowWords = /(اقل|أقل|ادنى|أدنى|lowest|bottom|weakest)/i;
+  var storeWords = /(فرع|فروع|محل|محلات|store|stores|branch|branches)/i;
+  var isTop = topWords.test(text), isLow = lowWords.test(text);
+  if (!isTop && !isLow) return null; // avoid false positives, e.g. plain "product mix"
+  if (!storeWords.test(text) && !isTop && !isLow) return null;
+  var numMatch = text.match(/(\d+)/);
+  var n = numMatch ? Math.max(1, Math.min(20, parseInt(numMatch[1],10))) : 10;
+  return { direction: isLow ? 'low' : 'top', n:n, prod:prod };
+}
+
+// ============================================================
 // Intent router
 // ============================================================
 function matchWhatIf(text){
-  var re = /sell\s+(\d+)\s*(mobile|gold|we\s*gold|fbb|fixed|wallet|we\s*pay|fwa|we\s*air)?/i;
+  var re = /(sell|بيع|هبيع|نبيع)\s*(\d+)\s*(mobile|gold|we\s*gold|fbb|fixed|wallet|we\s*pay|fwa|we\s*air|جولد|محفظة|موبايل)?/i;
   var m = text.match(re);
-  if (!m) return null;
-  var qty = m[1];
-  var label = (m[2]||'gold').toLowerCase().replace(/\s+/g,'');
-  var map = { mobile:'mobile', gold:'gold', wegold:'gold', fbb:'fbb', fixed:'fixed', wallet:'wallet', wepay:'wallet', fwa:'fwa', weair:'fwa' };
-  var key = map[label] || 'gold';
-  var prod = PRODUCTS.filter(function(p){ return p.key===key; })[0] || PRODUCTS.filter(function(p){return p.key==='gold';})[0];
+  if (!m || !m[2]) return null;
+  var qty = m[2];
+  var prod = faiDetectProduct(text) || PRODUCTS.filter(function(p){return p.key==='gold';})[0];
   return { qty:qty, product:prod };
 }
 
@@ -10004,17 +10065,20 @@ window.faiHandleIntent = function(rawText){
   var whatIf = matchWhatIf(text);
   if (whatIf) return intentWhatIf(whatIf);
 
+  var prodRanking = matchProductRanking(text);
+  if (prodRanking) return intentProductRanking(prodRanking.direction, prodRanking.n, prodRanking.prod);
+
   if (/lowest.*wallet|wallet.*lowest|bottom.*wallet/.test(text)) return intentLowestWallet();
-  if (/compare.*(east|west|region|area)|east.*vs.*west/.test(text)) return intentCompareRegions();
-  if (/best.*(branch|store|perform)/.test(text) && !/visit/.test(text)) return intentBestBranch();
-  if (/end of month|eom|predict/.test(text)) return intentProjection(true);
-  if (/projection/.test(text) && !/why|drop/.test(text)) return intentProjection(false);
-  if (/visit/.test(text) || /opportunity/.test(text)) return intentStoresToVisit();
-  if (/product mix/.test(text)) return intentProductMix();
-  if (/ranking/.test(text)) return intentBranchRanking();
-  if (/why.*(projection|drop)|risk/.test(text)) return intentWhyProjectionDrop();
-  if (/heatmap/.test(text)) return intentHeatmap();
-  if (/revenue/.test(text)) return intentWhatIf({ qty:10, product: PRODUCTS.filter(function(p){return p.key==='gold';})[0] });
+  if (/compare.*(east|west|region|area)|east.*vs.*west|قارن|مقارنة.*(شرق|غرب|منطقة)/.test(text)) return intentCompareRegions();
+  if ((/best.*(branch|store|perform)|افضل\s*فرع|أفضل\s*فرع|احسن\s*فرع/.test(text)) && !/visit|زيارة/.test(text)) return intentBestBranch();
+  if (/end of month|eom|predict|نهاية\s*الشهر|توقع/.test(text)) return intentProjection(true);
+  if (/projection|بروجكشن|إسقاط|اسقاط/.test(text) && !/why|drop|ليه|سبب/.test(text)) return intentProjection(false);
+  if (/visit|زيارة|زور/.test(text) || /opportunity|فرصة/.test(text)) return intentStoresToVisit();
+  if (/product mix|ميكس المنتج|توزيع المنتجات/.test(text)) return intentProductMix();
+  if (/ranking|ترتيب|تصنيف/.test(text)) return intentBranchRanking();
+  if (/why.*(projection|drop)|risk|ليه.*(بروجكشن|نزل)|سبب.*النزول|مخاطر/.test(text)) return intentWhyProjectionDrop();
+  if (/heatmap|هيت\s*ماب|خريطة\s*حرارية/.test(text)) return intentHeatmap();
+  if (/revenue|إيراد|ايراد/.test(text)) return intentWhatIf({ qty:10, product: PRODUCTS.filter(function(p){return p.key==='gold';})[0] });
 
   // internal shortcut tokens used by action buttons
   if (text === '__why__') return intentWhyProjectionDrop();
