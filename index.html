@@ -2561,13 +2561,30 @@ function mtdTpProductCellsHTML(k, valueColor) {
   }).join('');
 }
 
+var MTD_TEAM_PIVOT_AM_EXPANDED = {}; // amKey -> true if store-level rows are shown under it
+
+function mtdAmKey(rm, sv, am) { return rm + '|' + (sv||'') + '|' + am; }
+
+function toggleMTDTeamPivotAM(key) {
+  MTD_TEAM_PIVOT_AM_EXPANDED[key] = !MTD_TEAM_PIVOT_AM_EXPANDED[key];
+  renderMTDTeamPivot();
+}
+
+// storeRows: pass the AM's underlying rows to render one line per branch
+// right under it when expanded (clickFn/expanded control that toggle).
 function mtdTpRow(label, indent, rows, style, isLast) {
   var k = mtdQcCalcGroup(rows);
   var pad = 14 + indent*22;
   var bg = style.bg, color = style.color || '#1a1a2e', fw = style.fw || 600, fs = style.fs || 12;
+  var clickAttr = '';
+  var chevron = '';
+  if (style.clickable) {
+    clickAttr = ' onclick="'+style.clickFn+'"';
+    chevron = '<i class="fas fa-chevron-'+(style.expanded?'down':'left')+' mr-2" style="font-size:9px;opacity:.8"></i>';
+  }
   var tr = '<tr style="background:'+bg+';'+(style.borderTop?'border-top:'+style.borderTop+';':'')+(isLast?'border-bottom:2px solid #d1d5db;':'')+'">';
-  tr += '<td style="padding:8px '+(style.clickable?'8px':'14px')+' 8px '+pad+'px;font-size:'+fs+'px;font-weight:'+fw+';color:'+color+';white-space:nowrap'+(style.clickable?';cursor:pointer':'')+'"'+(style.clickable?' onclick="toggleMTDTeamPivotRM(\''+label.replace(/'/g,"\\'")+'\')"':'')+'>'+
-    (style.clickable ? '<i class="fas fa-chevron-'+(MTD_TEAM_PIVOT_COLLAPSED[label]?'left':'down')+' mr-2" style="font-size:9px;opacity:.8"></i>' : '') + label +
+  tr += '<td style="padding:8px '+(style.clickable?'8px':'14px')+' 8px '+pad+'px;font-size:'+fs+'px;font-weight:'+fw+';color:'+color+';white-space:nowrap'+(style.clickable?';cursor:pointer':'')+'"'+clickAttr+'>'+
+    chevron + label +
   '</td>';
   tr += mtdTpProductCellsHTML(k, bg==='transparent' ? null : color);
   tr += '</tr>';
@@ -2607,17 +2624,35 @@ function renderMTDTeamPivot() {
   var body = '';
   var sortProdSel = document.getElementById('mtd-tp-sort-product');
   var sortProdKey = (sortProdSel && sortProdSel.value) || 'mobile';
+
+  // Renders one line per branch (store) under an expanded Area Manager.
+  function storeRowsHTML(amRows, indent) {
+    var sorted = amRows.slice().sort(function(a,b){
+      var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
+      var ka = mtdQcCalcGroup([a])[sortProdKey||'mobile'], kb = mtdQcCalcGroup([b])[sortProdKey||'mobile'];
+      var pa = ka.tgt>0 ? (isProj?ka.proj:ka.act)/ka.tgt : -1, pb = kb.tgt>0 ? (isProj?kb.proj:kb.act)/kb.tgt : -1;
+      return pb - pa;
+    });
+    return sorted.map(function(r){
+      return mtdTpRow('🏪 ' + (r.store||r.storeCode||'—'), indent, [r], { bg:'#faf9fb', color:'#6b7280', fw:500, fs:11 });
+    }).join('');
+  }
+
   rmNames.forEach(function(rm){
     var rmData = tree[rm];
-    body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true });
-    if (!MTD_TEAM_PIVOT_COLLAPSED[rm]) {
+    var rmExpanded = !MTD_TEAM_PIVOT_COLLAPSED[rm];
+    body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleMTDTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+    if (rmExpanded) {
       if (MTD_TEAM_PIVOT_VIEW === 'flat') {
         // Flat: every Area Manager under this RM, ranked together, no
         // Supervisor grouping/subtotal rows in between.
         var flatList = mtdFlattenAreaManagers(rmData, sortProdKey);
         flatList.forEach(function(item, idx){
           var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-left:6px">#'+(idx+1)+'</span>';
-          body += mtdTpRow(rankBadge + item.am, 1, item.rows, { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+          var amKey = mtdAmKey(rm, 'flat', item.am);
+          var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+          body += mtdTpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+          if (amExpanded) body += storeRowsHTML(item.rows, 2);
         });
       } else {
         var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
@@ -2625,7 +2660,10 @@ function renderMTDTeamPivot() {
           var svData = rmData.supervisors[sv];
           var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
           amNames.forEach(function(am){
-            body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+            var amKey = mtdAmKey(rm, sv, am);
+            var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+            body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+            if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
           });
           body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
         });
