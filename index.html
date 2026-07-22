@@ -10048,6 +10048,189 @@ function matchProductRanking(text){
 }
 
 // ============================================================
+// Month parsing ("month 6", "شهر 6", "June", "يونيو")
+// ============================================================
+var FAI_MONTH_NAMES = {
+  jan:1, january:1, 'يناير':1,
+  feb:2, february:2, 'فبراير':2,
+  mar:3, march:3, 'مارس':3,
+  apr:4, april:4, 'ابريل':4, 'أبريل':4,
+  may:5, 'مايو':5,
+  jun:6, june:6, 'يونيو':6, 'يونية':6,
+  jul:7, july:7, 'يوليو':7, 'يوليه':7,
+  aug:8, august:8, 'اغسطس':8, 'أغسطس':8,
+  sep:9, sept:9, september:9, 'سبتمبر':9,
+  oct:10, october:10, 'اكتوبر':10, 'أكتوبر':10,
+  nov:11, november:11, 'نوفمبر':11,
+  dec:12, december:12, 'ديسمبر':12
+};
+function faiExtractMonth(text){
+  var monthNum = null;
+  var m1 = text.match(/(?:month|شهر)\s*#?\s*(\d{1,2})\b/i);
+  if (m1) monthNum = parseInt(m1[1],10);
+  if (!monthNum){
+    for (var key in FAI_MONTH_NAMES){
+      if (new RegExp('\\b'+key+'\\b','i').test(text)){ monthNum = FAI_MONTH_NAMES[key]; break; }
+    }
+  }
+  if (!monthNum || monthNum<1 || monthNum>12) return null;
+  var mm = (monthNum<10?'0':'')+monthNum;
+  var data = (typeof RAW_DATA !== 'undefined' && RAW_DATA && RAW_DATA.length) ? RAW_DATA : faiData();
+  var present = {};
+  data.forEach(function(r){ if (r.month) present[r.month]=true; });
+  var matches = Object.keys(present).filter(function(mk){ return mk.slice(0,2)===mm; });
+  return { num:monthNum, mm:mm, keys: matches.length ? matches : [mm+'-2026'] };
+}
+function faiStripMonthPhrase(text){
+  var out = text.replace(/(?:month|شهر)\s*#?\s*\d{1,2}\b/gi,'');
+  for (var key in FAI_MONTH_NAMES) out = out.replace(new RegExp('\\b'+key+'\\b','gi'),'');
+  return out.replace(/\s+/g,' ').trim();
+}
+function faiMonthLabel(monthInfo){
+  return (typeof MONTH_LABELS !== 'undefined' && MONTH_LABELS[monthInfo.keys[0]]) ? MONTH_LABELS[monthInfo.keys[0]] : monthInfo.mm;
+}
+
+// ============================================================
+// Named-entity fuzzy matching (Area Manager / Supervisor /
+// Regional Manager / Partner) — lets the copilot answer
+// free-text queries that mention a real person's name.
+// ============================================================
+var FAI_ENTITY_FIELDS = ['areaManager','supervisor','regionalManager','partner'];
+var FAI_ENTITY_LABELS = { areaManager:'Area Manager', supervisor:'Supervisor', regionalManager:'Regional Manager', partner:'Partner' };
+var faiEntityValuesCache = null;
+function faiEntityValues(){
+  if (faiEntityValuesCache) return faiEntityValuesCache;
+  var data = (typeof RAW_DATA !== 'undefined' && RAW_DATA && RAW_DATA.length) ? RAW_DATA : faiData();
+  var out = {};
+  FAI_ENTITY_FIELDS.forEach(function(f){
+    var set = {};
+    data.forEach(function(r){ if (r[f]) set[r[f]] = true; });
+    out[f] = Object.keys(set);
+  });
+  faiEntityValuesCache = out;
+  return out;
+}
+function faiNormalize(s){ return String(s).toLowerCase().replace(/[^a-z\u0600-\u06FF]/g,''); }
+function faiScoreMatch(token, value){
+  var t = faiNormalize(token), v = faiNormalize(value);
+  if (!t || t.length<3 || !v) return 0;
+  if (v.indexOf(t) !== -1) return t.length;
+  if (t.indexOf(v) !== -1 && v.length>=3) return v.length;
+  return 0;
+}
+function faiFindEntityInPhrase(phrase){
+  var values = faiEntityValues();
+  var tokens = phrase.split(/\s+/).filter(function(w){ return w.length>=3; });
+  var wholePhrase = phrase.replace(/\s+/g,'');
+  var best = null;
+  FAI_ENTITY_FIELDS.forEach(function(field){
+    values[field].forEach(function(value){
+      var bestForValue = faiScoreMatch(wholePhrase, value);
+      tokens.forEach(function(tok){ bestForValue = Math.max(bestForValue, faiScoreMatch(tok, value)); });
+      if (bestForValue>0 && (!best || bestForValue>best.score)){
+        best = { field:field, value:value, score:bestForValue };
+      }
+    });
+  });
+  return best;
+}
+
+function intentEntitySummary(entity, monthInfo){
+  if (!faiHasData()) return faiNoData();
+  var data = faiData();
+  var rows = data.filter(function(r){ return r[entity.field] === entity.value; });
+  if (monthInfo) rows = rows.filter(function(r){ return monthInfo.keys.indexOf(r.month) !== -1; });
+  if (!rows.length){
+    return { title:'No matching data', html:'<div>I found <b>' + entity.value + '</b> (' + FAI_ENTITY_LABELS[entity.field] + ') but there are no rows for it' + (monthInfo?' in that month':'') + ' in the current view.</div>', actions:[ navBtn('View Dashboard','overview','📊') ] };
+  }
+  var g = calcGroup(rows);
+  var prodRows = PRODUCTS.map(function(p){ return [p.label, pctSpan(faiPct(sum(rows,p.aKey), sum(rows,p.tKey)))]; });
+  var html = '<div style="font-size:10.5px;color:var(--text-muted);margin-bottom:6px">' + FAI_ENTITY_LABELS[entity.field] + (monthInfo ? ' · ' + faiMonthLabel(monthInfo) : '') + '</div>' +
+    kpiRow([ { val:g.pct+'%', lbl:'Overall Ach.', cls:g.pct>=100?'up':'down' }, { val:faiFmt(g.totalAch), lbl:'Achieved' }, { val:faiFmt(g.storeCount), lbl:'Stores' } ]) +
+    dataTable(['Product','Achievement %'], prodRows);
+  return {
+    title: '👤 ' + entity.value,
+    html: html,
+    actions:[ navBtn('Open Rankings','rankings','🥇'), navBtn('View Dashboard','overview','📊'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+function intentEntityCompare(entityA, entityB, monthInfo){
+  if (!faiHasData()) return faiNoData();
+  var data = faiData();
+  function rowsFor(e){
+    var r = data.filter(function(row){ return row[e.field] === e.value; });
+    if (monthInfo) r = r.filter(function(row){ return monthInfo.keys.indexOf(row.month) !== -1; });
+    return r;
+  }
+  var rowsA = rowsFor(entityA), rowsB = rowsFor(entityB);
+  if (!rowsA.length || !rowsB.length){
+    return { title:'Comparison', html:'<div>I could only partially match this — couldn\'t find enough rows for ' + (!rowsA.length?entityA.value:entityB.value) + (monthInfo?' in that month':'') + '.</div>', actions:[] };
+  }
+  var gA = calcGroup(rowsA), gB = calcGroup(rowsB);
+  var rows = PRODUCTS.map(function(p){
+    var aPct = faiPct(gA[p.aKey], gA[p.tKey]), bPct = faiPct(gB[p.aKey], gB[p.tKey]);
+    return [p.label, pctSpan(aPct), pctSpan(bPct), (aPct>=bPct ? entityA.value : entityB.value)];
+  });
+  var html = kpiRow([
+    { val:gA.pct+'%', lbl:entityA.value, cls: gA.pct>=gB.pct?'up':'down' },
+    { val:gB.pct+'%', lbl:entityB.value, cls: gB.pct>=gA.pct?'up':'down' },
+    { val:(gA.pct-gB.pct>=0?'+':'')+(gA.pct-gB.pct)+'pt', lbl:'Gap' }
+  ]) + dataTable(['Product', entityA.value, entityB.value, 'Leader'], rows);
+  return {
+    title:'⚖️ ' + entityA.value + ' vs ' + entityB.value + (monthInfo ? ' — ' + faiMonthLabel(monthInfo) : ''),
+    html: html,
+    actions:[ navBtn('Open Rankings','rankings','🥇'), navBtn('View Dashboard','overview','📊'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+function matchEntityQuery(text){
+  var monthInfo = faiExtractMonth(text);
+  var cleaned = faiStripMonthPhrase(text);
+  // strip common filler words that aren't entity names
+  cleaned = cleaned.replace(/\b(area|team|region|zone|month|فريق|منطقة|شهر)\b/gi,'').replace(/\s+/g,' ').trim();
+  if (!cleaned) return null;
+  var vsParts = cleaned.split(/\s+(?:vs\.?|versus|مقابل)\s+/i);
+  if (vsParts.length === 2){
+    var eA = faiFindEntityInPhrase(vsParts[0]);
+    var eB = faiFindEntityInPhrase(vsParts[1]);
+    if (eA && eB && eA.value !== eB.value) return { type:'compare', a:eA, b:eB, month:monthInfo };
+    return null;
+  }
+  var single = faiFindEntityInPhrase(cleaned);
+  if (single) return { type:'single', entity:single, month:monthInfo };
+  return null;
+}
+
+// ============================================================
+// Package-level intents (Kix / Tazbeet line counts)
+// ============================================================
+function faiDetectPackageGroup(text){
+  if (typeof PKG_GROUPS === 'undefined') return null;
+  if (/kix|كيكس|كيكيس/i.test(text)) return PKG_GROUPS.filter(function(g){ return g.key==='kix'; })[0] || null;
+  if (/tazbeet|تظبيط|تزبيط|تزبيت/i.test(text)) return PKG_GROUPS.filter(function(g){ return g.key==='tazbeet'; })[0] || null;
+  return null;
+}
+function intentPackageCount(pkg, monthInfo){
+  if (!faiHasData()) return faiNoData();
+  var rows = faiData();
+  if (monthInfo) rows = rows.filter(function(r){ return monthInfo.keys.indexOf(r.month) !== -1; });
+  var target = sum(rows, pkg.tKey), ach = sum(rows, pkg.aKey);
+  var pctVal = faiPct(ach, target);
+  var monthLabel = monthInfo ? faiMonthLabel(monthInfo) : 'current view';
+  var html = kpiRow([
+    { val: faiFmt(ach), lbl: pkg.label + ' Lines' },
+    { val: faiFmt(target), lbl:'Target' },
+    { val: pctVal+'%', lbl:'Achievement', cls: pctVal>=100?'up':'down' }
+  ]) + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">' + pkg.label + ' — ' + monthLabel + (rows.length ? '' : ' — no matching rows found for that period') + '</div>';
+  return {
+    title: '📱 ' + pkg.label + ' Lines' + (monthInfo ? ' — ' + monthLabel : ''),
+    html: html,
+    actions:[ navBtn('Open Package Mix','packages','📦'), navBtn('Export Report','reports','📄') ]
+  };
+}
+
+// ============================================================
 // Intent router
 // ============================================================
 function matchWhatIf(text){
@@ -10068,6 +10251,9 @@ window.faiHandleIntent = function(rawText){
   var prodRanking = matchProductRanking(text);
   if (prodRanking) return intentProductRanking(prodRanking.direction, prodRanking.n, prodRanking.prod);
 
+  var pkgGroup = faiDetectPackageGroup(text);
+  if (pkgGroup) return intentPackageCount(pkgGroup, faiExtractMonth(text));
+
   if (/lowest.*wallet|wallet.*lowest|bottom.*wallet/.test(text)) return intentLowestWallet();
   if (/compare.*(east|west|region|area)|east.*vs.*west|قارن|مقارنة.*(شرق|غرب|منطقة)/.test(text)) return intentCompareRegions();
   if ((/best.*(branch|store|perform)|افضل\s*فرع|أفضل\s*فرع|احسن\s*فرع/.test(text)) && !/visit|زيارة/.test(text)) return intentBestBranch();
@@ -10080,17 +10266,23 @@ window.faiHandleIntent = function(rawText){
   if (/heatmap|هيت\s*ماب|خريطة\s*حرارية/.test(text)) return intentHeatmap();
   if (/revenue|إيراد|ايراد/.test(text)) return intentWhatIf({ qty:10, product: PRODUCTS.filter(function(p){return p.key==='gold';})[0] });
 
+  var entityMatch = matchEntityQuery(text);
+  if (entityMatch){
+    if (entityMatch.type==='compare') return intentEntityCompare(entityMatch.a, entityMatch.b, entityMatch.month);
+    return intentEntitySummary(entityMatch.entity, entityMatch.month);
+  }
+
   // internal shortcut tokens used by action buttons
   if (text === '__why__') return intentWhyProjectionDrop();
   if (text === '__proj__') return intentProjection(false);
 
-  // fallback: generic overview
+  // fallback: honest "didn't fully understand" + generic overview
   if (!faiHasData()) return faiNoData();
   var g = calcGroup(faiData());
   return {
-    title:'📊 Quick Summary',
+    title:'🤔 Not sure I caught that — here\'s your overview',
     html: kpiRow([ { val:g.pct+'%', lbl:'Overall Achievement' }, { val:faiFmt(g.storeCount), lbl:'Stores in View' }, { val:faiFmt(g.totalTarget), lbl:'Total Target' } ]) +
-      '<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px">I can dig deeper into wallet performance, rankings, projections, product mix, or specific stores — try one of the suggested questions below, or ask me directly.</div>',
+      '<div style="font-size:11.5px;color:var(--text-muted);margin-top:6px">I can answer by store, supervisor, area manager, product, package (Kix/Tazbeet), or month — e.g. "Fakharany vs ElSisiy month 6" or "Kix lines in June". Try rephrasing with a name, product, or month.</div>',
     actions:[ navBtn('View Dashboard','overview','📊'), navBtn('Open Rankings','rankings','🥇'), navBtn('Product Mix','productmix','📦') ]
   };
 };
