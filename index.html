@@ -1640,6 +1640,17 @@ document.addEventListener('DOMContentLoaded', function() {
             <i class="fas fa-users" style="color:#5E2D91"></i> TEAM PERFORMANCE PIVOT (MTD)
           </h3>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+              <button id="mtd-tp-metric-ach" onclick="setMTDTeamPivotMetric('ach')"
+                style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s" title="النسبة الفعلية لحد النهاردة">
+                % Ach
+              </button>
+              <button id="mtd-tp-metric-proj" onclick="setMTDTeamPivotMetric('proj')"
+                style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="النسبة المتوقعة آخر الشهر لو الأداء استمر بنفس المعدل">
+                📈 Proj%
+              </button>
+            </div>
+            <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
             <button id="mtd-tp-mode-summary" onclick="setMTDTeamPivotMode('summary')"
               style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #5E2D91;background:#5E2D91;color:white;transition:all .2s">
               <i class="fas fa-list mr-1"></i>Summary
@@ -1654,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </button>
           </div>
         </div>
-        <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">اضغط على اسم أي Regional Manager عشان تطوي/تفتح الفريق بتاعه · بيحترم كل الفلاتر الحالية (يوم/فرع/شهر...) · Summary = النسبة بس لكل منتج · Details = Target/Achievement/% كامل</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">اضغط على اسم أي Regional Manager عشان تطوي/تفتح الفريق بتاعه · بيحترم كل الفلاتر الحالية (يوم/فرع/شهر...) · % Ach = الأداء الفعلي لحد اليوم · Proj% = المتوقع آخر الشهر لو استمر بنفس المعدل · Summary = النسبة بس لكل منتج · Details = Target/Achievement/% كامل</div>
         <div style="overflow-x:auto">
           <div id="mtd-team-pivot-table"></div>
         </div>
@@ -2437,12 +2448,21 @@ function exportTeamPivot() {
 //  Wallet (which isn't in PRODUCTS/MTD_PRODS the same way) is included.
 // ══════════════════════════════════════════════════════════════
 var MTD_TEAM_PIVOT_MODE = 'summary'; // 'summary' | 'details'
+var MTD_TEAM_PIVOT_METRIC = 'ach';   // 'ach' (achievement so far) | 'proj' (projected month-end)
 var MTD_TEAM_PIVOT_COLLAPSED = {};
 
 var MTD_TP_PRODUCTS = [
   { key:'mobile', label:'Mobile' }, { key:'fbb', label:'FBB' }, { key:'fixed', label:'Fixed' },
   { key:'fwa', label:'WE Air' }, { key:'gold', label:'WE Gold' }, { key:'wallet', label:'Wallet' }
 ];
+
+function setMTDTeamPivotMetric(metric) {
+  MTD_TEAM_PIVOT_METRIC = metric;
+  var aEl = document.getElementById('mtd-tp-metric-ach'), pEl = document.getElementById('mtd-tp-metric-proj');
+  if (aEl) { aEl.style.background = metric==='ach' ? '#5E2D91' : 'white'; aEl.style.color = metric==='ach' ? 'white' : '#6b7280'; }
+  if (pEl) { pEl.style.background = metric==='proj' ? '#d97706' : 'white'; pEl.style.color = metric==='proj' ? 'white' : '#6b7280'; }
+  renderMTDTeamPivot();
+}
 
 function setMTDTeamPivotMode(mode) {
   MTD_TEAM_PIVOT_MODE = mode;
@@ -2472,13 +2492,15 @@ function mtdBuildTeamPivotTree(rows) {
 }
 
 function mtdTpProductCellsHTML(k, valueColor) {
+  var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
   return MTD_TP_PRODUCTS.map(function(p){
-    var t = k[p.key].tgt||0, a = k[p.key].act||0;
-    var pc = t>0 ? Math.round(a/t*100) : 0;
+    var t = k[p.key].tgt||0;
+    var mainVal = isProj ? (k[p.key].proj||0) : (k[p.key].act||0);
+    var pc = t>0 ? Math.round(mainVal/t*100) : 0;
     var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
     if (MTD_TEAM_PIVOT_MODE === 'details') {
       return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(t)+'</td>'+
-             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(a)+'</td>'+
+             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(mainVal)+'</td>'+
              '<td style="padding:8px 10px;text-align:right;font-size:11.5px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
     }
     return '<td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
@@ -2514,8 +2536,8 @@ function renderMTDTeamPivot() {
   var subHeaderCells = MTD_TEAM_PIVOT_MODE === 'details'
     ? MTD_TP_PRODUCTS.map(function(){
         return '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">TGT</th>'+
-               '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">ACH</th>'+
-               '<th style="padding:5px 10px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15)">%</th>';
+               '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">'+(MTD_TEAM_PIVOT_METRIC==='proj'?'PROJ':'ACH')+'</th>'+
+               '<th style="padding:5px 10px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15)">'+(MTD_TEAM_PIVOT_METRIC==='proj'?'PROJ%':'%')+'</th>';
       }).join('')
     : '';
 
@@ -2557,17 +2579,19 @@ function exportMTDTeamPivot() {
   var rmNames = Object.keys(tree).sort(function(a,b){ return mtdQcCalcGroup(tree[b].rows).mobile.tgt - mtdQcCalcGroup(tree[a].rows).mobile.tgt; });
 
   var aoa = [];
+  var metricLabel = MTD_TEAM_PIVOT_METRIC === 'proj' ? 'PROJ' : 'ACH';
   var headerRow = ['Regional Manager', 'Supervisor', 'Area Manager'];
-  MTD_TP_PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' ACH', p.label+' %'); });
-  aoa.push(['Team Performance Pivot (MTD)']);
+  MTD_TP_PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' '+metricLabel, p.label+' %'); });
+  aoa.push(['Team Performance Pivot (MTD) — ' + (MTD_TEAM_PIVOT_METRIC === 'proj' ? 'Projected Month-End' : 'Achievement So Far')]);
   aoa.push([]);
   aoa.push(headerRow);
 
   function productCells(k) {
     var out = [];
+    var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
     MTD_TP_PRODUCTS.forEach(function(p){
-      var t=k[p.key].tgt||0, a=k[p.key].act||0;
-      out.push(t, a, (t>0?Math.round(a/t*100):0)+'%');
+      var t=k[p.key].tgt||0, v=isProj ? (k[p.key].proj||0) : (k[p.key].act||0);
+      out.push(t, v, (t>0?Math.round(v/t*100):0)+'%');
     });
     return out;
   }
@@ -7418,17 +7442,18 @@ function mtdQcCalcGroup(rows) {
   var g = { storeCount: rows.length };
   Object.keys(MTD_PRODS).forEach(function(key){
     var p = MTD_PRODS[key];
-    g[key] = { tgt: mtdSum(rows, p.tKey), act: mtdSum(rows, p.aKey) };
+    g[key] = { tgt: mtdSum(rows, p.tKey), act: mtdSum(rows, p.aKey), proj: mtdSum(rows, p.projKey) };
   });
   // Wallet — matched via WALLET_DATA by storeCode
-  var wTgt=0, wAct=0;
+  var wTgt=0, wAct=0, wProj=0;
   rows.forEach(function(r){
     var wk = String(r.storeCode||'').trim().toUpperCase();
     var w = (typeof WALLET_DATA!=='undefined' && WALLET_DATA[wk]) || {};
     wTgt += Number(w.walletTarget)||0;
     wAct += Number(w.walletSales)||0;
+    wProj += Number(w.walletProj)||0;
   });
-  g.wallet = { tgt: wTgt, act: wAct };
+  g.wallet = { tgt: wTgt, act: wAct, proj: wProj };
 
   // Tariff tiers (Low/Mid/High/12PT), scoped to this group's stores
   var codes = {};
