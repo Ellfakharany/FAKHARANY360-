@@ -1659,6 +1659,25 @@ document.addEventListener('DOMContentLoaded', function() {
               style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
               <i class="fas fa-th-large mr-1"></i>Details
             </button>
+            <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
+            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+              <button id="mtd-tp-view-tree" onclick="setMTDTeamPivotView('tree')"
+                style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s" title="الشكل الهرمي: RM ← Supervisor ← Area Manager">
+                <i class="fas fa-sitemap mr-1"></i>Hierarchy
+              </button>
+              <button id="mtd-tp-view-flat" onclick="setMTDTeamPivotView('flat')"
+                style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="كل الـ Area Managers مرتبين مع بعض من غير تقسيم السوبرفايزرز">
+                <i class="fas fa-sort-amount-down mr-1"></i>ترتيب الاريات
+              </button>
+            </div>
+            <select id="mtd-tp-sort-product" onchange="renderMTDTeamPivot()" style="display:none;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:20px;font-size:11px;font-weight:700;font-family:'Inter',sans-serif;outline:none;color:#1a1a2e;background:white">
+              <option value="mobile">رتّب حسب Mobile</option>
+              <option value="fbb">رتّب حسب FBB</option>
+              <option value="fixed">رتّب حسب Fixed</option>
+              <option value="fwa">رتّب حسب WE Air</option>
+              <option value="gold">رتّب حسب WE Gold</option>
+              <option value="wallet">رتّب حسب Wallet</option>
+            </select>
             <button onclick="exportMTDTeamPivot()"
               style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #5E2D91;background:white;color:#5E2D91">
               <i class="fas fa-file-export mr-1"></i>Export
@@ -2449,6 +2468,7 @@ function exportTeamPivot() {
 // ══════════════════════════════════════════════════════════════
 var MTD_TEAM_PIVOT_MODE = 'summary'; // 'summary' | 'details'
 var MTD_TEAM_PIVOT_METRIC = 'ach';   // 'ach' (achievement so far) | 'proj' (projected month-end)
+var MTD_TEAM_PIVOT_VIEW = 'tree';    // 'tree' (RM→Supervisor→AM) | 'flat' (all Area Managers ranked together)
 var MTD_TEAM_PIVOT_COLLAPSED = {};
 
 var MTD_TP_PRODUCTS = [
@@ -2472,6 +2492,16 @@ function setMTDTeamPivotMode(mode) {
   renderMTDTeamPivot();
 }
 
+function setMTDTeamPivotView(view) {
+  MTD_TEAM_PIVOT_VIEW = view;
+  var tEl = document.getElementById('mtd-tp-view-tree'), fEl = document.getElementById('mtd-tp-view-flat');
+  var sortSel = document.getElementById('mtd-tp-sort-product');
+  if (tEl) { tEl.style.background = view==='tree' ? '#5E2D91' : 'white'; tEl.style.color = view==='tree' ? 'white' : '#6b7280'; }
+  if (fEl) { fEl.style.background = view==='flat' ? '#5E2D91' : 'white'; fEl.style.color = view==='flat' ? 'white' : '#6b7280'; }
+  if (sortSel) sortSel.style.display = view==='flat' ? '' : 'none';
+  renderMTDTeamPivot();
+}
+
 function toggleMTDTeamPivotRM(rm) {
   MTD_TEAM_PIVOT_COLLAPSED[rm] = !MTD_TEAM_PIVOT_COLLAPSED[rm];
   renderMTDTeamPivot();
@@ -2491,6 +2521,30 @@ function mtdBuildTeamPivotTree(rows) {
   return tree;
 }
 
+// "ترتيب الاريات" flat view: collapse the Supervisor layer and list every
+// Area Manager under an RM directly, ranked by whichever product/metric is
+// selected — e.g. "show me every Area Manager under Ahmed Elananey, best
+// Mobile performer first", instead of having to open each supervisor first.
+function mtdFlattenAreaManagers(rmData, sortProdKey) {
+  var byAM = {}; // merges the same AM name across different supervisors, just in case
+  Object.keys(rmData.supervisors).forEach(function(sv){
+    var svData = rmData.supervisors[sv];
+    Object.keys(svData.areaManagers).forEach(function(am){
+      if (!byAM[am]) byAM[am] = [];
+      byAM[am] = byAM[am].concat(svData.areaManagers[am]);
+    });
+  });
+  var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
+  var list = Object.keys(byAM).map(function(am){
+    var k = mtdQcCalcGroup(byAM[am]);
+    var t = k[sortProdKey].tgt||0;
+    var v = isProj ? (k[sortProdKey].proj||0) : (k[sortProdKey].act||0);
+    return { am: am, rows: byAM[am], sortPct: t>0 ? (v/t) : -1 };
+  });
+  list.sort(function(a,b){ return b.sortPct - a.sortPct; });
+  return list;
+}
+
 function mtdTpProductCellsHTML(k, valueColor) {
   var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
   return MTD_TP_PRODUCTS.map(function(p){
@@ -2499,8 +2553,8 @@ function mtdTpProductCellsHTML(k, valueColor) {
     var pc = t>0 ? Math.round(mainVal/t*100) : 0;
     var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
     if (MTD_TEAM_PIVOT_MODE === 'details') {
-      return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(t)+'</td>'+
-             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(mainVal)+'</td>'+
+      return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(Math.round(t))+'</td>'+
+             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(Math.round(mainVal))+'</td>'+
              '<td style="padding:8px 10px;text-align:right;font-size:11.5px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
     }
     return '<td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
@@ -2551,19 +2605,31 @@ function renderMTDTeamPivot() {
     '</thead><tbody>';
 
   var body = '';
+  var sortProdSel = document.getElementById('mtd-tp-sort-product');
+  var sortProdKey = (sortProdSel && sortProdSel.value) || 'mobile';
   rmNames.forEach(function(rm){
     var rmData = tree[rm];
     body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true });
     if (!MTD_TEAM_PIVOT_COLLAPSED[rm]) {
-      var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
-      svNames.forEach(function(sv){
-        var svData = rmData.supervisors[sv];
-        var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
-        amNames.forEach(function(am){
-          body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+      if (MTD_TEAM_PIVOT_VIEW === 'flat') {
+        // Flat: every Area Manager under this RM, ranked together, no
+        // Supervisor grouping/subtotal rows in between.
+        var flatList = mtdFlattenAreaManagers(rmData, sortProdKey);
+        flatList.forEach(function(item, idx){
+          var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-left:6px">#'+(idx+1)+'</span>';
+          body += mtdTpRow(rankBadge + item.am, 1, item.rows, { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
         });
-        body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
-      });
+      } else {
+        var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
+        svNames.forEach(function(sv){
+          var svData = rmData.supervisors[sv];
+          var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
+          amNames.forEach(function(am){
+            body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+          });
+          body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+        });
+      }
     }
     body += mtdTpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
   });
@@ -2591,7 +2657,7 @@ function exportMTDTeamPivot() {
     var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
     MTD_TP_PRODUCTS.forEach(function(p){
       var t=k[p.key].tgt||0, v=isProj ? (k[p.key].proj||0) : (k[p.key].act||0);
-      out.push(t, v, (t>0?Math.round(v/t*100):0)+'%');
+      out.push(Math.round(t), Math.round(v), (t>0?Math.round(v/t*100):0)+'%');
     });
     return out;
   }
