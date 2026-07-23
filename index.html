@@ -2454,16 +2454,27 @@ function renderTeamPivot() {
   var sortSel = document.getElementById('tp-sort-product');
   var sortTKey = (sortSel && sortSel.value) || (PRODUCTS[0] && PRODUCTS[0].tKey);
 
-  // One line per branch (store) under an expanded Area Manager.
+  // One line per branch (store) under an expanded Area Manager. When no
+  // single month is selected, amRows contains one record PER STORE PER
+  // MONTH (RAW_DATA is month-granular) — grouping by store code first
+  // gives the combined total across all months in view instead of the
+  // same branch name repeating once per month.
   function storeRowsHTML(amRows, indent) {
-    var prod = PRODUCTS.find(function(p){ return p.tKey === sortTKey; }) || PRODUCTS[0];
-    var sorted = amRows.slice().sort(function(a,b){
-      var ta = a[prod.tKey]||0, aa = a[prod.aKey]||0, tb = b[prod.tKey]||0, ab = b[prod.aKey]||0;
-      var pa = ta>0 ? aa/ta : -1, pb = tb>0 ? ab/tb : -1;
-      return pb - pa;
+    var byStore = {};
+    amRows.forEach(function(r){
+      var code = r.storeCode || r.store || '—';
+      if (!byStore[code]) byStore[code] = { store: r.store || r.storeCode || '—', rows: [] };
+      byStore[code].rows.push(r);
     });
-    return sorted.map(function(r){
-      return tpRow('🏪 ' + (r.store||r.storeCode||'—'), indent, [r], { bg:'#faf9fb', color:'#6b7280', fw:500, fs:11 });
+    var prod = PRODUCTS.find(function(p){ return p.tKey === sortTKey; }) || PRODUCTS[0];
+    var list = Object.keys(byStore).map(function(code){
+      var k = calcGroup(byStore[code].rows);
+      var t = k[prod.tKey]||0, a = k[prod.aKey]||0;
+      return { name: byStore[code].store, rows: byStore[code].rows, sortPct: t>0 ? (a/t) : -1 };
+    });
+    list.sort(function(a,b){ return b.sortPct - a.sortPct; });
+    return list.map(function(item){
+      return tpRow('🏪 ' + item.name, indent, item.rows, { bg:'#faf9fb', color:'#6b7280', fw:500, fs:11 });
     }).join('');
   }
 
