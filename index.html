@@ -1250,9 +1250,21 @@ document.addEventListener('DOMContentLoaded', function() {
             style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #5E2D91;background:white;color:#5E2D91">
             <i class="fas fa-file-export mr-1"></i>Export
           </button>
+          <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
+          <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+            <button id="tp-view-tree" onclick="setTeamPivotView('tree')"
+              style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s" title="الشكل الهرمي: RM ← Supervisor ← Area Manager">
+              <i class="fas fa-sitemap mr-1"></i>Hierarchy
+            </button>
+            <button id="tp-view-flat" onclick="setTeamPivotView('flat')"
+              style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="كل الـ Area Managers مرتبين مع بعض من غير تقسيم السوبرفايزرز">
+              <i class="fas fa-sort-amount-down mr-1"></i>ترتيب الاريات
+            </button>
+          </div>
+          <select id="tp-sort-product" onchange="renderTeamPivot()" style="display:none;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:20px;font-size:11px;font-weight:700;font-family:'Inter',sans-serif;outline:none;color:#1a1a2e;background:white"></select>
         </div>
       </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">اضغط على اسم أي Regional Manager عشان تطوي/تفتح الفريق بتاعه · Summary = النسبة بس لكل منتج · Details = Target/Achievement/% كامل</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">اضغط على اسم أي Regional Manager أو Area Manager عشان تطوي/تفتح · دوسة على اسم الـ Area Manager بتفتح الفروع اللي تحته · Summary = النسبة بس لكل منتج · Details = Target/Achievement/% كامل</div>
       <div class="chart-card mb-6" style="padding:0;overflow-x:auto">
         <div id="team-pivot-table"></div>
       </div>
@@ -2294,7 +2306,36 @@ function renderAll() {
 //  Details mode adds an Ach% chip per product.
 // ══════════════════════════════════════════════════════════════
 var TEAM_PIVOT_MODE = 'summary'; // 'summary' | 'details'
+var TEAM_PIVOT_VIEW = 'tree';    // 'tree' (RM→Supervisor→AM) | 'flat' (all Area Managers ranked together)
 var TEAM_PIVOT_COLLAPSED = {};   // rmName -> true if collapsed
+var TEAM_PIVOT_AM_EXPANDED = {}; // amKey -> true if store-level rows are shown under it
+
+function tpAmKey(rm, sv, am) { return rm + '|' + (sv||'') + '|' + am; }
+
+function toggleTeamPivotAM(key) {
+  TEAM_PIVOT_AM_EXPANDED[key] = !TEAM_PIVOT_AM_EXPANDED[key];
+  renderTeamPivot();
+}
+
+function setTeamPivotView(view) {
+  TEAM_PIVOT_VIEW = view;
+  var tEl = document.getElementById('tp-view-tree'), fEl = document.getElementById('tp-view-flat');
+  var sortSel = document.getElementById('tp-sort-product');
+  if (tEl) { tEl.style.background = view==='tree' ? '#5E2D91' : 'white'; tEl.style.color = view==='tree' ? 'white' : '#6b7280'; }
+  if (fEl) { fEl.style.background = view==='flat' ? '#5E2D91' : 'white'; fEl.style.color = view==='flat' ? 'white' : '#6b7280'; }
+  if (sortSel) {
+    if (!sortSel.dataset.filled) {
+      PRODUCTS.forEach(function(p){
+        var o = document.createElement('option');
+        o.value = p.tKey; o.textContent = 'رتّب حسب ' + p.label;
+        sortSel.appendChild(o);
+      });
+      sortSel.dataset.filled = '1';
+    }
+    sortSel.style.display = view==='flat' ? '' : 'none';
+  }
+  renderTeamPivot();
+}
 
 function setTeamPivotMode(mode) {
   TEAM_PIVOT_MODE = mode;
@@ -2347,13 +2388,39 @@ function tpRow(label, indent, rows, style, isLast) {
   var k = calcGroup(rows);
   var pad = 14 + indent*22;
   var bg = style.bg, color = style.color || '#1a1a2e', fw = style.fw || 600, fs = style.fs || 12;
+  var clickAttr = '', chevron = '';
+  if (style.clickable) {
+    clickAttr = ' onclick="'+style.clickFn+'"';
+    chevron = '<i class="fas fa-chevron-'+(style.expanded?'down':'left')+' mr-2" style="font-size:9px;opacity:.8"></i>';
+  }
   var tr = '<tr style="background:'+bg+';'+(style.borderTop?'border-top:'+style.borderTop+';':'')+(isLast?'border-bottom:2px solid #d1d5db;':'')+'">';
-  tr += '<td style="padding:8px '+(style.clickable?'8px':'14px')+' 8px '+pad+'px;font-size:'+fs+'px;font-weight:'+fw+';color:'+color+';white-space:nowrap'+(style.clickable?';cursor:pointer':'')+'"'+(style.clickable?' onclick="toggleTeamPivotRM(\''+label.replace(/'/g,"\\'")+'\')"':'')+'>'+
-    (style.clickable ? '<i class="fas fa-chevron-'+(TEAM_PIVOT_COLLAPSED[label]?'left':'down')+' mr-2" style="font-size:9px;opacity:.8"></i>' : '') + label +
+  tr += '<td style="padding:8px '+(style.clickable?'8px':'14px')+' 8px '+pad+'px;font-size:'+fs+'px;font-weight:'+fw+';color:'+color+';white-space:nowrap'+(style.clickable?';cursor:pointer':'')+'"'+clickAttr+'>'+
+    chevron + label +
   '</td>';
   tr += tpProductCellsHTML(k, bg==='transparent' ? null : color);
   tr += '</tr>';
   return tr;
+}
+
+// "ترتيب الاريات" flat view — collapse the Supervisor layer, list every
+// Area Manager under an RM directly, ranked by the chosen product.
+function flattenAreaManagersClosure(rmData, sortTKey) {
+  var byAM = {};
+  Object.keys(rmData.supervisors).forEach(function(sv){
+    var svData = rmData.supervisors[sv];
+    Object.keys(svData.areaManagers).forEach(function(am){
+      if (!byAM[am]) byAM[am] = [];
+      byAM[am] = byAM[am].concat(svData.areaManagers[am]);
+    });
+  });
+  var prod = PRODUCTS.find(function(p){ return p.tKey === sortTKey; }) || PRODUCTS[0];
+  var list = Object.keys(byAM).map(function(am){
+    var k = calcGroup(byAM[am]);
+    var t = k[prod.tKey]||0, a = k[prod.aKey]||0;
+    return { am: am, rows: byAM[am], sortPct: t>0 ? (a/t) : -1 };
+  });
+  list.sort(function(a,b){ return b.sortPct - a.sortPct; });
+  return list;
 }
 
 function renderTeamPivot() {
@@ -2384,19 +2451,50 @@ function renderTeamPivot() {
     '</thead><tbody>';
 
   var body = '';
+  var sortSel = document.getElementById('tp-sort-product');
+  var sortTKey = (sortSel && sortSel.value) || (PRODUCTS[0] && PRODUCTS[0].tKey);
+
+  // One line per branch (store) under an expanded Area Manager.
+  function storeRowsHTML(amRows, indent) {
+    var prod = PRODUCTS.find(function(p){ return p.tKey === sortTKey; }) || PRODUCTS[0];
+    var sorted = amRows.slice().sort(function(a,b){
+      var ta = a[prod.tKey]||0, aa = a[prod.aKey]||0, tb = b[prod.tKey]||0, ab = b[prod.aKey]||0;
+      var pa = ta>0 ? aa/ta : -1, pb = tb>0 ? ab/tb : -1;
+      return pb - pa;
+    });
+    return sorted.map(function(r){
+      return tpRow('🏪 ' + (r.store||r.storeCode||'—'), indent, [r], { bg:'#faf9fb', color:'#6b7280', fw:500, fs:11 });
+    }).join('');
+  }
+
   rmNames.forEach(function(rm){
     var rmData = tree[rm];
-    body += tpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true });
-    if (!TEAM_PIVOT_COLLAPSED[rm]) {
-      var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return calcGroup(rmData.supervisors[b].rows).totalTarget - calcGroup(rmData.supervisors[a].rows).totalTarget; });
-      svNames.forEach(function(sv){
-        var svData = rmData.supervisors[sv];
-        var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return calcGroup(svData.areaManagers[b]).totalTarget - calcGroup(svData.areaManagers[a]).totalTarget; });
-        amNames.forEach(function(am){
-          body += tpRow(am, 2, svData.areaManagers[am], { bg:'transparent', color:'#374151', fw:500, fs:11.5 });
+    var rmExpanded = !TEAM_PIVOT_COLLAPSED[rm];
+    body += tpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+    if (rmExpanded) {
+      if (TEAM_PIVOT_VIEW === 'flat') {
+        var flatList = flattenAreaManagersClosure(rmData, sortTKey);
+        flatList.forEach(function(item, idx){
+          var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-left:6px">#'+(idx+1)+'</span>';
+          var amKey = tpAmKey(rm, 'flat', item.am);
+          var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+          body += tpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+          if (amExpanded) body += storeRowsHTML(item.rows, 2);
         });
-        body += tpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
-      });
+      } else {
+        var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return calcGroup(rmData.supervisors[b].rows).totalTarget - calcGroup(rmData.supervisors[a].rows).totalTarget; });
+        svNames.forEach(function(sv){
+          var svData = rmData.supervisors[sv];
+          var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return calcGroup(svData.areaManagers[b]).totalTarget - calcGroup(svData.areaManagers[a]).totalTarget; });
+          amNames.forEach(function(am){
+            var amKey = tpAmKey(rm, sv, am);
+            var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+            body += tpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+            if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
+          });
+          body += tpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+        });
+      }
     }
     body += tpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
   });
