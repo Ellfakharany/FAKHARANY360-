@@ -1945,8 +1945,6 @@ let appInitialized = false;
 
 function initApp() { initAppWithData([]); }
 function initAppWithData(injectedData) {
-  if (appInitialized) return;
-
   // ── Inject uploaded data into RAW_DATA (skip if already same reference) ──
   if (injectedData && injectedData.length > 0 && injectedData !== RAW_DATA) {
     RAW_DATA.length = 0;
@@ -1958,7 +1956,24 @@ function initAppWithData(injectedData) {
   // anything. The JSON's default mobileSubs/fixedSubs/fbbSubs are Sales
   // numbers; mobileSubsAct/fixedSubsAct/fbbSubsAct (only present for months
   // where the closure file's IDLE sheet had a usable split) hold Activation.
+  //
+  // IMPORTANT: this must run on every call, not just the first one. Admin
+  // uploads (handleAdminClosureUpload, MTD upload, etc.) reassign RAW_DATA
+  // to a brand-new array and then call initAppWithData(RAW_DATA) again in
+  // the same session. The old code returned immediately here once
+  // appInitialized was true, so the freshly uploaded month's rows never got
+  // _salesMobile/_actMobile computed — clicking the Activation toggle then
+  // set mobileSubs/fixedSubs/fbbSubs to undefined (silently rendered as 0)
+  // for that month only, while months loaded at page-load stayed fine.
   backupSalesActivationFields(RAW_DATA);
+
+  if (appInitialized) {
+    // App already booted — just refresh the derived view with the new data
+    // instead of redoing the one-time UI boot sequence below.
+    filteredData = [...RAW_DATA];
+    applyFilters(); // applyFilters() already calls populateCascade(RAW_DATA) and renderAll()
+    return;
+  }
 
   const loadEl = document.getElementById('loading-screen');
   if (loadEl) { loadEl.style.display = 'flex'; loadEl.style.zIndex = '9998'; }
