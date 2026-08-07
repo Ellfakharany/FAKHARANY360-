@@ -5660,6 +5660,26 @@ var MTD_SALES_DATA = [];           // optional separate Sales dataset (same row 
 var MTD_PKGMIX   = null;           // { cats, cols, rows } parsed from "Tariffs Per Stoers"
 var MTD_DAILY    = null;           // { dayCols, rows } parsed from "Stoers Daily"
 var MTD_WALLET_DAILY = null;       // { dayCols, rows } parsed from WePay "Sales Daily"
+
+// Sales↔Activation Proj rescaling uses a ratio of "MTD-to-date Sales" vs
+// "MTD-to-date Activation" to rescale the source file's own (Activation-
+// paced) month-end projection. That mixes two unstable small numbers
+// together (Sales-to-date ÷ Activation-to-date), so early in the month —
+// or for lower-volume products like FBB/Fixed — a tiny absolute gap (e.g.
+// 1 vs 3) produced a huge, meaningless ratio (3x) applied to the whole
+// month.
+//
+// Correct approach: WE's own Proj column already encodes a day-pace growth
+// multiplier — "how much bigger will the month-end number be than today's
+// number, at the current daily rate" (r.mobileProj / r.mobileSubs). That
+// multiplier is a real, meaningful figure — it doesn't depend on comparing
+// two small counts to each other. Apply that SAME multiplier directly to
+// today's Sales count (or, for the Activation-side alignment below, to
+// today's IDLE "All Activation" count) instead of deriving a second,
+// noisier ratio. This is the actual math, not an approximation/cap.
+function projPace(proj, actualToDate) {
+  return actualToDate > 0 ? (proj || 0) / actualToDate : 1;
+}
 var MTD_PKG_EXPANDED = {};         // which package category cards are expanded
 var MTD_DAILY_PROD = 'mobile';     // 'mobile' | 'wallet'
 var MTD_VIEW     = 'details';      // 'summary' | 'details'
@@ -5863,32 +5883,32 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           var sr = Object.assign({}, r);
           if (idle) {
-            var mobRatio = idle.mobileAct > 0 ? (idle.mobileSales / idle.mobileAct) : 1;
-            var fixRatio = idle.fixedAct  > 0 ? (idle.fixedSales  / idle.fixedAct)  : 1;
-            var fbbRatio = idle.fbbAct    > 0 ? (idle.fbbSales    / idle.fbbAct)    : 1;
+            var mobPace = projPace(r.mobileProj, r.mobileSubs);
+            var fixPace = projPace(r.fixedProj, r.fixedSubs);
+            var fbbPace = projPace(r.fbbProj, r.fbbSubs);
 
             sr.mobileSubs = idle.mobileSales; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = (r.mobileProj || 0) * mobRatio;
+            sr.mobileProj = idle.mobileSales * mobPace;
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs = idle.fixedSales; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj = (r.fixedProj || 0) * fixRatio;
+            sr.fixedProj = idle.fixedSales * fixPace;
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs = idle.fbbSales; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj = (r.fbbProj || 0) * fbbRatio;
+            sr.fbbProj = idle.fbbSales * fbbPace;
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldSales !== null) {
-              var goldRatio = idle.goldAct > 0 ? (idle.goldSales / idle.goldAct) : 1;
+              var goldPace = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = (r.goldProj || 0) * goldRatio;
+              sr.goldProj = idle.goldSales * goldPace;
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixSales !== null) {
-              var wemixRatio = idle.wemixAct > 0 ? (idle.wemixSales / idle.wemixAct) : 1;
+              var wemixPace = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = (r.weMixProj || 0) * wemixRatio;
+              sr.weMixProj = idle.wemixSales * wemixPace;
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
           }
@@ -5899,32 +5919,32 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           if (!idle) return r;
           var sr = Object.assign({}, r);
-          var mobRatioA = r.mobileSubs > 0 ? (idle.mobileAct / r.mobileSubs) : 1;
-          var fixRatioA = r.fixedSubs  > 0 ? (idle.fixedAct  / r.fixedSubs)  : 1;
-          var fbbRatioA = r.fbbSubs    > 0 ? (idle.fbbAct    / r.fbbSubs)    : 1;
+          var mobPaceA = projPace(r.mobileProj, r.mobileSubs);
+          var fixPaceA = projPace(r.fixedProj, r.fixedSubs);
+          var fbbPaceA = projPace(r.fbbProj, r.fbbSubs);
 
           sr.mobileSubs = idle.mobileAct; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
-          sr.mobileProj = (r.mobileProj || 0) * mobRatioA;
+          sr.mobileProj = idle.mobileAct * mobPaceA;
           sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
           sr.fixedSubs = idle.fixedAct; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
-          sr.fixedProj = (r.fixedProj || 0) * fixRatioA;
+          sr.fixedProj = idle.fixedAct * fixPaceA;
           sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
           sr.fbbSubs = idle.fbbAct; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
-          sr.fbbProj = (r.fbbProj || 0) * fbbRatioA;
+          sr.fbbProj = idle.fbbAct * fbbPaceA;
           sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
           if (idle.goldAct !== null) {
-            var goldRatioA = r.goldSubs > 0 ? (idle.goldAct / r.goldSubs) : 1;
+            var goldPaceA = projPace(r.goldProj, r.goldSubs);
             sr.goldSubs = idle.goldAct; sr.goldPct = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0;
-            sr.goldProj = (r.goldProj || 0) * goldRatioA;
+            sr.goldProj = idle.goldAct * goldPaceA;
             sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
           }
           if (idle.wemixAct !== null) {
-            var wemixRatioA = r.weMixSubs > 0 ? (idle.wemixAct / r.weMixSubs) : 1;
+            var wemixPaceA = projPace(r.weMixProj, r.weMixSubs);
             sr.weMixSubs = idle.wemixAct; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0;
-            sr.weMixProj = (r.weMixProj || 0) * wemixRatioA;
+            sr.weMixProj = idle.wemixAct * wemixPaceA;
             sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
           }
           return sr;
@@ -6509,42 +6529,43 @@ function loadMTDFile(file) {
             // Override the activation-based subscription numbers with Sales numbers,
             // keep targets the same (targets don't change between activation/sales view).
             // The "Proj" (month-end projection) column from the source file is only
-            // ever an Activation-based day-pace projection — it was never being
-            // recalculated here, so the Projection card silently kept showing the
-            // Activation projection even while viewing Sales. Fix: rescale it by the
-            // same Sales/Activation ratio as the actual number, so a store running
-            // 2x its activation pace in Sales also projects 2x at month-end.
-            var mobRatio = idle.mobileAct > 0 ? (idle.mobileSales / idle.mobileAct) : 1;
-            var fixRatio = idle.fixedAct  > 0 ? (idle.fixedSales  / idle.fixedAct)  : 1;
-            var fbbRatio = idle.fbbAct    > 0 ? (idle.fbbSales    / idle.fbbAct)    : 1;
+            // ever an Activation-based day-pace projection. Derive the day-pace growth
+            // multiplier it implies (r.mobileProj / r.mobileSubs — "how much bigger
+            // will the month-end number be than today's, at today's daily rate") and
+            // apply that SAME multiplier to today's Sales count, instead of comparing
+            // Sales-to-date to Activation-to-date directly (that ratio blows up when
+            // either to-date count is small, e.g. early in the month).
+            var mobPace = projPace(r.mobileProj, r.mobileSubs);
+            var fixPace = projPace(r.fixedProj, r.fixedSubs);
+            var fbbPace = projPace(r.fbbProj, r.fbbSubs);
 
             sr.mobileSubs = idle.mobileSales;
             sr.mobilePct  = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = (r.mobileProj || 0) * mobRatio;
+            sr.mobileProj = idle.mobileSales * mobPace;
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs  = idle.fixedSales;
             sr.fixedPct   = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj  = (r.fixedProj || 0) * fixRatio;
+            sr.fixedProj  = idle.fixedSales * fixPace;
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs    = idle.fbbSales;
             sr.fbbPct     = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj    = (r.fbbProj || 0) * fbbRatio;
+            sr.fbbProj    = idle.fbbSales * fbbPace;
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldSales !== null) {
-              var goldRatio = idle.goldAct > 0 ? (idle.goldSales / idle.goldAct) : 1;
+              var goldPace = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldSales;
               sr.goldPct  = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = (r.goldProj || 0) * goldRatio;
+              sr.goldProj = idle.goldSales * goldPace;
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixSales !== null) {
-              var wemixRatio = idle.wemixAct > 0 ? (idle.wemixSales / idle.wemixAct) : 1;
+              var wemixPace = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixSales;
               sr.weMixPct  = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = (r.weMixProj || 0) * wemixRatio;
+              sr.weMixProj = idle.wemixSales * wemixPace;
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
           }
@@ -6557,37 +6578,37 @@ function loadMTDFile(file) {
           var idle = idleData[code];
           if (idle) {
             var sr = Object.assign({}, r);
-            var mobRatioA = r.mobileSubs > 0 ? (idle.mobileAct / r.mobileSubs) : 1;
-            var fixRatioA = r.fixedSubs  > 0 ? (idle.fixedAct  / r.fixedSubs)  : 1;
-            var fbbRatioA = r.fbbSubs    > 0 ? (idle.fbbAct    / r.fbbSubs)    : 1;
+            var mobPaceA = projPace(r.mobileProj, r.mobileSubs);
+            var fixPaceA = projPace(r.fixedProj, r.fixedSubs);
+            var fbbPaceA = projPace(r.fbbProj, r.fbbSubs);
 
             sr.mobileSubs = idle.mobileAct;
             sr.mobilePct  = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
-            sr.mobileProj = (r.mobileProj || 0) * mobRatioA;
+            sr.mobileProj = idle.mobileAct * mobPaceA;
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs  = idle.fixedAct;
             sr.fixedPct   = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
-            sr.fixedProj  = (r.fixedProj || 0) * fixRatioA;
+            sr.fixedProj  = idle.fixedAct * fixPaceA;
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs    = idle.fbbAct;
             sr.fbbPct     = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
-            sr.fbbProj    = (r.fbbProj || 0) * fbbRatioA;
+            sr.fbbProj    = idle.fbbAct * fbbPaceA;
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldAct !== null) {
-              var goldRatioA = r.goldSubs > 0 ? (idle.goldAct / r.goldSubs) : 1;
+              var goldPaceA = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldAct;
               sr.goldPct  = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0;
-              sr.goldProj = (r.goldProj || 0) * goldRatioA;
+              sr.goldProj = idle.goldAct * goldPaceA;
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixAct !== null) {
-              var wemixRatioA = r.weMixSubs > 0 ? (idle.wemixAct / r.weMixSubs) : 1;
+              var wemixPaceA = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixAct;
               sr.weMixPct  = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0;
-              sr.weMixProj = (r.weMixProj || 0) * wemixRatioA;
+              sr.weMixProj = idle.wemixAct * wemixPaceA;
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
             return sr;
