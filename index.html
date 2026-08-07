@@ -5661,24 +5661,33 @@ var MTD_PKGMIX   = null;           // { cats, cols, rows } parsed from "Tariffs 
 var MTD_DAILY    = null;           // { dayCols, rows } parsed from "Stoers Daily"
 var MTD_WALLET_DAILY = null;       // { dayCols, rows } parsed from WePay "Sales Daily"
 
-// Sales↔Activation Proj rescaling uses a ratio of "MTD-to-date Sales" vs
-// "MTD-to-date Activation" to rescale the source file's own (Activation-
-// paced) month-end projection. That mixes two unstable small numbers
-// together (Sales-to-date ÷ Activation-to-date), so early in the month —
-// or for lower-volume products like FBB/Fixed — a tiny absolute gap (e.g.
-// 1 vs 3) produced a huge, meaningless ratio (3x) applied to the whole
-// month.
+// Sales↔Activation Proj rescaling — previous approach borrowed WE's own
+// Activation-based Proj column and rescaled it by a ratio derived from
+// small MTD-to-date counts (unstable early in the month / for low-volume
+// products like FBB/Fixed), and separately it turned out WE's own Proj
+// doesn't track a plain linear day-pace closely enough either (verified:
+// it gave 147% for a store where 43 target / 7 actual on day 4 of 31
+// should project to 126.2%).
 //
-// Correct approach: WE's own Proj column already encodes a day-pace growth
-// multiplier — "how much bigger will the month-end number be than today's
-// number, at the current daily rate" (r.mobileProj / r.mobileSubs). That
-// multiplier is a real, meaningful figure — it doesn't depend on comparing
-// two small counts to each other. Apply that SAME multiplier directly to
-// today's Sales count (or, for the Activation-side alignment below, to
-// today's IDLE "All Activation" count) instead of deriving a second,
-// noisier ratio. This is the actual math, not an approximation/cap.
-function projPace(proj, actualToDate) {
-  return actualToDate > 0 ? (proj || 0) / actualToDate : 1;
+// Correct, simple approach (day-count math only, no borrowed multipliers):
+//   Proj = ActualToDate × (DaysInMonth ÷ CurrentDayOfMonth)
+// i.e. "if this pace holds for the rest of the month". Same formula used
+// for both Sales and Activation, just fed each mode's own ActualToDate —
+// so both modes get an equally real, independently computed number.
+function projectToMonthEnd(actualToDate, currentDay, daysInMonth) {
+  if (!(currentDay > 0) || !(daysInMonth > 0)) return actualToDate;
+  return actualToDate * (daysInMonth / currentDay);
+}
+// Parses a "D <ArabicMonth> Y" label (as produced by isoToArabicLabel /
+// extractDateFromFilename) into { day, daysInMonth }, used as a fallback
+// current-day source when the "Stoers Daily" sheet isn't available.
+function dayOfMonthInfoFromLabel(label) {
+  var m = String(label || '').match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if (!m) return null;
+  var day = +m[1], year = +m[3];
+  var mi = AR_MONTHS_FULL.indexOf(m[2]);
+  if (mi < 0) return null;
+  return { day: day, daysInMonth: new Date(year, mi + 1, 0).getDate() };
 }
 var MTD_PKG_EXPANDED = {};         // which package category cards are expanded
 var MTD_DAILY_PROD = 'mobile';     // 'mobile' | 'wallet'
@@ -5876,6 +5885,19 @@ async function handleAdminUpload(kind) {
       var idleData = null;
       try { idleData = parseIDLESheet(wb); } catch (e) { console.warn('[Admin Upload] IDLE parse failed:', e.message); }
 
+      var pkgMix = null, daily = null;
+      try { pkgMix = parsePkgMixSheet(wb); } catch (e) { console.warn('[Admin Upload] PkgMix parse failed:', e.message); }
+      try { daily = parseDailySheet(wb); } catch (e) { console.warn('[Admin Upload] Daily parse failed:', e.message); }
+
+      // dateIso ("YYYY-MM-DD") comes straight from the admin's date picker —
+      // the most reliable source for daysInMonth. currentDay prefers the
+      // "Stoers Daily" sheet's own day columns (matches what the MTD
+      // forecast banner already uses) and falls back to the picked date's
+      // day-of-month if that sheet is missing.
+      var isoParts = dateIso.split('-').map(Number);
+      var daysInMonth = new Date(isoParts[0], isoParts[1], 0).getDate();
+      var currentDay = (daily && daily.dayCols && daily.dayCols.length) ? Math.max.apply(null, daily.dayCols) : isoParts[2];
+
       var mtdSalesData = [];
       if (idleData) {
         mtdSalesData = parsed.map(function (r) {
@@ -5883,32 +5905,26 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           var sr = Object.assign({}, r);
           if (idle) {
-            var mobPace = projPace(r.mobileProj, r.mobileSubs);
-            var fixPace = projPace(r.fixedProj, r.fixedSubs);
-            var fbbPace = projPace(r.fbbProj, r.fbbSubs);
-
             sr.mobileSubs = idle.mobileSales; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = idle.mobileSales * mobPace;
+            sr.mobileProj = projectToMonthEnd(idle.mobileSales, currentDay, daysInMonth);
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs = idle.fixedSales; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj = idle.fixedSales * fixPace;
+            sr.fixedProj = projectToMonthEnd(idle.fixedSales, currentDay, daysInMonth);
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs = idle.fbbSales; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj = idle.fbbSales * fbbPace;
+            sr.fbbProj = projectToMonthEnd(idle.fbbSales, currentDay, daysInMonth);
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldSales !== null) {
-              var goldPace = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = idle.goldSales * goldPace;
+              sr.goldProj = projectToMonthEnd(idle.goldSales, currentDay, daysInMonth);
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixSales !== null) {
-              var wemixPace = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = idle.wemixSales * wemixPace;
+              sr.weMixProj = projectToMonthEnd(idle.wemixSales, currentDay, daysInMonth);
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
           }
@@ -5919,41 +5935,31 @@ async function handleAdminUpload(kind) {
           var idle = idleData[code];
           if (!idle) return r;
           var sr = Object.assign({}, r);
-          var mobPaceA = projPace(r.mobileProj, r.mobileSubs);
-          var fixPaceA = projPace(r.fixedProj, r.fixedSubs);
-          var fbbPaceA = projPace(r.fbbProj, r.fbbSubs);
-
           sr.mobileSubs = idle.mobileAct; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
-          sr.mobileProj = idle.mobileAct * mobPaceA;
+          sr.mobileProj = projectToMonthEnd(idle.mobileAct, currentDay, daysInMonth);
           sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
           sr.fixedSubs = idle.fixedAct; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
-          sr.fixedProj = idle.fixedAct * fixPaceA;
+          sr.fixedProj = projectToMonthEnd(idle.fixedAct, currentDay, daysInMonth);
           sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
           sr.fbbSubs = idle.fbbAct; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
-          sr.fbbProj = idle.fbbAct * fbbPaceA;
+          sr.fbbProj = projectToMonthEnd(idle.fbbAct, currentDay, daysInMonth);
           sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
           if (idle.goldAct !== null) {
-            var goldPaceA = projPace(r.goldProj, r.goldSubs);
             sr.goldSubs = idle.goldAct; sr.goldPct = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0;
-            sr.goldProj = idle.goldAct * goldPaceA;
+            sr.goldProj = projectToMonthEnd(idle.goldAct, currentDay, daysInMonth);
             sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
           }
           if (idle.wemixAct !== null) {
-            var wemixPaceA = projPace(r.weMixProj, r.weMixSubs);
             sr.weMixSubs = idle.wemixAct; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0;
-            sr.weMixProj = idle.wemixAct * wemixPaceA;
+            sr.weMixProj = projectToMonthEnd(idle.wemixAct, currentDay, daysInMonth);
             sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
           }
           return sr;
         });
       }
-
-      var pkgMix = null, daily = null;
-      try { pkgMix = parsePkgMixSheet(wb); } catch (e) { console.warn('[Admin Upload] PkgMix parse failed:', e.message); }
-      try { daily = parseDailySheet(wb); } catch (e) { console.warn('[Admin Upload] Daily parse failed:', e.message); }
 
       statusEl.textContent = '⏳ جاري الرفع لـ Supabase...';
       var rows = parsed.filter(function (r) { return r.storeCode; }).map(function (r) {
@@ -6516,6 +6522,16 @@ function loadMTDFile(file) {
 
       if (parsed.length === 0) throw new Error('لم يتم العثور على بيانات صالحة');
 
+      // Package Mix Breakdown (Tariffs Per Stoers) + Daily Trend (Stoers Daily) —
+      // parsed early so currentDay/daysInMonth are ready before the Sales/
+      // Activation merge below needs them.
+      try { MTD_PKGMIX = parsePkgMixSheet(wb); } catch(e) { console.warn('[PkgMix] parse failed', e); MTD_PKGMIX = null; }
+      try { MTD_DAILY  = parseDailySheet(wb);  } catch(e) { console.warn('[Daily] parse failed', e);  MTD_DAILY  = null; }
+
+      var dLabelInfo = dayOfMonthInfoFromLabel(MTD_MOBILE_DATE_LABEL);
+      var currentDay = (MTD_DAILY && MTD_DAILY.dayCols && MTD_DAILY.dayCols.length) ? Math.max.apply(null, MTD_DAILY.dayCols) : (dLabelInfo ? dLabelInfo.day : null);
+      var daysInMonth = dLabelInfo ? dLabelInfo.daysInMonth : null;
+
       // Try to extract Activation vs Sales split from IDLE sheet
       var idleData = parseIDLESheet(wb);
       if (idleData) {
@@ -6528,44 +6544,34 @@ function loadMTDFile(file) {
           if (idle) {
             // Override the activation-based subscription numbers with Sales numbers,
             // keep targets the same (targets don't change between activation/sales view).
-            // The "Proj" (month-end projection) column from the source file is only
-            // ever an Activation-based day-pace projection. Derive the day-pace growth
-            // multiplier it implies (r.mobileProj / r.mobileSubs — "how much bigger
-            // will the month-end number be than today's, at today's daily rate") and
-            // apply that SAME multiplier to today's Sales count, instead of comparing
-            // Sales-to-date to Activation-to-date directly (that ratio blows up when
-            // either to-date count is small, e.g. early in the month).
-            var mobPace = projPace(r.mobileProj, r.mobileSubs);
-            var fixPace = projPace(r.fixedProj, r.fixedSubs);
-            var fbbPace = projPace(r.fbbProj, r.fbbSubs);
-
+            // Proj = ActualToDate × (DaysInMonth ÷ CurrentDay) — simple day-count
+            // extrapolation, computed independently for Sales here (the source
+            // file's own "Proj" column is Activation-only and isn't reused).
             sr.mobileSubs = idle.mobileSales;
             sr.mobilePct  = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = idle.mobileSales * mobPace;
+            sr.mobileProj = projectToMonthEnd(idle.mobileSales, currentDay, daysInMonth);
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs  = idle.fixedSales;
             sr.fixedPct   = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj  = idle.fixedSales * fixPace;
+            sr.fixedProj  = projectToMonthEnd(idle.fixedSales, currentDay, daysInMonth);
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs    = idle.fbbSales;
             sr.fbbPct     = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj    = idle.fbbSales * fbbPace;
+            sr.fbbProj    = projectToMonthEnd(idle.fbbSales, currentDay, daysInMonth);
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldSales !== null) {
-              var goldPace = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldSales;
               sr.goldPct  = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = idle.goldSales * goldPace;
+              sr.goldProj = projectToMonthEnd(idle.goldSales, currentDay, daysInMonth);
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixSales !== null) {
-              var wemixPace = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixSales;
               sr.weMixPct  = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = idle.wemixSales * wemixPace;
+              sr.weMixProj = projectToMonthEnd(idle.wemixSales, currentDay, daysInMonth);
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
           }
@@ -6578,37 +6584,31 @@ function loadMTDFile(file) {
           var idle = idleData[code];
           if (idle) {
             var sr = Object.assign({}, r);
-            var mobPaceA = projPace(r.mobileProj, r.mobileSubs);
-            var fixPaceA = projPace(r.fixedProj, r.fixedSubs);
-            var fbbPaceA = projPace(r.fbbProj, r.fbbSubs);
-
             sr.mobileSubs = idle.mobileAct;
             sr.mobilePct  = r.mobileTarget > 0 ? idle.mobileAct / r.mobileTarget : 0;
-            sr.mobileProj = idle.mobileAct * mobPaceA;
+            sr.mobileProj = projectToMonthEnd(idle.mobileAct, currentDay, daysInMonth);
             sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
 
             sr.fixedSubs  = idle.fixedAct;
             sr.fixedPct   = r.fixedTarget > 0 ? idle.fixedAct / r.fixedTarget : 0;
-            sr.fixedProj  = idle.fixedAct * fixPaceA;
+            sr.fixedProj  = projectToMonthEnd(idle.fixedAct, currentDay, daysInMonth);
             sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
 
             sr.fbbSubs    = idle.fbbAct;
             sr.fbbPct     = r.fbbTarget > 0 ? idle.fbbAct / r.fbbTarget : 0;
-            sr.fbbProj    = idle.fbbAct * fbbPaceA;
+            sr.fbbProj    = projectToMonthEnd(idle.fbbAct, currentDay, daysInMonth);
             sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
 
             if (idle.goldAct !== null) {
-              var goldPaceA = projPace(r.goldProj, r.goldSubs);
               sr.goldSubs = idle.goldAct;
               sr.goldPct  = r.goldTarget > 0 ? idle.goldAct / r.goldTarget : 0;
-              sr.goldProj = idle.goldAct * goldPaceA;
+              sr.goldProj = projectToMonthEnd(idle.goldAct, currentDay, daysInMonth);
               sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
             }
             if (idle.wemixAct !== null) {
-              var wemixPaceA = projPace(r.weMixProj, r.weMixSubs);
               sr.weMixSubs = idle.wemixAct;
               sr.weMixPct  = r.weMixTarget > 0 ? idle.wemixAct / r.weMixTarget : 0;
-              sr.weMixProj = idle.wemixAct * wemixPaceA;
+              sr.weMixProj = projectToMonthEnd(idle.wemixAct, currentDay, daysInMonth);
               sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
             }
             return sr;
@@ -6621,10 +6621,6 @@ function loadMTDFile(file) {
 
       MTD_DATA = parsed;
       MTD_FILTERED = parsed.slice();
-
-      // Package Mix Breakdown (Tariffs Per Stoers) + Daily Trend (Stoers Daily)
-      try { MTD_PKGMIX = parsePkgMixSheet(wb); } catch(e) { console.warn('[PkgMix] parse failed', e); MTD_PKGMIX = null; }
-      try { MTD_DAILY  = parseDailySheet(wb);  } catch(e) { console.warn('[Daily] parse failed', e);  MTD_DAILY  = null; }
 
       document.getElementById('mtd-tab-btn').style.display = '';
       populateMTDFilters();
