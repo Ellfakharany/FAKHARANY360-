@@ -8777,7 +8777,7 @@ function renderMTDPkgDetail(rows, colSums, totalMobile, storeMeta) {
       var v = r.vals[col.ci] || 0;
       if (!v) return null;
       var meta = storeMeta[r.storeCode] || {};
-      return { storeCode: r.storeCode, store: meta.store || r.storeCode, supervisor: meta.supervisor || '', val: v };
+      return { storeCode: r.storeCode, store: meta.store || r.storeCode, supervisor: meta.supervisor || '', val: v, storeTotal: meta.mobileSubs || 0 };
     }).filter(Boolean).sort(function(a,b){ return b.val - a.val; });
   });
 
@@ -8847,6 +8847,7 @@ function renderMTDPkgColDrilldownList() {
     : visible.map(function(r,i){
         var bg = i%2===0 ? 'white' : '#fafafa';
         var barPct = data[0] && data[0].val>0 ? Math.round(r.val/data[0].val*100) : 0;
+        var ofTotal = r.storeTotal > 0 ? (r.val/r.storeTotal*100).toFixed(1) : null;
         return '<div style="display:table;width:100%;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
           '<div style="display:table-row">'+
           '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#9ca3af;width:32px">'+(i+1)+'</div>'+
@@ -8855,7 +8856,10 @@ function renderMTDPkgColDrilldownList() {
             '<div style="background:#f3f4f6;border-radius:3px;height:4px;margin-top:4px;width:130px"><div style="width:'+barPct+'%;height:100%;background:'+cat.color+';border-radius:3px"></div></div>'+
           '</div>'+
           '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#6b7280;vertical-align:middle;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis">'+r.supervisor+'</div>'+
-          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:15px;font-weight:800;color:'+cat.color+'">'+fmtN(r.val)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle">'+
+            '<div style="font-size:15px;font-weight:800;color:'+cat.color+'">'+fmtN(r.val)+'</div>'+
+            (ofTotal !== null ? '<div style="font-size:9px;color:#9ca3af;white-space:nowrap">'+ofTotal+'% of Ach ('+fmtN(r.storeTotal)+')</div>' : '')+
+          '</div>'+
           '</div></div>';
       }).join('');
 
