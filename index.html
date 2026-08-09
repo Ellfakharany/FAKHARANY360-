@@ -1720,6 +1720,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span style="color:#c0392b"><i class="fas fa-exclamation-triangle mr-2"></i>Low Performance Stores — Proj &lt; 100%</span>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button id="mtd-lp-target-toggle" onclick="toggleMTDLPTarget()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:white;color:#6b7280;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-eye-slash"></i> Hide Target</button>
             <button onclick="exportMTDLowPerf()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel"></i> Export</button>
             <button onclick="exportMTDLowPerfAll()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-export"></i> Export All</button>
           </div>
@@ -8456,6 +8457,17 @@ function setLowPerfProd(prod) {
 
 var MTD_LP_SHOW_ALL = false;
 var MTD_LP_PAGE_SIZE = 20;
+var MTD_LP_SHOW_TARGET = true;   // Target column visibility (for clean screenshots)
+function toggleMTDLPTarget() {
+  MTD_LP_SHOW_TARGET = !MTD_LP_SHOW_TARGET;
+  var btn = document.getElementById('mtd-lp-target-toggle');
+  if (btn) {
+    btn.innerHTML = MTD_LP_SHOW_TARGET
+      ? '<i class="fas fa-eye-slash"></i> Hide Target'
+      : '<i class="fas fa-eye"></i> Show Target';
+  }
+  renderMTDLowPerf();
+}
 
 function renderMTDLowPerf() {
   var wrap  = document.getElementById('mtd-lowperf-wrap');
@@ -8505,7 +8517,7 @@ function renderMTDLowPerf() {
   var thLeft ='padding:9px 14px;text-align:left;border-bottom:2px solid #fca5a5;white-space:nowrap;font-size:10px;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.05em';
   thead.innerHTML = '<tr style="background:#fef2f2">'+
     '<th style="'+thLeft+'">Store</th>'+
-    '<th style="'+thStyle+'">Target</th>'+
+    (MTD_LP_SHOW_TARGET ? '<th style="'+thStyle+'">Target</th>' : '')+
     '<th style="'+thStyle+'">Actual</th>'+
     '<th style="'+thStyle+'">Proj</th>'+
     '<th style="'+thStyle+'">Proj%</th>'+
@@ -8524,7 +8536,7 @@ function renderMTDLowPerf() {
         '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.store+'">'+r.store+'</div>'+
         '<div style="font-size:9px;color:#9ca3af;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.supervisor+'</div>'+
       '</td>'+
-      '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#6b7280;vertical-align:middle">'+fmtN(r.tgt)+'</td>'+
+      (MTD_LP_SHOW_TARGET ? '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#6b7280;vertical-align:middle">'+fmtN(r.tgt)+'</td>' : '')+
       '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:700;color:#374151;vertical-align:middle">'+fmtN(r.act)+'</td>'+
       '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:600;color:'+gapColor+';vertical-align:middle">'+fmtN(Math.round(r.proj))+'<div style="font-size:9px">'+gapStr+'</div></td>'+
       '<td style="padding:8px 10px;text-align:center;vertical-align:middle">'+
