@@ -5900,36 +5900,15 @@ async function handleAdminUpload(kind) {
 
       var mtdSalesData = [];
       if (idleData) {
-        mtdSalesData = parsed.map(function (r) {
-          var code = String(r.storeCode || '').trim().toUpperCase();
-          var idle = idleData[code];
-          var sr = Object.assign({}, r);
-          if (idle) {
-            sr.mobileSubs = idle.mobileSales; sr.mobilePct = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = projectToMonthEnd(idle.mobileSales, currentDay, daysInMonth);
-            sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
+        // Verified against real data: Database sheet's Subscriptions/Proj
+        // columns are Sales, not Activation (see loadMTDFile() for the
+        // sum-check evidence). So the Sales dataset needs no merging at
+        // all — Database's native values already ARE Sales.
+        mtdSalesData = parsed.map(function (r) { return Object.assign({}, r); });
 
-            sr.fixedSubs = idle.fixedSales; sr.fixedPct = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj = projectToMonthEnd(idle.fixedSales, currentDay, daysInMonth);
-            sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
-
-            sr.fbbSubs = idle.fbbSales; sr.fbbPct = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj = projectToMonthEnd(idle.fbbSales, currentDay, daysInMonth);
-            sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
-
-            if (idle.goldSales !== null) {
-              sr.goldSubs = idle.goldSales; sr.goldPct = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = projectToMonthEnd(idle.goldSales, currentDay, daysInMonth);
-              sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
-            }
-            if (idle.wemixSales !== null) {
-              sr.weMixSubs = idle.wemixSales; sr.weMixPct = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = projectToMonthEnd(idle.wemixSales, currentDay, daysInMonth);
-              sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
-            }
-          }
-          return sr;
-        });
+        // Build the Activation dataset from IDLE's "All Activation" column;
+        // Proj computed via day-count math since there's no native
+        // Activation Proj column to reuse (Database's Proj is Sales-based).
         parsed = parsed.map(function (r) {
           var code = String(r.storeCode || '').trim().toUpperCase();
           var idle = idleData[code];
@@ -6537,48 +6516,23 @@ function loadMTDFile(file) {
       if (idleData) {
         // Merge into MTD_DATA (Activation dataset, the default/current numbers
         // should match "All Activation"), and build a separate Sales dataset
-        MTD_SALES_DATA = parsed.map(function(r){
-          var code = String(r.storeCode||'').trim().toUpperCase();
-          var idle = idleData[code];
-          var sr = Object.assign({}, r); // clone all fields (region, supervisor, etc.)
-          if (idle) {
-            // Override the activation-based subscription numbers with Sales numbers,
-            // keep targets the same (targets don't change between activation/sales view).
-            // Proj = ActualToDate × (DaysInMonth ÷ CurrentDay) — simple day-count
-            // extrapolation, computed independently for Sales here (the source
-            // file's own "Proj" column is Activation-only and isn't reused).
-            sr.mobileSubs = idle.mobileSales;
-            sr.mobilePct  = r.mobileTarget > 0 ? idle.mobileSales / r.mobileTarget : 0;
-            sr.mobileProj = projectToMonthEnd(idle.mobileSales, currentDay, daysInMonth);
-            sr.mobileProjPct = r.mobileTarget > 0 ? sr.mobileProj / r.mobileTarget : 0;
+        //
+        // IMPORTANT (verified against this file's raw data): Database sheet's
+        // "Subscriptions"/"Proj" columns are actually SALES numbers, not
+        // Activation — confirmed by summing every store: Database Mobile
+        // Subscriptions totals 12,763, which matches IDLE "Mobile All Sales"
+        // (12,763) exactly, not "Mobile All Activation" (13,492). Same for
+        // Fixed (1,748 = 1,748). So the Sales dataset needs NO merging at
+        // all — Database's own Target/Subs/%/Proj/ProjPct already ARE Sales.
+        // It's the Activation dataset (below) that needs building from
+        // scratch using IDLE's "All Activation" column, since there's no
+        // native Activation Proj anywhere in the file.
+        MTD_SALES_DATA = parsed.map(function(r){ return Object.assign({}, r); });
 
-            sr.fixedSubs  = idle.fixedSales;
-            sr.fixedPct   = r.fixedTarget > 0 ? idle.fixedSales / r.fixedTarget : 0;
-            sr.fixedProj  = projectToMonthEnd(idle.fixedSales, currentDay, daysInMonth);
-            sr.fixedProjPct = r.fixedTarget > 0 ? sr.fixedProj / r.fixedTarget : 0;
-
-            sr.fbbSubs    = idle.fbbSales;
-            sr.fbbPct     = r.fbbTarget > 0 ? idle.fbbSales / r.fbbTarget : 0;
-            sr.fbbProj    = projectToMonthEnd(idle.fbbSales, currentDay, daysInMonth);
-            sr.fbbProjPct = r.fbbTarget > 0 ? sr.fbbProj / r.fbbTarget : 0;
-
-            if (idle.goldSales !== null) {
-              sr.goldSubs = idle.goldSales;
-              sr.goldPct  = r.goldTarget > 0 ? idle.goldSales / r.goldTarget : 0;
-              sr.goldProj = projectToMonthEnd(idle.goldSales, currentDay, daysInMonth);
-              sr.goldProjPct = r.goldTarget > 0 ? sr.goldProj / r.goldTarget : 0;
-            }
-            if (idle.wemixSales !== null) {
-              sr.weMixSubs = idle.wemixSales;
-              sr.weMixPct  = r.weMixTarget > 0 ? idle.wemixSales / r.weMixTarget : 0;
-              sr.weMixProj = projectToMonthEnd(idle.wemixSales, currentDay, daysInMonth);
-              sr.weMixProjPct = r.weMixTarget > 0 ? sr.weMixProj / r.weMixTarget : 0;
-            }
-          }
-          return sr;
-        });
-        // Also align MTD_DATA (Activation) numbers with the explicit "All Activation"
-        // column from IDLE when available, for full consistency with Sales toggle
+        // Build the Activation dataset from IDLE's "All Activation" column.
+        // Proj = ActualToDate × (DaysInMonth ÷ CurrentDay) — simple day-count
+        // extrapolation, computed here because (per above) there's no native
+        // Activation Proj column to reuse; Database's Proj is Sales-based.
         parsed = parsed.map(function(r){
           var code = String(r.storeCode||'').trim().toUpperCase();
           var idle = idleData[code];
