@@ -1754,6 +1754,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6" id="mtd-pkg-grid"></div>
         <div id="mtd-pkg-detail"></div>
+        <div id="mtd-pkg-col-drill" style="margin-top:12px"></div>
       </div>
 
       <!-- ── Tariff Mix (Low/Mid/High/12PT) — MTD scope, same concept as the Tariff Mix tab ── -->
@@ -8741,7 +8742,9 @@ function renderMTDPkgMix() {
     }).join('');
   }
 
-  renderMTDPkgDetail(rows, colSums, totalMobile);
+  var storeMeta = {};
+  MTD_FILTERED.forEach(function(r){ storeMeta[String(r.storeCode||'').trim().toUpperCase()] = r; });
+  renderMTDPkgDetail(rows, colSums, totalMobile, storeMeta);
 }
 
 function togglePkgCat(key) {
@@ -8749,31 +8752,124 @@ function togglePkgCat(key) {
   renderMTDPkgMix();
 }
 
-function renderMTDPkgDetail(rows, colSums, totalMobile) {
+// ── Per-package drill-down (e.g. click "Super Kix 29" to see which
+// branches sell it) — mirrors the Tariff Mix tier drill-down pattern.
+var MTD_PKG_ACTIVE_COL = null;    // active column index (string), or null
+var MTD_PKG_ACTIVE_CAT = null;    // category key of the active column (for header color)
+var MTD_PKG_DRILL_SHOW_ALL = false;
+var MTD_PKG_DRILL_PAGE_SIZE = 20;
+var MTD_PKG_COL_STORE_DATA = {};  // ci -> [{storeCode, store, supervisor, val}], rebuilt each render
+// Cache of the inputs from the last renderMTDPkgDetail call, so a drill-down
+// click can re-render just the detail panels (for the ▸ highlight) without
+// recomputing the whole Package Mix section.
+var MTD_PKG_LAST = null;
+
+function renderMTDPkgDetail(rows, colSums, totalMobile, storeMeta) {
   var el = document.getElementById('mtd-pkg-detail');
   if (!el) return;
+  MTD_PKG_LAST = { rows: rows, colSums: colSums, totalMobile: totalMobile, storeMeta: storeMeta };
+
+  // Build/refresh the per-store contributor list for every column so a
+  // click on any package row can show it instantly.
+  MTD_PKG_COL_STORE_DATA = {};
+  MTD_PKGMIX.cols.forEach(function(col){
+    MTD_PKG_COL_STORE_DATA[col.ci] = rows.map(function(r){
+      var v = r.vals[col.ci] || 0;
+      if (!v) return null;
+      var meta = storeMeta[r.storeCode] || {};
+      return { storeCode: r.storeCode, store: meta.store || r.storeCode, supervisor: meta.supervisor || '', val: v };
+    }).filter(Boolean).sort(function(a,b){ return b.val - a.val; });
+  });
+
   var panels = MTD_PKG_CATS.filter(function(c){ return MTD_PKG_EXPANDED[c.key]; }).map(function(c){
     var cols = MTD_PKGMIX.cols.filter(function(col){ return col.cat === c.key; })
-      .map(function(col){ return { label: col.label, v: colSums[col.ci]||0 }; })
+      .map(function(col){ return { ci: col.ci, label: col.label, v: colSums[col.ci]||0 }; })
       .filter(function(x){ return x.v > 0; })
       .sort(function(a,b){ return b.v - a.v; });
     var groupTotal = cols.reduce(function(s,x){ return s+x.v; }, 0);
     var subRows = cols.map(function(x){
       var barPct = groupTotal > 0 ? Math.round(x.v/groupTotal*100) : 0;
       var mobP = totalMobile > 0 ? (x.v/totalMobile*100).toFixed(1) : '0.0';
-      return '<div style="display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:11px">'+
-        '<span style="color:#374151;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+x.label+'</span>'+
+      var isActive = String(MTD_PKG_ACTIVE_COL) === String(x.ci);
+      return '<div onclick="showMTDPkgColDrilldown(\''+x.ci+'\',\''+c.key+'\')" style="cursor:pointer;display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid #f3f4f6;font-size:11px;border-radius:6px'+(isActive?';background:'+c.color+'12':'')+'">'+
+        '<span style="color:'+(isActive?c.color:'#374151')+';font-weight:'+(isActive?800:600)+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(isActive?'▸ ':'')+x.label+'</span>'+
         '<div style="background:#f3f4f6;border-radius:4px;height:6px;overflow:hidden"><div style="width:'+barPct+'%;height:100%;background:'+c.color+'88"></div></div>'+
         '<span style="font-weight:700;color:'+c.color+'">'+fmtN(x.v)+'</span>'+
         '<span style="color:#9ca3af;width:42px;text-align:right">'+mobP+'%</span>'+
       '</div>';
     }).join('') || '<div style="font-size:11px;color:#9ca3af;padding:8px 0">No sub-package data</div>';
     return '<div style="background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid '+c.color+';margin-bottom:12px">'+
-      '<div style="font-size:13px;font-weight:800;color:'+c.color+';margin-bottom:8px">'+c.icon+' '+c.label+'</div>'+
+      '<div style="font-size:13px;font-weight:800;color:'+c.color+';margin-bottom:2px">'+c.icon+' '+c.label+'</div>'+
+      '<div style="font-size:9px;color:#9ca3af;margin-bottom:6px">اضغط على أي باقة لمعرفة الفروع اللي بتبيعها</div>'+
       subRows+
     '</div>';
   });
   el.innerHTML = panels.join('');
+  renderMTDPkgColDrilldownList();
+}
+
+function showMTDPkgColDrilldown(ci, catKey) {
+  var key = String(ci);
+  if (String(MTD_PKG_ACTIVE_COL) === key) {
+    MTD_PKG_ACTIVE_COL = null;
+    MTD_PKG_ACTIVE_CAT = null;
+  } else {
+    MTD_PKG_ACTIVE_COL = key;
+    MTD_PKG_ACTIVE_CAT = catKey;
+  }
+  MTD_PKG_DRILL_SHOW_ALL = false;
+  // Re-render the detail panels (so the ▸ highlight moves to the clicked
+  // row) using the cached inputs, then the drill-down list underneath.
+  if (MTD_PKG_LAST) renderMTDPkgDetail(MTD_PKG_LAST.rows, MTD_PKG_LAST.colSums, MTD_PKG_LAST.totalMobile, MTD_PKG_LAST.storeMeta);
+}
+
+function renderMTDPkgColDrilldownList() {
+  var el = document.getElementById('mtd-pkg-col-drill');
+  if (!el) return;
+  if (MTD_PKG_ACTIVE_COL === null || !MTD_PKGMIX) { el.innerHTML = ''; return; }
+
+  var col = MTD_PKGMIX.cols.find(function(c){ return String(c.ci) === String(MTD_PKG_ACTIVE_COL); });
+  if (!col) { el.innerHTML = ''; return; }
+  var cat = MTD_PKG_CATS.find(function(c){ return c.key === (MTD_PKG_ACTIVE_CAT || col.cat); }) || MTD_PKG_CATS[MTD_PKG_CATS.length-1];
+  var data = MTD_PKG_COL_STORE_DATA[col.ci] || [];
+  var totalCount = data.length;
+  var visible = MTD_PKG_DRILL_SHOW_ALL ? data : data.slice(0, MTD_PKG_DRILL_PAGE_SIZE);
+  var hasMore = totalCount > MTD_PKG_DRILL_PAGE_SIZE;
+  var colTotal = data.reduce(function(s,x){ return s+x.val; }, 0);
+
+  var header = '<div style="display:flex;align-items:center;justify-content:space-between;background:'+cat.color+';color:white;padding:10px 16px;border-radius:12px 12px 0 0">'+
+    '<span style="font-size:12px;font-weight:800"><i class="fas fa-layer-group mr-1"></i>'+col.label+' — '+fmtN(colTotal)+' ('+totalCount+' فرع)</span>'+
+    '<span onclick="showMTDPkgColDrilldown(\''+col.ci+'\',\''+col.cat+'\')" style="cursor:pointer;opacity:.85">✕</span>'+
+  '</div>';
+
+  var rows = visible.length === 0
+    ? '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">لا توجد فروع</div>'
+    : visible.map(function(r,i){
+        var bg = i%2===0 ? 'white' : '#fafafa';
+        var barPct = data[0] && data[0].val>0 ? Math.round(r.val/data[0].val*100) : 0;
+        return '<div style="display:table;width:100%;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+          '<div style="display:table-row">'+
+          '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#9ca3af;width:32px">'+(i+1)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;vertical-align:middle">'+
+            '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="'+r.store+'">'+r.store+'</div>'+
+            '<div style="background:#f3f4f6;border-radius:3px;height:4px;margin-top:4px;width:130px"><div style="width:'+barPct+'%;height:100%;background:'+cat.color+';border-radius:3px"></div></div>'+
+          '</div>'+
+          '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#6b7280;vertical-align:middle;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis">'+r.supervisor+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:15px;font-weight:800;color:'+cat.color+'">'+fmtN(r.val)+'</div>'+
+          '</div></div>';
+      }).join('');
+
+  var pagination = '';
+  if (hasMore) {
+    pagination = '<div style="padding:12px;text-align:center;border-top:1px solid #f3f4f6;background:#fafafa">' +
+      (MTD_PKG_DRILL_SHOW_ALL
+        ? '<button onclick="MTD_PKG_DRILL_SHOW_ALL=false;renderMTDPkgColDrilldownList()" style="padding:6px 18px;border-radius:16px;border:1.5px solid '+cat.color+';background:white;color:'+cat.color+';font-size:11px;font-weight:700;cursor:pointer">Show First '+MTD_PKG_DRILL_PAGE_SIZE+' Only</button>'
+        : '<span style="font-size:11px;color:#6b7280;margin-right:10px">عرض '+MTD_PKG_DRILL_PAGE_SIZE+' من '+totalCount+' فرع</span>'+
+          '<button onclick="MTD_PKG_DRILL_SHOW_ALL=true;renderMTDPkgColDrilldownList()" style="padding:6px 18px;border-radius:16px;border:1.5px solid '+cat.color+';background:'+cat.color+';color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+totalCount+')</button>'
+      )+'</div>';
+  }
+
+  el.innerHTML = '<div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">'+header+rows+pagination+'</div>';
 }
 
 // ── Password-protected Excel export helper ─────────────────────
