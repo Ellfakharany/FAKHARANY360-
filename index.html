@@ -1268,6 +1268,16 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="chart-card mb-6" style="padding:0;overflow-x:auto">
         <div id="team-pivot-table"></div>
       </div>
+
+      <!-- CLASSIFICATION PERFORMANCE -->
+      <div class="section-title"><i class="fas fa-tags mr-2"></i>Classification Performance</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">بيحترم كل الفلاتر الحالية (Regional Manager, Area Manager, Supervisor, Month...) ما عدا فلتر الـ Classification نفسه — عشان تقدر تقارن كل التصنيفات مع بعض. دوس على أي تصنيف تشوف الفروع اللي تحته.</div>
+      <div class="chart-card mb-6" style="padding:14px">
+        <div id="class-perf-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+        <div id="class-perf-table" style="overflow-x:auto"></div>
+        <div id="class-perf-drill" style="margin-top:12px"></div>
+      </div>
+
     </div>
 
     <!-- PRODUCTS TAB -->
@@ -1700,6 +1710,15 @@ document.addEventListener('DOMContentLoaded', function() {
         <div style="overflow-x:auto">
           <div id="mtd-team-pivot-table"></div>
         </div>
+      </div>
+
+      <!-- CLASSIFICATION PERFORMANCE (MTD) -->
+      <div class="section-title"><i class="fas fa-tags mr-2"></i>Classification Performance</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">بيحترم كل الفلاتر الحالية (Region, Regional Manager, Area Manager, Supervisor...) ما عدا فلتر الـ Classification نفسه، وبيتبع وضع Activation/Sales الحالي — عشان تقدر تقارن كل التصنيفات مع بعض. دوس على أي تصنيف تشوف الفروع اللي تحته.</div>
+      <div style="background:white;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:24px">
+        <div id="mtd-class-perf-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+        <div id="mtd-class-perf-table" style="overflow-x:auto"></div>
+        <div id="mtd-class-perf-drill" style="margin-top:12px"></div>
       </div>
 
 
@@ -2305,7 +2324,7 @@ function renderAll() {
   renderExecKPIs();
   renderProductKPIs('product-kpi-grid');
   renderProductKPIs('product-kpi-grid2');
-  if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); }
+  if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); }
   if (activeTab === 'products') { renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (activeTab === 'tariff') { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (activeTab === 'rankings') { renderAllRankings(); }
@@ -2529,6 +2548,178 @@ function renderTeamPivot() {
   body += tpRow('GRAND TOTAL', 0, filteredData, { bg:'#1a1a2e', color:'white', fw:900, fs:13, isLast:true });
 
   el.innerHTML = thead + body + '</tbody></table>';
+}
+
+// ── Classification Performance (Overview tab) ──────────────────────────────
+// Shows every classification (Express, Franchise, ...) side by side for one
+// selected product, respecting every currently-active filter EXCEPT the
+// Classification filter itself (so all classifications stay visible at
+// once, even if a classification is also selected globally elsewhere).
+var CLASS_PERF_PROD = 'mobile';
+var CLASS_PERF_ACTIVE = null;   // currently drilled-down classification, or null
+var CLASS_PERF_SHOW_ALL = false;
+var CLASS_PERF_PAGE_SIZE = 20;
+
+// Re-applies every filter from applyFilters() except the classification one.
+function getDataExceptClassFilter() {
+  var get = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+  var rm = get('f-regMgr'), sv = get('f-supervisor'), am = get('f-areaMgr');
+  var ac = get('f-accMgr'), pt = get('f-partner'), mo = get('f-month');
+  return RAW_DATA.filter(function(r){
+    return (!rm || r.regionalManager === rm) &&
+      (!sv || r.supervisor === sv) &&
+      (!am || r.areaManager === am) &&
+      (!ac || r.accountManager === ac) &&
+      (!pt || r.partner === pt) &&
+      (!selectedStore || (r.storeCode || r.store) === selectedStore) &&
+      (!mo || r.month === mo);
+  });
+}
+
+function setClassPerfProd(key) {
+  CLASS_PERF_PROD = key;
+  CLASS_PERF_ACTIVE = null;
+  CLASS_PERF_SHOW_ALL = false;
+  renderClassPerf();
+}
+
+function renderClassPerf() {
+  var pillsEl = document.getElementById('class-perf-pills');
+  var tableEl = document.getElementById('class-perf-table');
+  if (!pillsEl || !tableEl) return;
+
+  pillsEl.innerHTML = PRODUCTS.map(function(p){
+    var active = CLASS_PERF_PROD === p.key;
+    return '<button onclick="setClassPerfProd(\''+p.key+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid '+(active?p.color:'#e5e7eb')+';background:'+(active?p.color:'white')+';color:'+(active?'white':'#374151')+'"><i class="fas '+p.icon+'"></i>'+p.label+'</button>';
+  }).join('');
+
+  var prod = PRODUCTS.find(function(p){ return p.key === CLASS_PERF_PROD; }) || PRODUCTS[0];
+  var base = getDataExceptClassFilter();
+  var classes = [...new Set(base.map(function(r){ return r.classification; }).filter(Boolean))].sort();
+
+  var byClass = classes.map(function(cls){
+    var rows = base.filter(function(r){ return r.classification === cls; });
+    var g = calcGroup(rows);
+    return { cls: cls, storeCount: g.storeCount, target: g[prod.tKey]||0, ach: g[prod.aKey]||0, rows: rows };
+  });
+  var grandAch = byClass.reduce(function(s,x){ return s+x.ach; }, 0);
+  byClass.sort(function(a,b){ return b.ach - a.ach; });
+
+  var thStyle = 'padding:9px 12px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.03em;text-align:center';
+  var thead = '<tr style="background:#5E2D91">'+
+    '<th style="'+thStyle+';text-align:left">Classification</th>'+
+    '<th style="'+thStyle+'">Stores</th>'+
+    '<th style="'+thStyle+'">Target</th>'+
+    '<th style="'+thStyle+'">Achievement</th>'+
+    '<th style="'+thStyle+'">Ach%</th>'+
+    '<th style="'+thStyle+'">Contribution%</th>'+
+  '</tr>';
+
+  var body = byClass.map(function(x,i){
+    var ap = pct(x.ach, x.target);
+    var apNum = parseFloat(ap);
+    var contrib = grandAch > 0 ? (x.ach/grandAch*100).toFixed(1) : '0.0';
+    var isActive = CLASS_PERF_ACTIVE === x.cls;
+    var bg = isActive ? '#f3e8ff' : (i%2===0 ? 'white' : '#faf9fb');
+    var apColor = apNum>=100 ? '#22c55e' : (apNum>=70 ? '#f59e0b' : '#ef4444');
+    return '<tr onclick="showClassPerfDrilldown(\''+x.cls.replace(/'/g,"\\'")+'\')" style="cursor:pointer;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:9px 12px;font-size:12px;font-weight:700;color:'+(isActive?'#5E2D91':'#374151')+'">'+(isActive?'▸ ':'')+x.cls+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;color:#6b7280">'+fmtN(x.storeCount)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;color:#6b7280">'+fmtN(x.target)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#374151">'+fmtN(x.ach)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center"><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:800;background:'+apColor+'18;color:'+apColor+'">'+ap+'%</span></td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+contrib+'%</td>'+
+    '</tr>';
+  }).join('');
+
+  var totalRow = '<tr style="background:#f3e8ff;border-top:2px solid #5E2D91">'+
+    '<td style="padding:9px 12px;font-size:12px;font-weight:800;color:#5E2D91">Total</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+fmtN(new Set(base.map(function(r){return r.store;})).size)+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+fmtN(byClass.reduce(function(s,x){return s+x.target;},0))+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">'+fmtN(grandAch)+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">'+pct(grandAch, byClass.reduce(function(s,x){return s+x.target;},0))+'%</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">100%</td>'+
+  '</tr>';
+
+  tableEl.innerHTML = classes.length === 0
+    ? '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">لا توجد بيانات تصنيف في العرض الحالي</div>'
+    : '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">'+
+        '<thead>'+thead+'</thead><tbody>'+body+totalRow+'</tbody></table>';
+
+  // stash for the drill-down renderer
+  CLASS_PERF_LAST = { byClass: byClass, prod: prod };
+  renderClassPerfDrilldown();
+}
+
+var CLASS_PERF_LAST = null;
+
+function showClassPerfDrilldown(cls) {
+  CLASS_PERF_ACTIVE = (CLASS_PERF_ACTIVE === cls) ? null : cls;
+  CLASS_PERF_SHOW_ALL = false;
+  renderClassPerf();
+}
+
+function renderClassPerfDrilldown() {
+  var el = document.getElementById('class-perf-drill');
+  if (!el) return;
+  if (!CLASS_PERF_ACTIVE || !CLASS_PERF_LAST) { el.innerHTML = ''; return; }
+
+  var prod = CLASS_PERF_LAST.prod;
+  var group = CLASS_PERF_LAST.byClass.find(function(x){ return x.cls === CLASS_PERF_ACTIVE; });
+  if (!group) { el.innerHTML = ''; return; }
+
+  // one line per store (RAW_DATA is month-granular, so combine by store code)
+  var byStore = {};
+  group.rows.forEach(function(r){
+    var code = r.storeCode || r.store || '—';
+    if (!byStore[code]) byStore[code] = { store: r.store || code, supervisor: r.supervisor||'', rows: [] };
+    byStore[code].rows.push(r);
+  });
+  var data = Object.keys(byStore).map(function(code){
+    var g = calcGroup(byStore[code].rows);
+    return { store: byStore[code].store, supervisor: byStore[code].supervisor, target: g[prod.tKey]||0, ach: g[prod.aKey]||0 };
+  }).sort(function(a,b){ return b.ach - a.ach; });
+
+  var totalCount = data.length;
+  var visible = CLASS_PERF_SHOW_ALL ? data : data.slice(0, CLASS_PERF_PAGE_SIZE);
+  var hasMore = totalCount > CLASS_PERF_PAGE_SIZE;
+
+  var header = '<div style="display:flex;align-items:center;justify-content:space-between;background:#5E2D91;color:white;padding:10px 16px;border-radius:12px 12px 0 0">'+
+    '<span style="font-size:12px;font-weight:800"><i class="fas fa-tags mr-1"></i>'+CLASS_PERF_ACTIVE+' — '+prod.label+' ('+totalCount+' فرع)</span>'+
+    '<span onclick="showClassPerfDrilldown(\''+CLASS_PERF_ACTIVE.replace(/'/g,"\\'")+'\')" style="cursor:pointer;opacity:.85">✕</span>'+
+  '</div>';
+
+  var rows = visible.length === 0
+    ? '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">لا توجد فروع</div>'
+    : visible.map(function(r,i){
+        var bg = i%2===0 ? 'white' : '#fafafa';
+        var ap = pct(r.ach, r.target);
+        var apNum = parseFloat(ap);
+        var apColor = apNum>=100 ? '#22c55e' : (apNum>=70 ? '#f59e0b' : '#ef4444');
+        return '<div style="display:table;width:100%;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+          '<div style="display:table-row">'+
+          '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#9ca3af;width:32px">'+(i+1)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;vertical-align:middle">'+
+            '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="'+r.store+'">'+r.store+'</div>'+
+            '<div style="font-size:9px;color:#9ca3af">'+r.supervisor+'</div>'+
+          '</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:11px;color:#6b7280">'+fmtN(r.target)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:14px;font-weight:800;color:#374151">'+fmtN(r.ach)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle"><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:800;background:'+apColor+'18;color:'+apColor+'">'+ap+'%</span></div>'+
+          '</div></div>';
+      }).join('');
+
+  var pagination = '';
+  if (hasMore) {
+    pagination = '<div style="padding:12px;text-align:center;border-top:1px solid #f3f4f6;background:#fafafa">' +
+      (CLASS_PERF_SHOW_ALL
+        ? '<button onclick="CLASS_PERF_SHOW_ALL=false;renderClassPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:11px;font-weight:700;cursor:pointer">Show First '+CLASS_PERF_PAGE_SIZE+' Only</button>'
+        : '<span style="font-size:11px;color:#6b7280;margin-right:10px">عرض '+CLASS_PERF_PAGE_SIZE+' من '+totalCount+' فرع</span>'+
+          '<button onclick="CLASS_PERF_SHOW_ALL=true;renderClassPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:#5E2D91;color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+totalCount+')</button>'
+      )+'</div>';
+  }
+
+  el.innerHTML = '<div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">'+header+rows+pagination+'</div>';
 }
 
 // ── Export just this section: Summary sheet mirrors the pivot exactly as
@@ -7430,6 +7621,192 @@ function mtdSum(rows,key){ return rows.reduce(function(s,r){return s+(Number(r[k
 function mtdPct(a,t){ return t>0?(a/t*100).toFixed(1):'0.0'; }
 function mtdColor(v){ return v>=100?'#22c55e':v>=80?'#eab308':'#ef4444'; }
 
+// ── Classification Performance (MTD tab) ────────────────────────────────
+// Mirrors renderClassPerf() from the Overview tab: shows every
+// classification side by side for one selected product, respecting every
+// currently-active MTD filter EXCEPT Classification itself, and following
+// whichever Activation/Sales mode is currently selected.
+var MTD_CLASS_PERF_PROD = 'mobile';
+var MTD_CLASS_PERF_ACTIVE = null;
+var MTD_CLASS_PERF_SHOW_ALL = false;
+var MTD_CLASS_PERF_PAGE_SIZE = 20;
+var MTD_CLASS_PERF_LAST = null;
+var MTD_CLASS_PROD_META = {
+  mobile: { label:'Mobile',  icon:'fa-mobile-alt',      color:'#5E2D91' },
+  fbb:    { label:'FBB',     icon:'fa-wifi',            color:'#2563eb' },
+  fixed:  { label:'Fixed',   icon:'fa-phone',           color:'#16a34a' },
+  fwa:    { label:'WE Air',  icon:'fa-broadcast-tower', color:'#0891b2' },
+  gold:   { label:'WE Gold', icon:'fa-star',            color:'#f5a623' },
+  wallet: { label:'Wallet',  icon:'fa-wallet',          color:'#e91e8c' }
+};
+
+// Re-applies every filter from getMTDFiltered() except classification.
+function getMTDDataExceptClassFilter() {
+  var get=function(id){return (document.getElementById(id)||{}).value||'';};
+  var region=get('mtd-f-region'), rm=get('mtd-f-rm'), am=get('mtd-f-am'), sv=get('mtd-f-sv');
+  var acc=get('mtd-f-acc'), partner=get('mtd-f-partner');
+  return getMTDActiveDataset().filter(function(r){
+    if(region && r.region!==region) return false;
+    if(rm && r.regionalManager!==rm) return false;
+    if(am && r.areaManager!==am) return false;
+    if(sv && r.supervisor!==sv) return false;
+    if(acc && r.accountManager!==acc) return false;
+    if(partner && r.partner!==partner) return false;
+    if(MTD_SELECTED_STORE && r.store!==MTD_SELECTED_STORE) return false;
+    return true;
+  });
+}
+
+function setMTDClassPerfProd(key) {
+  MTD_CLASS_PERF_PROD = key;
+  MTD_CLASS_PERF_ACTIVE = null;
+  MTD_CLASS_PERF_SHOW_ALL = false;
+  renderMTDClassPerf();
+}
+
+function renderMTDClassPerf() {
+  var pillsEl = document.getElementById('mtd-class-perf-pills');
+  var tableEl = document.getElementById('mtd-class-perf-table');
+  if (!pillsEl || !tableEl || !MTD_FILTERED.length) { if (tableEl) tableEl.innerHTML=''; if(pillsEl) pillsEl.innerHTML=''; return; }
+
+  pillsEl.innerHTML = MTD_TP_PRODUCTS.map(function(p){
+    var meta = MTD_CLASS_PROD_META[p.key] || {};
+    var active = MTD_CLASS_PERF_PROD === p.key;
+    var color = meta.color || '#5E2D91';
+    return '<button onclick="setMTDClassPerfProd(\''+p.key+'\')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid '+(active?color:'#e5e7eb')+';background:'+(active?color:'white')+';color:'+(active?'white':'#374151')+'"><i class="fas '+(meta.icon||'fa-box')+'"></i>'+p.label+'</button>';
+  }).join('');
+
+  var prodKey = MTD_CLASS_PERF_PROD;
+  var prodMeta = MTD_CLASS_PROD_META[prodKey] || {};
+  var base = getMTDDataExceptClassFilter();
+  var classes = [...new Set(base.map(function(r){ return r.classification; }).filter(Boolean))].sort();
+
+  var byClass = classes.map(function(cls){
+    var rows = base.filter(function(r){ return r.classification === cls; });
+    var g = mtdQcCalcGroup(rows);
+    return { cls: cls, storeCount: rows.length, target: g[prodKey].tgt||0, ach: g[prodKey].act||0, rows: rows };
+  });
+  var grandAch = byClass.reduce(function(s,x){ return s+x.ach; }, 0);
+  byClass.sort(function(a,b){ return b.ach - a.ach; });
+
+  var thStyle = 'padding:9px 12px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.03em;text-align:center';
+  var thead = '<tr style="background:#5E2D91">'+
+    '<th style="'+thStyle+';text-align:left">Classification</th>'+
+    '<th style="'+thStyle+'">Stores</th>'+
+    '<th style="'+thStyle+'">Target</th>'+
+    '<th style="'+thStyle+'">Achievement</th>'+
+    '<th style="'+thStyle+'">Ach%</th>'+
+    '<th style="'+thStyle+'">Contribution%</th>'+
+  '</tr>';
+
+  var body = byClass.map(function(x,i){
+    var ap = mtdPct(x.ach, x.target);
+    var apNum = parseFloat(ap);
+    var contrib = grandAch > 0 ? (x.ach/grandAch*100).toFixed(1) : '0.0';
+    var isActive = MTD_CLASS_PERF_ACTIVE === x.cls;
+    var bg = isActive ? '#f3e8ff' : (i%2===0 ? 'white' : '#faf9fb');
+    var apColor = mtdColor(apNum);
+    return '<tr onclick="showMTDClassPerfDrilldown(\''+x.cls.replace(/'/g,"\\'")+'\')" style="cursor:pointer;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:9px 12px;font-size:12px;font-weight:700;color:'+(isActive?'#5E2D91':'#374151')+'">'+(isActive?'▸ ':'')+x.cls+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;color:#6b7280">'+fmtN(x.storeCount)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;color:#6b7280">'+fmtN(Math.round(x.target))+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#374151">'+fmtN(Math.round(x.ach))+'</td>'+
+      '<td style="padding:9px 12px;text-align:center"><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:800;background:'+apColor+'18;color:'+apColor+'">'+ap+'%</span></td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+contrib+'%</td>'+
+    '</tr>';
+  }).join('');
+
+  var totalTarget = byClass.reduce(function(s,x){return s+x.target;},0);
+  var totalRow = '<tr style="background:#f3e8ff;border-top:2px solid #5E2D91">'+
+    '<td style="padding:9px 12px;font-size:12px;font-weight:800;color:#5E2D91">Total</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+fmtN(base.length)+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:700;color:#5E2D91">'+fmtN(Math.round(totalTarget))+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">'+fmtN(Math.round(grandAch))+'</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">'+mtdPct(grandAch, totalTarget)+'%</td>'+
+    '<td style="padding:9px 12px;text-align:center;font-size:12px;font-weight:800;color:#5E2D91">100%</td>'+
+  '</tr>';
+
+  tableEl.innerHTML = classes.length === 0
+    ? '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">لا توجد بيانات تصنيف في العرض الحالي</div>'
+    : '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">'+
+        '<thead>'+thead+'</thead><tbody>'+body+totalRow+'</tbody></table>';
+
+  MTD_CLASS_PERF_LAST = { byClass: byClass, prodKey: prodKey, prodMeta: prodMeta };
+  renderMTDClassPerfDrilldown();
+}
+
+function showMTDClassPerfDrilldown(cls) {
+  MTD_CLASS_PERF_ACTIVE = (MTD_CLASS_PERF_ACTIVE === cls) ? null : cls;
+  MTD_CLASS_PERF_SHOW_ALL = false;
+  renderMTDClassPerf();
+}
+
+function renderMTDClassPerfDrilldown() {
+  var el = document.getElementById('mtd-class-perf-drill');
+  if (!el) return;
+  if (!MTD_CLASS_PERF_ACTIVE || !MTD_CLASS_PERF_LAST) { el.innerHTML = ''; return; }
+
+  var prodKey = MTD_CLASS_PERF_LAST.prodKey;
+  var prodMeta = MTD_CLASS_PERF_LAST.prodMeta;
+  var group = MTD_CLASS_PERF_LAST.byClass.find(function(x){ return x.cls === MTD_CLASS_PERF_ACTIVE; });
+  if (!group) { el.innerHTML = ''; return; }
+
+  // MTD_FILTERED is already one row per store (no month-series), so no
+  // per-store aggregation is needed — just read each row's product fields.
+  var data = group.rows.map(function(r){
+    var t, a;
+    if (prodKey === 'wallet') {
+      var wk = String(r.storeCode||'').trim().toUpperCase();
+      var w = (typeof WALLET_DATA!=='undefined' && WALLET_DATA[wk]) || {};
+      t = Number(w.walletTarget)||0; a = Number(w.walletSales)||0;
+    } else {
+      var p = MTD_PRODS[prodKey];
+      t = Number(r[p.tKey])||0; a = Number(r[p.aKey])||0;
+    }
+    return { store: r.store || r.storeCode, supervisor: r.supervisor||'', target: t, ach: a };
+  }).sort(function(a,b){ return b.ach - a.ach; });
+
+  var totalCount = data.length;
+  var visible = MTD_CLASS_PERF_SHOW_ALL ? data : data.slice(0, MTD_CLASS_PERF_PAGE_SIZE);
+  var hasMore = totalCount > MTD_CLASS_PERF_PAGE_SIZE;
+
+  var header = '<div style="display:flex;align-items:center;justify-content:space-between;background:#5E2D91;color:white;padding:10px 16px;border-radius:12px 12px 0 0">'+
+    '<span style="font-size:12px;font-weight:800"><i class="fas fa-tags mr-1"></i>'+MTD_CLASS_PERF_ACTIVE+' — '+(prodMeta.label||prodKey)+' ('+totalCount+' فرع)</span>'+
+    '<span onclick="showMTDClassPerfDrilldown(\''+MTD_CLASS_PERF_ACTIVE.replace(/'/g,"\\'")+'\')" style="cursor:pointer;opacity:.85">✕</span>'+
+  '</div>';
+
+  var rows = visible.length === 0
+    ? '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">لا توجد فروع</div>'
+    : visible.map(function(r,i){
+        var bg = i%2===0 ? 'white' : '#fafafa';
+        var ap = mtdPct(r.ach, r.target);
+        var apColor = mtdColor(parseFloat(ap));
+        return '<div style="display:table;width:100%;background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+          '<div style="display:table-row">'+
+          '<div style="display:table-cell;padding:7px 14px;font-size:11px;color:#9ca3af;width:32px">'+(i+1)+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;vertical-align:middle">'+
+            '<div style="font-size:11px;font-weight:600;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="'+r.store+'">'+r.store+'</div>'+
+            '<div style="font-size:9px;color:#9ca3af">'+r.supervisor+'</div>'+
+          '</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:11px;color:#6b7280">'+fmtN(Math.round(r.target))+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle;font-size:14px;font-weight:800;color:#374151">'+fmtN(Math.round(r.ach))+'</div>'+
+          '<div style="display:table-cell;padding:7px 14px;text-align:center;vertical-align:middle"><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:800;background:'+apColor+'18;color:'+apColor+'">'+ap+'%</span></div>'+
+          '</div></div>';
+      }).join('');
+
+  var pagination = '';
+  if (hasMore) {
+    pagination = '<div style="padding:12px;text-align:center;border-top:1px solid #f3f4f6;background:#fafafa">' +
+      (MTD_CLASS_PERF_SHOW_ALL
+        ? '<button onclick="MTD_CLASS_PERF_SHOW_ALL=false;renderMTDClassPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:11px;font-weight:700;cursor:pointer">Show First '+MTD_CLASS_PERF_PAGE_SIZE+' Only</button>'
+        : '<span style="font-size:11px;color:#6b7280;margin-right:10px">عرض '+MTD_CLASS_PERF_PAGE_SIZE+' من '+totalCount+' فرع</span>'+
+          '<button onclick="MTD_CLASS_PERF_SHOW_ALL=true;renderMTDClassPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:#5E2D91;color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+totalCount+')</button>'
+      )+'</div>';
+  }
+
+  el.innerHTML = '<div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">'+header+rows+pagination+'</div>';
+}
+
 // ══════════════════════════════════════════════════════════════
 //  MTD QUICK COMPARE — same idea as the Overview Quick Compare,
 //  adapted to MTD's dimensions (Day instead of Month, plus Region/
@@ -8188,6 +8565,7 @@ function renderMTD() {
     renderMTDPkgMix();
     renderMTDTariffMix();
     renderMTDTeamPivot();
+    renderMTDClassPerf();
     applyMTDView();
     renderMTDTable();
   }
