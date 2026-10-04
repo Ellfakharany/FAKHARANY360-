@@ -1282,13 +1282,16 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="section-title"><i class="fas fa-calendar-alt mr-2"></i>Monthly Performance</div>
       <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">بيحترم كل الفلاتر الحالية (Regional Manager, Area Manager, Supervisor, Classification, Store...) ما عدا فلتر الـ Month نفسه — عشان تقدر تشوف الأداء من أول شهر لحد آخر شهر متاح مرة واحدة.</div>
       <div class="chart-card mb-6" style="padding:14px">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <button onclick="exportMonthlyPerf()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;border:none;border-radius:18px;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel"></i> Export</button>
           <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:18px;padding:3px">
             <button id="monthly-perf-metric-ach" onclick="setMonthlyPerfMetric('ach')" style="padding:5px 12px;border-radius:14px;font-size:10px;font-weight:700;border:none;cursor:pointer;background:#5E2D91;color:white">Achievement</button>
             <button id="monthly-perf-metric-details" onclick="setMonthlyPerfMetric('details')" style="padding:5px 12px;border-radius:14px;font-size:10px;font-weight:700;border:none;cursor:pointer;background:transparent;color:#6b7280">Target / Ach / %</button>
           </div>
         </div>
+        <div style="font-size:9px;color:#9ca3af;margin-bottom:6px">اضغط على اسم أي شهر لعرض الفروع وأداءها في الشهر ده</div>
         <div id="monthly-perf-table" style="overflow-x:auto"></div>
+        <div id="monthly-perf-drill" style="margin-top:12px"></div>
       </div>
 
     </div>
@@ -2768,14 +2771,20 @@ function setMonthlyPerfMetric(metric) {
   renderMonthlyPerf();
 }
 
+var MONTHLY_PERF_LAST = null;
+var MONTHLY_PERF_ACTIVE_MONTH = null;
+var MONTHLY_PERF_DRILL_SHOW_ALL = false;
+var MONTHLY_PERF_DRILL_PAGE_SIZE = 20;
+
 function renderMonthlyPerf() {
   var el = document.getElementById('monthly-perf-table');
   if (!el) return;
 
   var base = getDataExceptMonthFilter();
   var months = MONTH_ORDER.filter(function(m){ return base.some(function(r){ return r.month === m; }); });
+  MONTHLY_PERF_LAST = { base: base, months: months };
 
-  if (!months.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">لا توجد بيانات في العرض الحالي</div>'; return; }
+  if (!months.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">لا توجد بيانات في العرض الحالي</div>'; document.getElementById('monthly-perf-drill').innerHTML=''; return; }
 
   var details = MONTHLY_PERF_METRIC === 'details';
   var colsPerProduct = details ? 3 : 1;
@@ -2809,8 +2818,9 @@ function renderMonthlyPerf() {
         '<div style="font-size:9px;font-weight:700;color:'+apColor+'">'+ap+'%</div>'+
       '</td>';
     }).join('');
-    return '<tr style="background:'+bg+';border-bottom:1px solid #f3f4f6">'+
-      '<td style="padding:8px 12px;font-size:12px;font-weight:700;color:#374151;white-space:nowrap">'+(MONTH_LABELS[m]||m)+'</td>'+
+    var isActive = MONTHLY_PERF_ACTIVE_MONTH === m;
+    return '<tr style="background:'+(isActive?'#f3e8ff':bg)+';border-bottom:1px solid #f3f4f6">'+
+      '<td onclick="showMonthlyPerfDrilldown(\''+m+'\')" style="cursor:pointer;padding:8px 12px;font-size:12px;font-weight:700;color:'+(isActive?'#5E2D91':'#374151')+';white-space:nowrap">'+(isActive?'▸ ':'')+(MONTH_LABELS[m]||m)+'</td>'+
       cells+
     '</tr>';
   }).join('');
@@ -2838,6 +2848,145 @@ function renderMonthlyPerf() {
 
   el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">'+
     '<thead>'+thead+'</thead><tbody>'+body+totalRow+'</tbody></table>';
+
+  renderMonthlyPerfDrilldown();
+}
+
+function showMonthlyPerfDrilldown(m) {
+  MONTHLY_PERF_ACTIVE_MONTH = (MONTHLY_PERF_ACTIVE_MONTH === m) ? null : m;
+  MONTHLY_PERF_DRILL_SHOW_ALL = false;
+  renderMonthlyPerf();
+}
+
+function renderMonthlyPerfDrilldown() {
+  var el = document.getElementById('monthly-perf-drill');
+  if (!el) return;
+  if (!MONTHLY_PERF_ACTIVE_MONTH || !MONTHLY_PERF_LAST) { el.innerHTML = ''; return; }
+
+  var m = MONTHLY_PERF_ACTIVE_MONTH;
+  var details = MONTHLY_PERF_METRIC === 'details';
+  var rows = MONTHLY_PERF_LAST.base.filter(function(r){ return r.month === m; });
+
+  // Group by store (RAW_DATA is store-month, but group defensively in case
+  // of duplicate entries for the same store/month).
+  var byStore = {};
+  rows.forEach(function(r){
+    var code = r.storeCode || r.store;
+    if (!byStore[code]) byStore[code] = { store: r.store, supervisor: r.supervisor||'', rows: [] };
+    byStore[code].rows.push(r);
+  });
+  var data = Object.keys(byStore).map(function(code){
+    var g = calcGroup(byStore[code].rows);
+    return { store: byStore[code].store, supervisor: byStore[code].supervisor, g: g };
+  });
+  data.sort(function(a,b){
+    var sa = PRODUCTS.reduce(function(s,p){ return s+(a.g[p.aKey]||0); }, 0);
+    var sb = PRODUCTS.reduce(function(s,p){ return s+(b.g[p.aKey]||0); }, 0);
+    return sb - sa;
+  });
+
+  var totalCount = data.length;
+  var visible = MONTHLY_PERF_DRILL_SHOW_ALL ? data : data.slice(0, MONTHLY_PERF_DRILL_PAGE_SIZE);
+  var hasMore = totalCount > MONTHLY_PERF_DRILL_PAGE_SIZE;
+
+  var thStyle = 'padding:7px 8px;font-size:9px;font-weight:800;color:white;text-transform:uppercase;text-align:center;white-space:nowrap';
+  var colsPerProduct = details ? 3 : 1;
+  var productHeaderCells = PRODUCTS.map(function(p){ return '<th colspan="'+colsPerProduct+'" style="'+thStyle+';background:'+p.color+'">'+p.label+'</th>'; }).join('');
+  var subHeaderCells = details
+    ? PRODUCTS.map(function(){ return '<th style="'+thStyle+';background:#6b7280">Tgt</th><th style="'+thStyle+';background:#6b7280">Ach</th><th style="'+thStyle+';background:#6b7280">%</th>'; }).join('')
+    : '';
+
+  var header = '<div style="display:flex;align-items:center;justify-content:space-between;background:#5E2D91;color:white;padding:10px 16px;border-radius:12px 12px 0 0">'+
+    '<span style="font-size:12px;font-weight:800"><i class="fas fa-store mr-1"></i>'+(MONTH_LABELS[m]||m)+' — '+totalCount+' فرع</span>'+
+    '<span onclick="showMonthlyPerfDrilldown(\''+m+'\')" style="cursor:pointer;opacity:.85">✕</span>'+
+  '</div>';
+
+  var theadRow = '<tr><th style="'+thStyle+';text-align:left;background:#3b1d63">Store</th>'+productHeaderCells+'</tr>'+
+    (details ? '<tr><th style="'+thStyle+';background:#3b1d63"></th>'+subHeaderCells+'</tr>' : '');
+
+  var bodyRows = visible.map(function(r,i){
+    var bg = i%2===0 ? 'white' : '#fafafa';
+    var cells = PRODUCTS.map(function(p){
+      var t = r.g[p.tKey]||0, a = r.g[p.aKey]||0, ap = pct(a,t);
+      var apColor = ap>=100 ? '#22c55e' : (ap>=70 ? '#f59e0b' : '#ef4444');
+      if (details) {
+        return '<td style="padding:6px 8px;text-align:center;font-size:10px;color:#6b7280">'+fmtN(t)+'</td>'+
+          '<td style="padding:6px 8px;text-align:center;font-size:11px;font-weight:700;color:#374151">'+fmtN(a)+'</td>'+
+          '<td style="padding:6px 8px;text-align:center;font-size:10px;font-weight:800;color:'+apColor+'">'+ap+'%</td>';
+      }
+      return '<td style="padding:6px 8px;text-align:center">'+
+        '<div style="font-size:11px;font-weight:700;color:#374151">'+fmtN(a)+'</div>'+
+        '<div style="font-size:8px;font-weight:700;color:'+apColor+'">'+ap+'%</div>'+
+      '</td>';
+    }).join('');
+    return '<tr style="background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:6px 10px;vertical-align:middle">'+
+        '<div style="font-size:11px;font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px" title="'+r.store+'">'+r.store+'</div>'+
+        '<div style="font-size:9px;color:#9ca3af">'+r.supervisor+'</div>'+
+      '</td>'+
+      cells+
+    '</tr>';
+  }).join('');
+
+  var emptyMsg = visible.length === 0 ? '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">لا توجد فروع</div>' : '';
+
+  var pagination = '';
+  if (hasMore) {
+    pagination = '<div style="padding:12px;text-align:center;border-top:1px solid #f3f4f6;background:#fafafa">' +
+      (MONTHLY_PERF_DRILL_SHOW_ALL
+        ? '<button onclick="MONTHLY_PERF_DRILL_SHOW_ALL=false;renderMonthlyPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:11px;font-weight:700;cursor:pointer">Show First '+MONTHLY_PERF_DRILL_PAGE_SIZE+' Only</button>'
+        : '<span style="font-size:11px;color:#6b7280;margin-right:10px">عرض '+MONTHLY_PERF_DRILL_PAGE_SIZE+' من '+totalCount+' فرع</span>'+
+          '<button onclick="MONTHLY_PERF_DRILL_SHOW_ALL=true;renderMonthlyPerfDrilldown()" style="padding:6px 18px;border-radius:16px;border:1.5px solid #5E2D91;background:#5E2D91;color:white;font-size:11px;font-weight:700;cursor:pointer"><i class="fas fa-list mr-1"></i>Show All ('+totalCount+')</button>'
+      )+'</div>';
+  }
+
+  el.innerHTML = '<div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">'+header+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif"><thead>'+theadRow+'</thead><tbody>'+bodyRows+'</tbody></table>'+emptyMsg+'</div>'+
+    pagination+
+  '</div>';
+}
+
+// ── Export: Summary sheet has one row per month (mirrors the table exactly,
+// Total row included) in the currently selected metric view; Full Data
+// sheet has every underlying store-month row in the current scope (all
+// months, since the Month filter is deliberately ignored by this section).
+function exportMonthlyPerf() {
+  if (!MONTHLY_PERF_LAST || !MONTHLY_PERF_LAST.base.length) { alert('⚠️ مفيش بيانات في العرض الحالي'); return; }
+  var base = MONTHLY_PERF_LAST.base, months = MONTHLY_PERF_LAST.months;
+
+  var aoa = [];
+  var headerRow = ['Month'];
+  PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' ACH', p.label+' %'); });
+  aoa.push(['Monthly Performance']);
+  aoa.push([]);
+  aoa.push(headerRow);
+
+  function productCells(g) {
+    var out = [];
+    PRODUCTS.forEach(function(p){
+      var t=g[p.tKey]||0, a=g[p.aKey]||0;
+      out.push(t, a, (t>0?Math.round(a/t*100):0)+'%');
+    });
+    return out;
+  }
+
+  months.forEach(function(m){
+    var g = calcGroup(base.filter(function(r){ return r.month === m; }));
+    aoa.push([MONTH_LABELS[m]||m].concat(productCells(g)));
+  });
+  var tg = calcGroup(base);
+  aoa.push(['TOTAL'].concat(productCells(tg)));
+
+  var wb2 = XLSX.utils.book_new();
+  var wsSummary = XLSX.utils.aoa_to_sheet(aoa);
+  wsSummary['!cols'] = [{wch:14}].concat(PRODUCTS.map(function(){ return [{wch:10},{wch:10},{wch:8}]; }).flat());
+  XLSX.utils.book_append_sheet(wb2, wsSummary, 'Summary');
+
+  var fullData = base.map(qcRowToExportObj);
+  var wsFull = XLSX.utils.json_to_sheet(fullData.length ? fullData : [{'Info':'No rows'}]);
+  XLSX.utils.book_append_sheet(wb2, wsFull, 'Full Data');
+
+  exportWithPassword(wb2, 'MonthlyPerformance');
 }
 
 // ── Export just this section: Summary sheet mirrors the pivot exactly as
