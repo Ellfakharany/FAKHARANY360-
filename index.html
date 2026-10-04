@@ -1278,6 +1278,19 @@ document.addEventListener('DOMContentLoaded', function() {
         <div id="class-perf-drill" style="margin-top:12px"></div>
       </div>
 
+      <!-- MONTHLY PERFORMANCE -->
+      <div class="section-title"><i class="fas fa-calendar-alt mr-2"></i>Monthly Performance</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:10px">بيحترم كل الفلاتر الحالية (Regional Manager, Area Manager, Supervisor, Classification, Store...) ما عدا فلتر الـ Month نفسه — عشان تقدر تشوف الأداء من أول شهر لحد آخر شهر متاح مرة واحدة.</div>
+      <div class="chart-card mb-6" style="padding:14px">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <div style="display:flex;gap:4px;background:#f3f4f6;border-radius:18px;padding:3px">
+            <button id="monthly-perf-metric-ach" onclick="setMonthlyPerfMetric('ach')" style="padding:5px 12px;border-radius:14px;font-size:10px;font-weight:700;border:none;cursor:pointer;background:#5E2D91;color:white">Achievement</button>
+            <button id="monthly-perf-metric-details" onclick="setMonthlyPerfMetric('details')" style="padding:5px 12px;border-radius:14px;font-size:10px;font-weight:700;border:none;cursor:pointer;background:transparent;color:#6b7280">Target / Ach / %</button>
+          </div>
+        </div>
+        <div id="monthly-perf-table" style="overflow-x:auto"></div>
+      </div>
+
     </div>
 
     <!-- PRODUCTS TAB -->
@@ -2324,7 +2337,7 @@ function renderAll() {
   renderExecKPIs();
   renderProductKPIs('product-kpi-grid');
   renderProductKPIs('product-kpi-grid2');
-  if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); }
+  if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); renderMonthlyPerf(); }
   if (activeTab === 'products') { renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (activeTab === 'tariff') { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (activeTab === 'rankings') { renderAllRankings(); }
@@ -2720,6 +2733,111 @@ function renderClassPerfDrilldown() {
   }
 
   el.innerHTML = '<div style="background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow:hidden">'+header+rows+pagination+'</div>';
+}
+
+// ── Monthly Performance (Overview tab) ──────────────────────────────────
+// One row per month (from the earliest to the latest month present in the
+// current scope), one column per product, respecting every currently-active
+// filter EXCEPT the Month filter itself — so the whole history shows at
+// once regardless of which single month (if any) is selected elsewhere.
+var MONTHLY_PERF_METRIC = 'ach';   // 'ach' | 'details' (Target/Ach/Ach%)
+
+function getDataExceptMonthFilter() {
+  var rm = document.getElementById('f-regMgr').value;
+  var sv = document.getElementById('f-supervisor').value;
+  var am = document.getElementById('f-areaMgr').value;
+  var ac = document.getElementById('f-accMgr').value;
+  var pt = document.getElementById('f-partner').value;
+  return RAW_DATA.filter(function(r){
+    return (!rm || r.regionalManager === rm) &&
+      (!sv || r.supervisor === sv) &&
+      (!am || r.areaManager === am) &&
+      (!ac || r.accountManager === ac) &&
+      (!pt || r.partner === pt) &&
+      (!selectedStore || (r.storeCode || r.store) === selectedStore) &&
+      (activeClass === 'all' || r.classification === activeClass);
+  });
+}
+
+function setMonthlyPerfMetric(metric) {
+  MONTHLY_PERF_METRIC = metric;
+  var achBtn = document.getElementById('monthly-perf-metric-ach');
+  var detBtn = document.getElementById('monthly-perf-metric-details');
+  if (achBtn) { achBtn.style.background = metric==='ach' ? '#5E2D91' : 'transparent'; achBtn.style.color = metric==='ach' ? 'white' : '#6b7280'; }
+  if (detBtn) { detBtn.style.background = metric==='details' ? '#5E2D91' : 'transparent'; detBtn.style.color = metric==='details' ? 'white' : '#6b7280'; }
+  renderMonthlyPerf();
+}
+
+function renderMonthlyPerf() {
+  var el = document.getElementById('monthly-perf-table');
+  if (!el) return;
+
+  var base = getDataExceptMonthFilter();
+  var months = MONTH_ORDER.filter(function(m){ return base.some(function(r){ return r.month === m; }); });
+
+  if (!months.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">لا توجد بيانات في العرض الحالي</div>'; return; }
+
+  var details = MONTHLY_PERF_METRIC === 'details';
+  var colsPerProduct = details ? 3 : 1;
+  var thStyle = 'padding:8px 10px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.03em;text-align:center;white-space:nowrap';
+
+  var productHeaderCells = PRODUCTS.map(function(p){
+    return '<th colspan="'+colsPerProduct+'" style="'+thStyle+';background:'+p.color+'"><i class="fas '+p.icon+' mr-1"></i>'+p.label+'</th>';
+  }).join('');
+  var subHeaderCells = details
+    ? PRODUCTS.map(function(){ return '<th style="'+thStyle+';background:#6b7280;font-size:9px">Target</th><th style="'+thStyle+';background:#6b7280;font-size:9px">Ach</th><th style="'+thStyle+';background:#6b7280;font-size:9px">Ach%</th>'; }).join('')
+    : '';
+
+  var thead = '<tr><th style="'+thStyle+';text-align:left;background:#5E2D91">Month</th>'+productHeaderCells+'</tr>'+
+    (details ? '<tr><th style="'+thStyle+';background:#5E2D91"></th>'+subHeaderCells+'</tr>' : '');
+
+  var body = months.map(function(m, i){
+    var rows = base.filter(function(r){ return r.month === m; });
+    var g = calcGroup(rows);
+    var bg = i%2===0 ? 'white' : '#faf9fb';
+    var cells = PRODUCTS.map(function(p){
+      var t = g[p.tKey]||0, a = g[p.aKey]||0;
+      var ap = pct(a, t);
+      var apColor = ap>=100 ? '#22c55e' : (ap>=70 ? '#f59e0b' : '#ef4444');
+      if (details) {
+        return '<td style="padding:8px 10px;text-align:center;font-size:11px;color:#6b7280">'+fmtN(t)+'</td>'+
+          '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:700;color:#374151">'+fmtN(a)+'</td>'+
+          '<td style="padding:8px 10px;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;background:'+apColor+'18;color:'+apColor+'">'+ap+'%</span></td>';
+      }
+      return '<td style="padding:8px 10px;text-align:center">'+
+        '<div style="font-size:12px;font-weight:700;color:#374151">'+fmtN(a)+'</div>'+
+        '<div style="font-size:9px;font-weight:700;color:'+apColor+'">'+ap+'%</div>'+
+      '</td>';
+    }).join('');
+    return '<tr style="background:'+bg+';border-bottom:1px solid #f3f4f6">'+
+      '<td style="padding:8px 12px;font-size:12px;font-weight:700;color:#374151;white-space:nowrap">'+(MONTH_LABELS[m]||m)+'</td>'+
+      cells+
+    '</tr>';
+  }).join('');
+
+  // Grand total row across all months in scope
+  var totalRows = base;
+  var tg = calcGroup(totalRows);
+  var totalCells = PRODUCTS.map(function(p){
+    var t = tg[p.tKey]||0, a = tg[p.aKey]||0;
+    var ap = pct(a, t);
+    if (details) {
+      return '<td style="padding:8px 10px;text-align:center;font-size:11px;color:white">'+fmtN(t)+'</td>'+
+        '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800;color:white">'+fmtN(a)+'</td>'+
+        '<td style="padding:8px 10px;text-align:center;font-size:11px;font-weight:800;color:white">'+ap+'%</td>';
+    }
+    return '<td style="padding:8px 10px;text-align:center">'+
+      '<div style="font-size:12px;font-weight:800;color:white">'+fmtN(a)+'</div>'+
+      '<div style="font-size:9px;font-weight:700;color:#e9d5ff">'+ap+'%</div>'+
+    '</td>';
+  }).join('');
+  var totalRow = '<tr style="background:#5E2D91;border-top:2px solid #3b1d63">'+
+    '<td style="padding:8px 12px;font-size:12px;font-weight:800;color:white">Total</td>'+
+    totalCells+
+  '</tr>';
+
+  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">'+
+    '<thead>'+thead+'</thead><tbody>'+body+totalRow+'</tbody></table>';
 }
 
 // ── Export just this section: Summary sheet mirrors the pivot exactly as
