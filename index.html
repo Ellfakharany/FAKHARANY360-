@@ -10537,16 +10537,25 @@ function mtdInsStoreTable(titleParts, items, withArea, pace, metric, withTotal) 
   }
   return { k: 'tbl', title: titleParts, head: mtdInsStoreHead(withArea), body: body, minW: 760 };
 }
-function mtdInsAreaTable(amName, amItems, pace, metric) {
-  var g = mtdInsAgg(amItems, pace), m = g.strategic[1];
-  var share = m.T > 0 ? (metric === 'proj' ? m.P : m.A) / m.T : 0;
-  var good = metric === 'proj' ? share >= 0.9 : (pace > 0 ? share / pace >= 0.9 : share >= 0.9);
-  return mtdInsStoreTable([
-    { t: amName + ' Stores ', c: '#5E2D91', b: 1 },
-    { t: '(' + (metric === 'proj' ? 'Proj%' : 'VS%') + ' – IDLE – Remaining): ', c: '#374151', b: 1 },
-    good ? { t: 'Good Job For Mobile — Keep Focusing On Lowest Stores and Other Products', c: '#16a34a', b: 1 }
-         : { t: 'Improvement Required', c: '#dc2626', b: 1 }
-  ], amItems, false, pace, metric, false);
+function mtdInsSupAreasTable(svName, sv, pace, metric) {
+  // One table per supervisor: Supervisor (+ store count) → each Area Manager band → that area's stores
+  var NC = 12, body = [];
+  sv.amOrder.forEach(function (am) {
+    var items = sv.ams[am], g = mtdInsAgg(items, pace), m = g.strategic[1];
+    var share = m.T > 0 ? (metric === 'proj' ? m.P : m.A) / m.T : 0;
+    var good = metric === 'proj' ? share >= 0.9 : (pace > 0 ? share / pace >= 0.9 : share >= 0.9);
+    body.push([
+      { v: am + ' · ' + items.length + ' stores', f: 'txt', bg: '#ede9fe', fg: '#5E2D91', b: 1, al: 'l', cs: 4, bd: '#ddd6fe' },
+      { v: good ? 'Good Job For Mobile — Keep Focusing On Lowest Stores and Other Products' : 'Improvement Required', f: 'txt', bg: '#ede9fe', fg: good ? '#16a34a' : '#dc2626', b: 1, al: 'l', cs: NC - 4, bd: '#ddd6fe' }
+    ]);
+    var calc = items.map(function (i) { return { i: i, c: mtdInsStoreCalc(i, pace) }; });
+    calc.sort(function (x, y) { return mtdInsMobShare(y.c, 'ach') - mtdInsMobShare(x.c, 'ach'); });
+    calc.forEach(function (x) { body.push(mtdInsStoreRow(x, false, pace, metric)); });
+  });
+  return { k: 'tbl', minW: 760, head: mtdInsStoreHead(false), body: body, title: [
+    { t: svName + ' ', c: '#5E2D91', b: 1 },
+    { t: '— ' + sv.items.length + ' stores (' + (metric === 'proj' ? 'Proj%' : 'VS%') + ' – IDLE – Remaining)', c: '#374151', b: 1 }
+  ] };
 }
 function mtdInsSupTable(svName, svItems, pace, metric) {
   return mtdInsStoreTable([
@@ -10586,7 +10595,7 @@ function mtdInsBuildBlocks(items, pace, metric, view) {
     rmItems.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
     svOrder.forEach(function (sv) {
       if (view === 'sup') blocks.push(mtdInsSupTable(sv, svMap[sv].items, pace, metric));
-      else svMap[sv].amOrder.forEach(function (am) { blocks.push(mtdInsAreaTable(am, svMap[sv].ams[am], pace, metric)); });
+      else blocks.push(mtdInsSupAreasTable(sv, svMap[sv], pace, metric));
     });
     var crit = mtdInsCriticalTable(rmItems, pace, metric);
     if (crit) blocks.push(crit);
