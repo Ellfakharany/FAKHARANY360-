@@ -1868,12 +1868,25 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="mtd-insights-wrap" style="margin-top:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <div class="section-title" style="margin:0"><i class="fas fa-lightbulb mr-2"></i>Insights</div>
-          <button id="mtd-insights-toggle" onclick="toggleMTDInsights()"
-            style="padding:7px 16px;border-radius:20px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif">
-            <i class="fas fa-eye mr-1"></i>Show
-          </button>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button id="mtd-insights-export" onclick="exportMTDInsights()"
+              style="padding:7px 16px;border-radius:20px;border:2px solid #5E2D91;background:white;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif">
+              <i class="fas fa-file-export mr-1"></i>Export
+            </button>
+            <button id="mtd-insights-toggle" onclick="toggleMTDInsights()"
+              style="padding:7px 16px;border-radius:20px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif">
+              <i class="fas fa-eye mr-1"></i>Show
+            </button>
+          </div>
         </div>
         <div id="mtd-insights-body" style="display:none">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+              <button id="mtd-ins-metric-ach" onclick="setMTDInsMetric('ach')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s" title="النسبة الفعلية لحد النهاردة">% Ach</button>
+              <button id="mtd-ins-metric-proj" onclick="setMTDInsMetric('proj')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="النسبة المتوقعة آخر الشهر لو الأداء استمر بنفس المعدل">📈 Proj%</button>
+            </div>
+            <span style="font-size:10px;color:#6b7280">% Ach = الفعلي لحد اليوم · Proj% = المتوقع آخر الشهر · Rem = المتبقي للتارجت (Target − Actual)</span>
+          </div>
           <div id="mtd-insights-content"></div>
         </div>
       </div>
@@ -10247,38 +10260,54 @@ function renderMTDTable() {
 <script>
 // ════════════════════════════════════════════════════════════════
 //  MTD INSIGHTS  (Regional Manager → Supervisors → Area Managers → Stores)
-//  Sits at the bottom of the MTD tab, collapsed by default (Show / Hide).
-//  - Prepaid & Control   : VS% = Subs ÷ Target per sub-package, Rem = Target − Subs
-//  - Strategic Products  : Gold / Mobile / FBB / Fixed A (Activation) / Fixed S (Sales) / WE Pay
-//  - IDLE                : Sales − Activation  (Mobile, FBB)
-//  - Stores Achievement  : stores bucketed by Mobile projection %
-//  - Per-Area-Manager store tables + Critical Cases (lowest Mobile % stores)
+//  Bottom of the MTD tab · collapsed by default (Show / Hide)
+//  One data model ("blocks") feeds BOTH the on-screen HTML and the Excel
+//  export, so the export always has the same numbers / colours / layout.
+//   • % Ach | Proj%   : switches every VS% cell (Rem stays = Target − Actual)
+//   • Per Area | Per Supervisor : how the store tables are grouped
+//   • Export          : Excel, 2 sheets → Active (current filters) + Full Data
 // ════════════════════════════════════════════════════════════════
 var MTD_INS_OPEN = false;
-var MTD_INS_CRITICAL_N = 7;   // how many lowest-Mobile stores appear in Critical Cases per Regional Manager
+var MTD_INS_METRIC = 'ach';     // 'ach' | 'proj'
+var MTD_INS_VIEW = 'area';      // 'area' | 'sup'
+var MTD_INS_CRITICAL_N = 7;     // lowest-Mobile stores listed in Critical Cases per Regional Manager
+var MTD_INS_NCOLS = 13;         // widest table (Excel merge width)
 
+// ── UI state ───────────────────────────────────────────────────
+function mtdInsSegStyle(on) {
+  return 'padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;transition:all .2s;' +
+    (on ? 'background:#5E2D91;color:white' : 'background:white;color:#6b7280');
+}
+function mtdInsSyncToolbar() {
+  var a = document.getElementById('mtd-ins-metric-ach'), p = document.getElementById('mtd-ins-metric-proj');
+  if (a) a.setAttribute('style', mtdInsSegStyle(MTD_INS_METRIC === 'ach'));
+  if (p) p.setAttribute('style', mtdInsSegStyle(MTD_INS_METRIC === 'proj'));
+  var b = document.getElementById('mtd-insights-toggle');
+  if (b) b.innerHTML = MTD_INS_OPEN ? '<i class="fas fa-eye-slash mr-1"></i>Hide' : '<i class="fas fa-eye mr-1"></i>Show';
+}
+function mtdInsRerender() {
+  if (!MTD_INS_OPEN) return;
+  var y = window.pageYOffset;
+  renderMTDInsights();
+  window.scrollTo(0, y);
+}
 function toggleMTDInsights() {
   MTD_INS_OPEN = !MTD_INS_OPEN;
   var body = document.getElementById('mtd-insights-body');
-  var btn  = document.getElementById('mtd-insights-toggle');
   if (body) body.style.display = MTD_INS_OPEN ? '' : 'none';
-  if (btn)  btn.innerHTML = MTD_INS_OPEN
-    ? '<i class="fas fa-eye-slash mr-1"></i>Hide'
-    : '<i class="fas fa-eye mr-1"></i>Show';
+  mtdInsSyncToolbar();
   if (MTD_INS_OPEN) renderMTDInsights();
 }
+function setMTDInsMetric(m) { MTD_INS_METRIC = m; mtdInsSyncToolbar(); mtdInsRerender(); }
+function setMTDInsView(v)   { MTD_INS_VIEW = v; mtdInsRerender(); }
 
+// ── helpers ────────────────────────────────────────────────────
 function mtdInsEsc(s) {
-  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function mtdInsNum(v) { return Math.round(Number(v) || 0).toLocaleString('en-US'); }
-function mtdInsSum(items, getter) {
-  var s = 0;
-  for (var i = 0; i < items.length; i++) s += Number(getter(items[i])) || 0;
-  return s;
-}
 
-// Share of the month already elapsed — used to colour VS% cells relative to pace.
+// Share of the month already elapsed — used to colour Ach% cells relative to pace.
 function mtdInsPace() {
   var info = (typeof dayOfMonthInfoFromLabel === 'function' && MTD_MOBILE_DATE_LABEL) ? dayOfMonthInfoFromLabel(MTD_MOBILE_DATE_LABEL) : null;
   if (info && info.day > 0 && info.daysInMonth > 0) return info.day / info.daysInMonth;
@@ -10286,43 +10315,39 @@ function mtdInsPace() {
   if (dc > 0) return dc / 30;
   return 0.5;
 }
-
-// Same palette family as the rest of the dashboard (green / amber / red), plus a dark tier for the worst cells.
+// Same palette family as the rest of the dashboard, plus a dark tier for the worst cells.
 function mtdInsTier(ratio) {
-  if (ratio >= 0.9)  return { bg:'#dcfce7', fg:'#15803d' };
-  if (ratio >= 0.75) return { bg:'#fef3c7', fg:'#a16207' };
-  if (ratio >= 0.55) return { bg:'#fee2e2', fg:'#b91c1c' };
-  return { bg:'#1f2937', fg:'#fca5a5' };
+  if (ratio >= 0.9)  return { bg: '#dcfce7', fg: '#15803d' };
+  if (ratio >= 0.75) return { bg: '#fef3c7', fg: '#a16207' };
+  if (ratio >= 0.55) return { bg: '#fee2e2', fg: '#b91c1c' };
+  return { bg: '#1f2937', fg: '#fca5a5' };
 }
-function mtdInsPctCell(T, A, pace) {
-  if (!(T > 0)) return '<td style="padding:5px 8px;text-align:center;color:#9ca3af;border:1px solid #f1f5f9">–</td>';
-  var p = A / T, t = mtdInsTier(pace > 0 ? p / pace : p);
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:' + t.bg + ';color:' + t.fg + ';border:1px solid #f1f5f9">' + Math.round(p * 100) + '%</td>';
+var MTD_INS_LIGHT = { '#15803d': '#86efac', '#a16207': '#fde68a', '#b91c1c': '#fda4af', '#fca5a5': '#fca5a5' };
+
+// Projection of one metric: use the file's own Proj column; if it's missing, extrapolate from pace.
+function mtdInsProjOf(o, pk, a, pace) {
+  var raw = o[pk], v = Number(raw);
+  if (raw != null && raw !== '' && isFinite(v) && !(v === 0 && a > 0)) return v;
+  return pace > 0 ? a / pace : a;
 }
-function mtdInsRemCell(T, A, forceShow) {
-  if (!(T > 0) && !forceShow) return '<td style="padding:5px 8px;text-align:center;color:#9ca3af;border:1px solid #f1f5f9">–</td>';
-  var r = Math.round(T - A);
-  if (r < 0) return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:#dcfce7;color:#15803d;border:1px solid #f1f5f9">(' + mtdInsNum(-r) + ')</td>';
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:#fff1f2;color:#9f1239;border:1px solid #f1f5f9">' + mtdInsNum(r) + '</td>';
-}
-function mtdInsIdleCell(v) {
-  v = Math.round(v || 0);
-  var bg = v < 0 ? '#fee2e2' : (v > 0 ? '#ede9fe' : '#fff');
-  var fg = v < 0 ? '#b91c1c' : (v > 0 ? '#5E2D91' : '#6b7280');
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:' + bg + ';color:' + fg + ';border:1px solid #f1f5f9">' + v + '</td>';
+function mtdInsTP(items, src, tk, vk, pk, pace) {
+  var T = 0, A = 0, P = 0;
+  for (var i = 0; i < items.length; i++) {
+    var o = items[i][src], a = Number(o[vk]) || 0;
+    T += Number(o[tk]) || 0; A += a; P += mtdInsProjOf(o, pk, a, pace);
+  }
+  return { T: T, A: A, P: P };
 }
 
-// ── Build one item per filtered store, joined across Activation / Sales / Wallet ──
-function mtdInsBuildItems() {
-  var filtered = (typeof MTD_FILTERED !== 'undefined' && MTD_FILTERED) ? MTD_FILTERED : [];
+// One item per store, joined across Activation / Sales / Wallet.
+function mtdInsBuildItems(rowsIn) {
+  var rows = rowsIn || [];
   var actMap = {}, salesMap = {};
   (MTD_DATA || []).forEach(function (r) { actMap[String(r.storeCode || '').trim().toUpperCase()] = r; });
   (MTD_SALES_DATA || []).forEach(function (r) { salesMap[String(r.storeCode || '').trim().toUpperCase()] = r; });
-  var hasSales = (MTD_SALES_DATA || []).length > 0;
-  var items = filtered.map(function (fr) {
+  var items = rows.map(function (fr) {
     var code = String(fr.storeCode || '').trim().toUpperCase();
-    var a = actMap[code] || fr;
-    var s = salesMap[code] || a;
+    var a = actMap[code] || fr, s = salesMap[code] || a;
     var w = (typeof WALLET_DATA !== 'undefined' && WALLET_DATA[code]) || {};
     return {
       code: code, store: a.store || fr.store || code,
@@ -10332,254 +10357,408 @@ function mtdInsBuildItems() {
       a: a, s: s, w: w
     };
   });
-  return { items: items, hasSales: hasSales };
+  return { items: items, hasSales: (MTD_SALES_DATA || []).length > 0 };
 }
 
 var MTD_INS_PREPAID = [
-  { label: 'Kix',        t: 'kixTarget',    v: 'kixSubs' },
-  { label: 'Tazbeet',    t: 'tazbeetTarget', v: 'tazbeetSubs' },
-  { label: 'Data SIM-MIFI', t: 'simTarget', v: 'simSubs' },
-  { label: 'PAYG',       t: 'paygTarget',   v: 'paygSubs' },
-  { label: 'WE Club',    t: 'clubTarget',   v: 'clubSubs' },
-  { label: 'WE Mix',     t: 'weMixTarget',  v: 'weMixSubs' }
+  { label: 'Kix',           t: 'kixTarget',     v: 'kixSubs',     p: 'kixProj' },
+  { label: 'Tazbeet',       t: 'tazbeetTarget', v: 'tazbeetSubs', p: 'tazbeetProj' },
+  { label: 'Data SIM-MIFI', t: 'simTarget',     v: 'simSubs',     p: 'simProj' },
+  { label: 'PAYG',          t: 'paygTarget',    v: 'paygSubs',    p: 'paygProj' },
+  { label: 'WE Club',       t: 'clubTarget',    v: 'clubSubs',    p: 'clubProj' },
+  { label: 'WE Mix',        t: 'weMixTarget',   v: 'weMixSubs',   p: 'weMixProj' }
 ];
 var MTD_INS_STRATEGIC = [
-  { label: 'WE Gold', src: 'a', t: 'goldTarget',   v: 'goldSubs' },
-  { label: 'Mobile',  src: 'a', t: 'mobileTarget', v: 'mobileSubs' },
-  { label: 'FBB',     src: 'a', t: 'fbbTarget',    v: 'fbbSubs' },
-  { label: 'Fixed (A)', src: 'a', t: 'fixedTarget', v: 'fixedSubs' },
-  { label: 'Fixed (S)', src: 's', t: 'fixedTarget', v: 'fixedSubs' },
-  { label: 'WE Pay',  src: 'w', t: 'walletTarget', v: 'walletSales' }
+  { label: 'WE Gold',   src: 'a', t: 'goldTarget',   v: 'goldSubs',    p: 'goldProj' },
+  { label: 'Mobile',    src: 'a', t: 'mobileTarget', v: 'mobileSubs',  p: 'mobileProj' },
+  { label: 'FBB',       src: 'a', t: 'fbbTarget',    v: 'fbbSubs',     p: 'fbbProj' },
+  { label: 'Fixed (A)', src: 'a', t: 'fixedTarget',  v: 'fixedSubs',   p: 'fixedProj' },
+  { label: 'Fixed (S)', src: 's', t: 'fixedTarget',  v: 'fixedSubs',   p: 'fixedProj' },
+  { label: 'WE Pay',    src: 'w', t: 'walletTarget', v: 'walletSales', p: 'walletProj' }
 ];
 
-function mtdInsAgg(items) {
+function mtdInsAgg(items, pace) {
   var o = { prepaid: [], strategic: [], idleMob: 0, idleFbb: 0, bands: [0, 0, 0, 0] };
-  MTD_INS_PREPAID.forEach(function (p) {
-    o.prepaid.push({ T: mtdInsSum(items, function (i) { return i.a[p.t]; }), A: mtdInsSum(items, function (i) { return i.a[p.v]; }) });
-  });
-  MTD_INS_STRATEGIC.forEach(function (p) {
-    o.strategic.push({ T: mtdInsSum(items, function (i) { return i[p.src][p.t]; }), A: mtdInsSum(items, function (i) { return i[p.src][p.v]; }) });
-  });
-  o.idleMob = mtdInsSum(items, function (i) { return (Number(i.s.mobileSubs) || 0) - (Number(i.a.mobileSubs) || 0); });
-  o.idleFbb = mtdInsSum(items, function (i) { return (Number(i.s.fbbSubs) || 0) - (Number(i.a.fbbSubs) || 0); });
+  MTD_INS_PREPAID.forEach(function (p) { o.prepaid.push(mtdInsTP(items, 'a', p.t, p.v, p.p, pace)); });
+  MTD_INS_STRATEGIC.forEach(function (p) { o.strategic.push(mtdInsTP(items, p.src, p.t, p.v, p.p, pace)); });
   items.forEach(function (i) {
+    o.idleMob += (Number(i.s.mobileSubs) || 0) - (Number(i.a.mobileSubs) || 0);
+    o.idleFbb += (Number(i.s.fbbSubs) || 0) - (Number(i.a.fbbSubs) || 0);
     var T = Number(i.a.mobileTarget) || 0;
     if (!(T > 0)) return;
-    var pr = (Number(i.a.mobileProj) || Number(i.a.mobileSubs) || 0) / T;
+    var pr = mtdInsProjOf(i.a, 'mobileProj', Number(i.a.mobileSubs) || 0, pace) / T;
     if (pr >= 1) o.bands[0]++; else if (pr >= 0.8) o.bands[1]++; else if (pr >= 0.7) o.bands[2]++; else o.bands[3]++;
   });
   return o;
 }
 
-// ── Row builders ──
-var MTD_INS_TH = 'padding:6px 8px;text-align:center;font-size:11px;font-weight:800;color:#fff;border:1px solid #7c3aed;background:#5E2D91;white-space:nowrap';
-function mtdInsRowStyle(kind, idx) {
-  if (kind === 'sv')    return { bg: '#fbbf24', fg: '#1f2937', w: 800 };
-  if (kind === 'total') return { bg: '#111827', fg: '#ffffff', w: 800 };
-  return { bg: idx % 2 ? '#f3f4f6' : '#ffffff', fg: '#1f2937', w: 600 };
+// ── cell model:  { v, f:'txt'|'pct'|'int'|'rem', bg, fg, b, al:'l'|'c'|'r', cs, rs, hd, bd, rtl, sticky } ──
+function mtdInsBase(kind) {
+  if (kind === 'sv')    return { bg: '#fbbf24', fg: '#1f2937' };
+  if (kind === 'total') return { bg: '#111827', fg: '#ffffff' };
+  return { bg: '#ffffff', fg: '#1f2937' };
 }
-function mtdInsNameCell(name, st) {
-  return '<td style="padding:6px 10px;text-align:left;font-size:12px;font-weight:' + st.w + ';background:' + st.bg + ';color:' + st.fg + ';border:1px solid #e5e7eb;white-space:nowrap;position:sticky;left:0">' + mtdInsEsc(name) + '</td>';
+function mtdInsH(text, o) {
+  var c = { v: text, f: 'txt', hd: 1, bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'c', bd: '#7c3aed' };
+  for (var k in (o || {})) c[k] = o[k];
+  return c;
 }
-// Cells on dark / amber rows keep their number readable by neutral styling
-function mtdInsPctCellOn(kind, T, A, pace) {
-  if (kind === 'am') return mtdInsPctCell(T, A, pace);
-  var st = mtdInsRowStyle(kind, 0);
-  if (!(T > 0)) return '<td style="padding:5px 8px;text-align:center;background:' + st.bg + ';color:' + st.fg + ';border:1px solid #e5e7eb">–</td>';
-  var p = A / T, t = mtdInsTier(pace > 0 ? p / pace : p);
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:' + st.bg + ';color:' + (kind === 'total' ? t.fg === '#fca5a5' ? '#fca5a5' : (t.fg === '#15803d' ? '#86efac' : (t.fg === '#a16207' ? '#fde68a' : '#fda4af')) : st.fg) + ';border:1px solid #e5e7eb">' + Math.round(p * 100) + '%</td>';
+function mtdInsName(text, kind, idx) {
+  var b = mtdInsBase(kind);
+  var bg = kind === 'am' ? (idx % 2 ? '#f3f4f6' : '#ffffff') : b.bg;
+  return { v: text, f: 'txt', bg: bg, fg: b.fg, b: 1, al: 'l', sticky: 1 };
 }
-function mtdInsRemCellOn(kind, T, A) {
-  if (kind === 'am') return mtdInsRemCell(T, A, false);
-  var st = mtdInsRowStyle(kind, 0);
-  if (!(T > 0)) return '<td style="padding:5px 8px;text-align:center;background:' + st.bg + ';color:' + st.fg + ';border:1px solid #e5e7eb">–</td>';
-  var r = Math.round(T - A);
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:' + st.bg + ';color:' + st.fg + ';border:1px solid #e5e7eb">' + (r < 0 ? '(' + mtdInsNum(-r) + ')' : mtdInsNum(r)) + '</td>';
+function mtdInsPct(x, kind, pace, metric) {
+  var base = mtdInsBase(kind), T = x.T;
+  if (!(T > 0)) return { v: null, f: 'pct', bg: base.bg, fg: kind === 'am' ? '#9ca3af' : base.fg, al: 'c' };
+  var val = (metric === 'proj' ? x.P : x.A) / T;
+  var t = mtdInsTier(metric === 'proj' ? val : (pace > 0 ? val / pace : val));
+  if (kind === 'am') return { v: val, f: 'pct', bg: t.bg, fg: t.fg, b: 1, al: 'c' };
+  return { v: val, f: 'pct', bg: base.bg, fg: kind === 'total' ? MTD_INS_LIGHT[t.fg] : base.fg, b: 1, al: 'c' };
 }
-function mtdInsPlainCell(kind, txt) {
-  var st = mtdInsRowStyle(kind, 0);
-  return '<td style="padding:5px 8px;text-align:center;font-weight:800;background:' + (kind === 'am' ? '#fff' : st.bg) + ';color:' + (kind === 'am' ? '#1f2937' : st.fg) + ';border:1px solid #e5e7eb">' + txt + '</td>';
+function mtdInsRem(x, kind) {
+  var base = mtdInsBase(kind), T = x.T;
+  if (!(T > 0)) return { v: null, f: 'rem', bg: base.bg, fg: kind === 'am' ? '#9ca3af' : base.fg, al: 'c' };
+  var r = Math.round(T - x.A);
+  if (kind !== 'am') return { v: r, f: 'rem', bg: base.bg, fg: base.fg, b: 1, al: 'c' };
+  return r < 0 ? { v: r, f: 'rem', bg: '#dcfce7', fg: '#15803d', b: 1, al: 'c' }
+               : { v: r, f: 'rem', bg: '#fff1f2', fg: '#9f1239', b: 1, al: 'c' };
+}
+function mtdInsPlain(v, kind) {
+  var base = mtdInsBase(kind);
+  return { v: v, f: 'int', bg: base.bg, fg: base.fg, b: 1, al: 'c' };
+}
+function mtdInsIdle(v) {
+  v = Math.round(v || 0);
+  return { v: v, f: 'int', bg: v < 0 ? '#fee2e2' : (v > 0 ? '#ede9fe' : '#ffffff'), fg: v < 0 ? '#b91c1c' : (v > 0 ? '#5E2D91' : '#6b7280'), b: 1, al: 'c' };
 }
 
-// Walks RM → Supervisor → Area Manager and emits rows using the given cell renderer.
-function mtdInsHierRows(rmItems, cellsFn) {
-  var html = '', svMap = {}, svOrder = [];
+// RM → Supervisor → Area Manager rows (supervisor row = amber, RM total = dark)
+function mtdInsHierBody(rmItems, pace, cellsFn) {
+  var svMap = {}, svOrder = [], body = [];
   rmItems.forEach(function (i) {
     if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); }
-    var sv = svMap[i.sv];
-    sv.items.push(i);
+    var sv = svMap[i.sv]; sv.items.push(i);
     if (!sv.ams[i.am]) { sv.ams[i.am] = []; sv.amOrder.push(i.am); }
     sv.ams[i.am].push(i);
   });
   svOrder.forEach(function (svName) {
     var sv = svMap[svName];
-    var stSv = mtdInsRowStyle('sv', 0);
-    html += '<tr>' + mtdInsNameCell(svName, stSv) + cellsFn('sv', mtdInsAgg(sv.items)) + '</tr>';
+    body.push([mtdInsName(svName, 'sv', 0)].concat(cellsFn('sv', mtdInsAgg(sv.items, pace))));
     sv.amOrder.forEach(function (amName, idx) {
-      var st = mtdInsRowStyle('am', idx);
-      html += '<tr>' + mtdInsNameCell(amName, st) + cellsFn('am', mtdInsAgg(sv.ams[amName])) + '</tr>';
+      body.push([mtdInsName(amName, 'am', idx)].concat(cellsFn('am', mtdInsAgg(sv.ams[amName], pace))));
     });
   });
-  var stT = mtdInsRowStyle('total', 0);
-  html += '<tr>' + mtdInsNameCell('Total', stT) + cellsFn('total', mtdInsAgg(rmItems)) + '</tr>';
-  return html;
+  body.push([mtdInsName('Total', 'total', 0)].concat(cellsFn('total', mtdInsAgg(rmItems, pace))));
+  return body;
 }
-function mtdInsWrapTable(title, head, body) {
-  return '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:800;color:#5E2D91;margin:0 0 6px 2px">' + title + '</div>' +
-    '<div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb"><table style="border-collapse:collapse;width:100%;font-size:12px;min-width:520px">' +
-    '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div></div>';
+function mtdInsPairHead(list, metric) {
+  var r1 = [mtdInsH('Area Manager', { rs: 2, al: 'l' })], r2 = [];
+  list.forEach(function (p) {
+    r1.push(mtdInsH(p.label, { cs: 2 }));
+    r2.push(mtdInsH(metric === 'proj' ? 'Proj %' : 'VS %', { bg: '#6d3fa8' }), mtdInsH('Rem', { bg: '#111827', bd: '#111827' }));
+  });
+  return [r1, r2];
 }
-
-function mtdInsPrepaidTable(rmItems, pace) {
-  var h1 = '<tr><th rowspan="2" style="' + MTD_INS_TH + ';text-align:left">Area Manager</th>';
-  var h2 = '<tr>';
-  MTD_INS_PREPAID.forEach(function (p) {
-    h1 += '<th colspan="2" style="' + MTD_INS_TH + '">' + p.label + '</th>';
-    h2 += '<th style="' + MTD_INS_TH + ';background:#6d3fa8">VS %</th><th style="' + MTD_INS_TH + ';background:#111827;border-color:#111827">Rem</th>';
-  });
-  h1 += '</tr>'; h2 += '</tr>';
-  var body = mtdInsHierRows(rmItems, function (kind, g) {
-    var c = '';
-    g.prepaid.forEach(function (x) { c += mtdInsPctCellOn(kind, x.T, x.A, pace) + mtdInsRemCellOn(kind, x.T, x.A); });
-    return c;
-  });
-  return mtdInsWrapTable('Prepaid &amp; Control Products:', h1 + h2, body);
-}
-function mtdInsStrategicTable(rmItems, pace) {
-  var h1 = '<tr><th rowspan="2" style="' + MTD_INS_TH + ';text-align:left">Area Manager</th>';
-  var h2 = '<tr>';
-  MTD_INS_STRATEGIC.forEach(function (p) {
-    h1 += '<th colspan="2" style="' + MTD_INS_TH + '">' + p.label + '</th>';
-    h2 += '<th style="' + MTD_INS_TH + ';background:#6d3fa8">VS %</th><th style="' + MTD_INS_TH + ';background:#111827;border-color:#111827">Rem</th>';
-  });
-  h1 += '</tr>'; h2 += '</tr>';
-  var body = mtdInsHierRows(rmItems, function (kind, g) {
-    var c = '';
-    g.strategic.forEach(function (x) { c += mtdInsPctCellOn(kind, x.T, x.A, pace) + mtdInsRemCellOn(kind, x.T, x.A); });
-    return c;
-  });
-  return mtdInsWrapTable('Strategic Products:', h1 + h2, body);
-}
-function mtdInsIdleTable(rmItems) {
-  var h1 = '<tr><th rowspan="2" style="' + MTD_INS_TH + ';text-align:left">Area Manager</th>' +
-    '<th colspan="2" style="' + MTD_INS_TH + ';background:#2563eb;border-color:#2563eb">IDLE</th>' +
-    '<th colspan="4" style="' + MTD_INS_TH + '">Stores Achievement (Projection)</th></tr>';
-  var h2 = '<tr><th style="' + MTD_INS_TH + ';background:#2563eb;border-color:#2563eb">Mobile</th><th style="' + MTD_INS_TH + ';background:#2563eb;border-color:#2563eb">FBB</th>' +
-    '<th style="' + MTD_INS_TH + ';background:#dcfce7;color:#15803d;border-color:#e5e7eb">100% &amp; &gt;</th>' +
-    '<th style="' + MTD_INS_TH + ';background:#fef3c7;color:#a16207;border-color:#e5e7eb">100% - 80%</th>' +
-    '<th style="' + MTD_INS_TH + ';background:#fee2e2;color:#b91c1c;border-color:#e5e7eb">Below 80%</th>' +
-    '<th style="' + MTD_INS_TH + ';background:#fff;color:#dc2626;border-color:#e5e7eb">Below 70%</th></tr>';
-  var body = mtdInsHierRows(rmItems, function (kind, g) {
-    var c = mtdInsPlainCell(kind, Math.round(g.idleMob)) + mtdInsPlainCell(kind, Math.round(g.idleFbb));
-    g.bands.forEach(function (n) { c += mtdInsPlainCell(kind, n > 0 ? n : '–'); });
-    return c;
-  });
-  return mtdInsWrapTable('IDLE Lines &amp; Stores Achievement:', h1 + h2, body);
-}
-
-// Per-store row (used by Area Manager store tables and Critical Cases)
-function mtdInsStoreCalc(i) {
+function mtdInsPairTable(titleText, list, key, rmItems, pace, metric) {
   return {
-    gold:   { T: Number(i.a.goldTarget) || 0,   A: Number(i.a.goldSubs) || 0 },
-    mobile: { T: Number(i.a.mobileTarget) || 0, A: Number(i.a.mobileSubs) || 0 },
-    fbb:    { T: Number(i.a.fbbTarget) || 0,    A: Number(i.a.fbbSubs) || 0 },
-    fixedS: { T: Number(i.s.fixedTarget) || 0,  A: Number(i.s.fixedSubs) || 0 },
-    wallet: { T: Number(i.w.walletTarget) || 0, A: Number(i.w.walletSales) || 0 },
-    idle:   (Number(i.s.mobileSubs) || 0) - (Number(i.a.mobileSubs) || 0)
+    k: 'tbl', title: [{ t: titleText, c: '#5E2D91', b: 1 }], minW: 520,
+    head: mtdInsPairHead(list, metric),
+    body: mtdInsHierBody(rmItems, pace, function (kind, g) {
+      var c = [];
+      g[key].forEach(function (x) { c.push(mtdInsPct(x, kind, pace, metric), mtdInsRem(x, kind)); });
+      return c;
+    })
   };
 }
-function mtdInsStoreNameCell(name, bg) {
-  return '<td dir="auto" style="padding:5px 10px;font-size:12px;font-weight:700;background:' + (bg || '#fff') + ';color:#1f2937;border:1px solid #e5e7eb;white-space:nowrap;text-align:right">' + mtdInsEsc(name) + '</td>';
+function mtdInsIdleTable(rmItems, pace) {
+  var blue = { bg: '#2563eb', bd: '#2563eb' };
+  var head = [[
+    mtdInsH('Area Manager', { rs: 2, al: 'l' }), mtdInsH('IDLE', { cs: 2, bg: '#2563eb', bd: '#2563eb' }),
+    mtdInsH('Stores Achievement (Projection)', { cs: 4 })
+  ], [
+    mtdInsH('Mobile', blue), mtdInsH('FBB', blue),
+    mtdInsH('100% & >', { bg: '#dcfce7', fg: '#15803d', bd: '#e5e7eb' }),
+    mtdInsH('100% - 80%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }),
+    mtdInsH('Below 80%', { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }),
+    mtdInsH('Below 70%', { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })
+  ]];
+  return {
+    k: 'tbl', title: [{ t: 'IDLE Lines & Stores Achievement:', c: '#5E2D91', b: 1 }], minW: 520, head: head,
+    body: mtdInsHierBody(rmItems, pace, function (kind, g) {
+      var c = [mtdInsPlain(Math.round(g.idleMob), kind), mtdInsPlain(Math.round(g.idleFbb), kind)];
+      g.bands.forEach(function (n) { c.push(mtdInsPlain(n > 0 ? n : null, kind)); });
+      return c;
+    })
+  };
 }
-function mtdInsStoreTables(amName, amItems, pace) {
-  var g = mtdInsAgg(amItems);
-  var mobP = g.strategic[1].T > 0 ? g.strategic[1].A / g.strategic[1].T : 0;
-  var good = pace > 0 ? (mobP / pace) >= 0.9 : mobP >= 0.9;
-  var remark = good
-    ? '<span style="color:#16a34a">Good Job For Mobile — Keep Focusing On Lowest Stores and Other Products</span>'
-    : '<span style="color:#dc2626">Improvement Required</span>';
-  var calc = amItems.map(function (i) { return { i: i, c: mtdInsStoreCalc(i) }; });
-  calc.sort(function (x, y) {
-    var px = x.c.mobile.T > 0 ? x.c.mobile.A / x.c.mobile.T : -1, py = y.c.mobile.T > 0 ? y.c.mobile.A / y.c.mobile.T : -1;
-    return py - px;
-  });
-  var th = MTD_INS_TH;
-  var head = '<tr><th style="' + th + ';text-align:right">Branch Name</th>' +
-    ['Gold', 'Mobile', 'FBB', 'Fixed (S)', 'Wallet'].map(function (l) { return '<th style="' + th + '">' + l + '</th>'; }).join('') +
-    '<th style="' + th + ';background:#4b5563;border-color:#4b5563">IDLE</th>' +
-    ['Gold', 'Mobile', 'FBB', 'Fixed (S)', 'Wallet'].map(function (l) { return '<th style="' + th + ';background:#111827;border-color:#111827">' + l + ' Rem</th>'; }).join('') + '</tr>';
-  var body = calc.map(function (x) {
-    var c = x.c, ks = ['gold', 'mobile', 'fbb', 'fixedS', 'wallet'];
-    return '<tr>' + mtdInsStoreNameCell(x.i.store) +
-      ks.map(function (k) { return mtdInsPctCell(c[k].T, c[k].A, pace); }).join('') +
-      mtdInsIdleCell(c.idle) +
-      ks.map(function (k) { return mtdInsRemCell(c[k].T, c[k].A, false); }).join('') + '</tr>';
-  }).join('');
-  return mtdInsWrapTable(mtdInsEsc(amName) + ' Stores <span style="color:#374151;font-weight:700">(VS% – IDLE – Remaining)</span>: ' + remark, head, body).replace('min-width:520px', 'min-width:760px');
+
+// ── store tables ──
+var MTD_INS_SKEYS = [['Gold', 0], ['Mobile', 1], ['FBB', 2], ['Fixed (S)', 4], ['Wallet', 5]];   // index into agg.strategic
+function mtdInsStoreCalc(i, pace) {
+  function tp(o, tk, vk, pk) { var a = Number(o[vk]) || 0; return { T: Number(o[tk]) || 0, A: a, P: mtdInsProjOf(o, pk, a, pace) }; }
+  return [
+    tp(i.a, 'goldTarget', 'goldSubs', 'goldProj'), tp(i.a, 'mobileTarget', 'mobileSubs', 'mobileProj'), tp(i.a, 'fbbTarget', 'fbbSubs', 'fbbProj'),
+    tp(i.s, 'fixedTarget', 'fixedSubs', 'fixedProj'), tp(i.w, 'walletTarget', 'walletSales', 'walletProj')
+  ];
 }
-function mtdInsCriticalTable(rmItems, pace) {
-  var calc = rmItems.map(function (i) { return { i: i, c: mtdInsStoreCalc(i) }; })
-    .filter(function (x) { return x.c.mobile.T > 0; });
-  calc.sort(function (x, y) { return (x.c.mobile.A / x.c.mobile.T) - (y.c.mobile.A / y.c.mobile.T); });
+function mtdInsStoreIdle(i) { return (Number(i.s.mobileSubs) || 0) - (Number(i.a.mobileSubs) || 0); }
+function mtdInsMobShare(c, metric) { return c[1].T > 0 ? (metric === 'proj' ? c[1].P : c[1].A) / c[1].T : -1; }
+
+function mtdInsStoreHead(withArea) {
+  var th = [mtdInsH('Branch Name', { al: 'r' })];
+  if (withArea) th.push(mtdInsH('Area Manager', { al: 'l' }));
+  MTD_INS_SKEYS.forEach(function (k) { th.push(mtdInsH(k[0])); });
+  th.push(mtdInsH('IDLE', { bg: '#4b5563', bd: '#4b5563' }));
+  MTD_INS_SKEYS.forEach(function (k) { th.push(mtdInsH(k[0] + ' Rem', { bg: '#111827', bd: '#111827' })); });
+  return [th];
+}
+function mtdInsStoreRow(x, withArea, pace, metric) {
+  var r = [{ v: x.i.store, f: 'txt', bg: '#ffffff', fg: '#1f2937', b: 1, al: 'r', rtl: 1 }];
+  if (withArea) r.push({ v: x.i.am, f: 'txt', bg: '#ffffff', fg: '#374151', b: 1, al: 'l' });
+  x.c.forEach(function (t) { r.push(mtdInsPct(t, 'am', pace, metric)); });
+  r.push(mtdInsIdle(mtdInsStoreIdle(x.i)));
+  x.c.forEach(function (t) { r.push(mtdInsRem(t, 'am')); });
+  return r;
+}
+function mtdInsStoreTable(titleParts, items, withArea, pace, metric, withTotal) {
+  var calc = items.map(function (i) { return { i: i, c: mtdInsStoreCalc(i, pace) }; });
+  calc.sort(function (x, y) { return mtdInsMobShare(y.c, 'ach') - mtdInsMobShare(x.c, 'ach'); });
+  var body = calc.map(function (x) { return mtdInsStoreRow(x, withArea, pace, metric); });
+  if (withTotal) {
+    var g = mtdInsAgg(items, pace), tot = [mtdInsName('Total', 'total', 0)];
+    tot[0].al = 'r'; tot[0].sticky = 0;
+    if (withArea) tot.push(mtdInsName('', 'total', 0));
+    MTD_INS_SKEYS.forEach(function (k) { tot.push(mtdInsPct(g.strategic[k[1]], 'total', pace, metric)); });
+    var idl = mtdInsPlain(Math.round(g.idleMob), 'total');
+    tot.push(idl);
+    MTD_INS_SKEYS.forEach(function (k) { tot.push(mtdInsRem(g.strategic[k[1]], 'total')); });
+    body.push(tot);
+  }
+  return { k: 'tbl', title: titleParts, head: mtdInsStoreHead(withArea), body: body, minW: 760 };
+}
+function mtdInsAreaTable(amName, amItems, pace, metric) {
+  var g = mtdInsAgg(amItems, pace), m = g.strategic[1];
+  var share = m.T > 0 ? (metric === 'proj' ? m.P : m.A) / m.T : 0;
+  var good = metric === 'proj' ? share >= 0.9 : (pace > 0 ? share / pace >= 0.9 : share >= 0.9);
+  return mtdInsStoreTable([
+    { t: amName + ' Stores ', c: '#5E2D91', b: 1 },
+    { t: '(' + (metric === 'proj' ? 'Proj%' : 'VS%') + ' – IDLE – Remaining): ', c: '#374151', b: 1 },
+    good ? { t: 'Good Job For Mobile — Keep Focusing On Lowest Stores and Other Products', c: '#16a34a', b: 1 }
+         : { t: 'Improvement Required', c: '#dc2626', b: 1 }
+  ], amItems, false, pace, metric, false);
+}
+function mtdInsSupTable(svName, svItems, pace, metric) {
+  return mtdInsStoreTable([
+    { t: svName + ' ', c: '#5E2D91', b: 1 },
+    { t: '— ' + svItems.length + ' stores (' + (metric === 'proj' ? 'Proj%' : 'VS%') + ' – IDLE – Remaining)', c: '#374151', b: 1 }
+  ], svItems, true, pace, metric, true);
+}
+function mtdInsCriticalTable(rmItems, pace, metric) {
+  var calc = rmItems.map(function (i) { return { i: i, c: mtdInsStoreCalc(i, pace) }; }).filter(function (x) { return x.c[1].T > 0; });
+  calc.sort(function (x, y) { return mtdInsMobShare(x.c, metric) - mtdInsMobShare(y.c, metric); });
   calc = calc.slice(0, MTD_INS_CRITICAL_N);
-  if (!calc.length) return '';
-  var th = MTD_INS_TH;
-  var head = '<tr><th style="' + th + ';text-align:right;background:#111827;border-color:#111827">Branch Name</th>' +
-    ['Gold', 'Mobile', 'FBB', 'Fixed (S)', 'Wallet', 'IDLE'].map(function (l) { return '<th style="' + th + '">' + l + '</th>'; }).join('') + '</tr>';
+  if (!calc.length) return null;
+  var head = [[mtdInsH('Branch Name', { al: 'r', bg: '#111827', bd: '#111827' })]];
+  MTD_INS_SKEYS.forEach(function (k) { head[0].push(mtdInsH(k[0])); });
+  head[0].push(mtdInsH('IDLE'));
   var body = calc.map(function (x) {
-    var c = x.c;
-    return '<tr>' + mtdInsStoreNameCell(x.i.store) +
-      ['gold', 'mobile', 'fbb', 'fixedS', 'wallet'].map(function (k) { return mtdInsPctCell(c[k].T, c[k].A, pace); }).join('') +
-      mtdInsIdleCell(c.idle) + '</tr>';
-  }).join('');
-  return mtdInsWrapTable('<span style="color:#111827">CRITICAL CASES</span> <span style="color:#dc2626">(IMMEDIATE ACTION REQUIRED)</span>:', head, body);
+    var r = [{ v: x.i.store, f: 'txt', bg: '#ffffff', fg: '#1f2937', b: 1, al: 'r', rtl: 1 }];
+    x.c.forEach(function (t) { r.push(mtdInsPct(t, 'am', pace, metric)); });
+    r.push(mtdInsIdle(mtdInsStoreIdle(x.i)));
+    return r;
+  });
+  return { k: 'tbl', title: [{ t: 'CRITICAL CASES ', c: '#111827', b: 1 }, { t: '(IMMEDIATE ACTION REQUIRED):', c: '#dc2626', b: 1 }], head: head, body: body, minW: 520 };
+}
+
+// ── full model for a set of stores ──
+function mtdInsBuildBlocks(items, pace, metric, view) {
+  var rmMap = {}, rmOrder = [], blocks = [];
+  items.forEach(function (i) { if (!rmMap[i.rm]) { rmMap[i.rm] = []; rmOrder.push(i.rm); } rmMap[i.rm].push(i); });
+  rmOrder.forEach(function (rm) {
+    var rmItems = rmMap[rm];
+    blocks.push({ k: 'rm', t: rm + ' · ' + rmItems.length + ' stores' });
+    blocks.push(mtdInsPairTable('Prepaid & Control Products:', MTD_INS_PREPAID, 'prepaid', rmItems, pace, metric));
+    blocks.push(mtdInsPairTable('Strategic Products:', MTD_INS_STRATEGIC, 'strategic', rmItems, pace, metric));
+    blocks.push(mtdInsIdleTable(rmItems, pace));
+    blocks.push({ k: 'bar', t: 'Stores Breakdown', view: view });
+    var svOrder = [], svMap = {};
+    rmItems.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
+    svOrder.forEach(function (sv) {
+      if (view === 'sup') blocks.push(mtdInsSupTable(sv, svMap[sv].items, pace, metric));
+      else svMap[sv].amOrder.forEach(function (am) { blocks.push(mtdInsAreaTable(am, svMap[sv].ams[am], pace, metric)); });
+    });
+    var crit = mtdInsCriticalTable(rmItems, pace, metric);
+    if (crit) blocks.push(crit);
+  });
+  return blocks;
+}
+
+// ── HTML renderer ──
+function mtdInsFmt(c) {
+  if (c.v === null || c.v === undefined || c.v === '') return c.f === 'txt' ? '' : '–';
+  if (c.f === 'pct') return Math.round(c.v * 100) + '%';
+  if (c.f === 'int') return Math.round(c.v).toLocaleString('en-US');
+  if (c.f === 'rem') return c.v < 0 ? '(' + mtdInsNum(-c.v) + ')' : mtdInsNum(c.v);
+  return mtdInsEsc(c.v).replace(/&amp;amp;/g, '&amp;');
+}
+function mtdInsCellHtml(c) {
+  var tag = c.hd ? 'th' : 'td', al = c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center');
+  var pad = c.hd ? '6px 8px' : (c.sticky ? '6px 10px' : (c.rtl ? '5px 10px' : '5px 8px'));
+  var st = 'padding:' + pad + ';text-align:' + al + ';background:' + c.bg + ';color:' + c.fg + ';font-weight:' + (c.b ? 800 : 600) +
+    ';font-size:' + (c.hd ? 11 : 12) + 'px;border:1px solid ' + (c.bd || '#e5e7eb') + ';white-space:nowrap' + (c.sticky ? ';position:sticky;left:0' : '');
+  return '<' + tag + (c.cs ? ' colspan="' + c.cs + '"' : '') + (c.rs ? ' rowspan="' + c.rs + '"' : '') + (c.rtl ? ' dir="auto"' : '') + ' style="' + st + '">' + mtdInsFmt(c) + '</' + tag + '>';
+}
+function mtdInsTitleHtml(parts) {
+  return parts.map(function (p) { return '<span style="color:' + p.c + ';font-weight:' + (p.b ? 800 : 600) + '">' + mtdInsEsc(p.t) + '</span>'; }).join('');
+}
+function mtdInsBlocksHtml(blocks) {
+  var html = '', open = false;
+  blocks.forEach(function (b) {
+    if (b.k === 'rm') {
+      if (open) html += '</div>';
+      open = true;
+      html += '<div style="margin-bottom:26px"><div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:14px;font-weight:800"><i class="fas fa-user-tie mr-2"></i>' + mtdInsEsc(b.t) + '</div>';
+    } else if (b.k === 'bar') {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:4px 0 10px;padding:8px 12px;background:#f5f3ff;border-radius:10px">' +
+        '<span style="font-size:12px;font-weight:800;color:#5E2D91"><i class="fas fa-store mr-1"></i>' + mtdInsEsc(b.t) + '</span>' +
+        '<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:white">' +
+        '<button onclick="setMTDInsView(\'area\')" style="' + mtdInsSegStyle(b.view === 'area') + '"><i class="fas fa-user mr-1"></i>Per Area</button>' +
+        '<button onclick="setMTDInsView(\'sup\')" style="' + mtdInsSegStyle(b.view === 'sup') + '"><i class="fas fa-users mr-1"></i>Per Supervisor</button></div></div>';
+    } else if (b.k === 'tbl') {
+      html += '<div style="margin-bottom:16px"><div style="font-size:12px;margin:0 0 6px 2px">' + mtdInsTitleHtml(b.title) + '</div>' +
+        '<div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb"><table style="border-collapse:collapse;width:100%;font-size:12px;min-width:' + b.minW + 'px"><thead>' +
+        b.head.map(function (r) { return '<tr>' + r.map(mtdInsCellHtml).join('') + '</tr>'; }).join('') + '</thead><tbody>' +
+        b.body.map(function (r) { return '<tr>' + r.map(mtdInsCellHtml).join('') + '</tr>'; }).join('') + '</tbody></table></div></div>';
+    }
+  });
+  if (open) html += '</div>';
+  return html;
 }
 
 function renderMTDInsights() {
   var el = document.getElementById('mtd-insights-content');
   if (!el) return;
-  var built = mtdInsBuildItems();
-  var items = built.items;
+  mtdInsSyncToolbar();
+  var built = mtdInsBuildItems(MTD_FILTERED), items = built.items;
   if (!items.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">No data for the current filters</div>'; return; }
-  var pace = mtdInsPace();
+  var pace = mtdInsPace(), notes = '';
+  function warn(t) { return '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ ' + t + '</div>'; }
+  if (!items.some(function (i) { return (Number(i.a.kixTarget) || 0) > 0; })) notes += warn('تارجتات الباقات الفرعية (Kix / Tazbeet / SIM-MIFI / PAYG / WE Club / WE Mix) مش موجودة في الداتا الحالية — ارفع ملف MTD تاني عشان تتحمّل.');
+  if (!built.hasSales) notes += warn('مفيش داتا Sales منفصلة — الـ IDLE و Fixed (S) هيظهروا بنفس أرقام Activation.');
+  if (!items.some(function (i) { return (Number(i.w.walletTarget) || 0) > 0; })) notes += warn('داتا WE Pay (Wallet) مش محمّلة.');
+  el.innerHTML = notes + mtdInsBlocksHtml(mtdInsBuildBlocks(items, pace, MTD_INS_METRIC, MTD_INS_VIEW));
+}
 
-  // Heads-up banners for missing source data
-  var notes = '';
-  var anyPrepaidTarget = items.some(function (i) { return (Number(i.a.kixTarget) || 0) > 0; });
-  if (!anyPrepaidTarget) notes += '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ تارجتات الباقات الفرعية (Kix / Tazbeet / SIM-MIFI / PAYG / WE Club / WE Mix) مش موجودة في الداتا الحالية — ارفع ملف MTD تاني عشان تتحمّل.</div>';
-  if (!built.hasSales) notes += '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ مفيش داتا Sales منفصلة — الـ IDLE و Fixed (S) هيظهروا بنفس أرقام Activation.</div>';
-  var anyWallet = items.some(function (i) { return (Number(i.w.walletTarget) || 0) > 0; });
-  if (!anyWallet) notes += '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ داتا WE Pay (Wallet) مش محمّلة.</div>';
-
-  // Group by Regional Manager (keeps first-seen order)
-  var rmMap = {}, rmOrder = [];
-  items.forEach(function (i) {
-    if (!rmMap[i.rm]) { rmMap[i.rm] = []; rmOrder.push(i.rm); }
-    rmMap[i.rm].push(i);
+// ════════════════ EXCEL EXPORT (styled, 2 sheets) ════════════════
+function mtdInsLoadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = function () { window.ExcelJS ? res() : rej(new Error('ExcelJS not available')); };
+    s.onerror = function () { rej(new Error('تعذر تحميل مكتبة التصدير (تأكد من الإنترنت)')); };
+    document.head.appendChild(s);
   });
-
-  var html = notes;
-  rmOrder.forEach(function (rm) {
-    var rmItems = rmMap[rm];
-    html += '<div style="margin-bottom:26px">' +
-      '<div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:14px;font-weight:800">' +
-      '<i class="fas fa-user-tie mr-2"></i>' + mtdInsEsc(rm) + ' <span style="font-size:11px;opacity:.85;font-weight:600">· ' + rmItems.length + ' stores</span></div>';
-    html += mtdInsPrepaidTable(rmItems, pace);
-    html += mtdInsStrategicTable(rmItems, pace);
-    html += mtdInsIdleTable(rmItems);
-    // Per Area Manager store tables (same order as the hierarchy above)
-    var seen = {}, amList = [];
-    rmItems.forEach(function (i) { var k = i.sv + '|' + i.am; if (!seen[k]) { seen[k] = 1; amList.push({ sv: i.sv, am: i.am }); } });
-    var svFirst = {}, svN = 0;
-    rmItems.forEach(function (i) { if (svFirst[i.sv] === undefined) svFirst[i.sv] = svN++; });
-    amList.sort(function (x, y) { return svFirst[x.sv] - svFirst[y.sv]; });   // stable: AMs keep first-seen order inside a supervisor
-    amList.forEach(function (x) {
-      html += mtdInsStoreTables(x.am, rmItems.filter(function (i) { return i.sv === x.sv && i.am === x.am; }), pace);
-    });
-    html += mtdInsCriticalTable(rmItems, pace);
-    html += '</div>';
+}
+// Same password gate the other exports use (reuses EXPORT_PASSWORD_HASH + sha256Hex)
+async function mtdInsAuth() {
+  var pw = prompt('🔐 أدخل كلمة المرور لتحميل الملف:', '');
+  if (pw === null) return false;
+  if ((await sha256Hex(pw)) !== EXPORT_PASSWORD_HASH) { alert('❌ كلمة المرور غلط!'); return false; }
+  return true;
+}
+function mtdInsArgb(hex) { return 'FF' + String(hex).replace('#', '').toUpperCase(); }
+function mtdInsXlStyle(cell, c) {
+  var border = { style: 'thin', color: { argb: mtdInsArgb(c.bd || '#E5E7EB') } };
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: mtdInsArgb(c.bg) } };
+  cell.font = { name: 'Calibri', size: c.hd ? 11 : 11, bold: !!c.b, color: { argb: mtdInsArgb(c.fg) } };
+  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: (c.al === 'l' || c.al === 'r') ? 1 : 0 };
+  cell.border = { top: border, left: border, bottom: border, right: border };
+}
+function mtdInsXlValue(cell, c) {
+  if (c.v === null || c.v === undefined || c.v === '') { cell.value = c.f === 'txt' ? '' : '–'; return; }
+  cell.value = c.v;
+  if (c.f === 'pct') cell.numFmt = '0%';
+  else if (c.f === 'int') cell.numFmt = '#,##0';
+  else if (c.f === 'rem') cell.numFmt = '#,##0;(#,##0)';
+}
+function mtdInsXlMerged(ws, r, c1, c2, text, style) {
+  ws.mergeCells(r, c1, r, c2);
+  for (var cc = c1; cc <= c2; cc++) mtdInsXlStyle(ws.getCell(r, cc), style);
+  ws.getCell(r, c1).value = text;
+}
+function mtdInsWriteSheet(ws, heading, blocks) {
+  var N = MTD_INS_NCOLS, r = 1;
+  ws.views = [{ showGridLines: false }];
+  ws.getColumn(1).width = 34; ws.getColumn(2).width = 26;
+  for (var ci = 3; ci <= N; ci++) ws.getColumn(ci).width = 12;
+  mtdInsXlMerged(ws, r, 1, N, heading, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
+  ws.getRow(r).height = 24; r += 2;
+  blocks.forEach(function (b) {
+    if (b.k === 'rm') {
+      mtdInsXlMerged(ws, r, 1, N, b.t, { bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'l', bd: '#5E2D91' });
+      ws.getRow(r).height = 22; r++;
+    } else if (b.k === 'bar') {
+      mtdInsXlMerged(ws, r, 1, N, b.t + ' — ' + (b.view === 'sup' ? 'Per Supervisor' : 'Per Area'), { bg: '#F5F3FF', fg: '#5E2D91', b: 1, al: 'l', bd: '#DDD6FE' });
+      r++;
+    } else if (b.k === 'tbl') {
+      ws.mergeCells(r, 1, r, N);
+      var tc = ws.getCell(r, 1);
+      tc.value = { richText: b.title.map(function (p) { return { text: p.t, font: { name: 'Calibri', size: 11, bold: !!p.b, color: { argb: mtdInsArgb(p.c) } } }; }) };
+      tc.alignment = { horizontal: 'left', vertical: 'middle' };
+      r++;
+      var occ = {};
+      b.head.concat(b.body).forEach(function (row, ri) {
+        var isHead = ri < b.head.length, col = 1;
+        row.forEach(function (c) {
+          while (occ[r + ':' + col]) col++;
+          var cs = c.cs || 1, rs = c.rs || 1;
+          if (cs > 1 || rs > 1) {
+            ws.mergeCells(r, col, r + rs - 1, col + cs - 1);
+            for (var rr = r; rr < r + rs; rr++) for (var cc2 = col; cc2 < col + cs; cc2++) { occ[rr + ':' + cc2] = 1; mtdInsXlStyle(ws.getCell(rr, cc2), c); }
+          } else { occ[r + ':' + col] = 1; }
+          var cell = ws.getCell(r, col);
+          mtdInsXlStyle(cell, c);
+          mtdInsXlValue(cell, c);
+          col += cs;
+        });
+        r++;
+      });
+      r++;   // blank line between tables
+    }
   });
-  el.innerHTML = html;
+}
+async function exportMTDInsights() {
+  var btn = document.getElementById('mtd-insights-export');
+  if (!(MTD_FILTERED && MTD_FILTERED.length) && !(MTD_DATA && MTD_DATA.length)) { alert('⚠️ مفيش بيانات للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var pace = mtdInsPace(), metric = MTD_INS_METRIC, view = MTD_INS_VIEW;
+    var modeTxt = (metric === 'proj' ? 'Proj%' : 'Ach%') + ' · ' + (view === 'sup' ? 'Per Supervisor' : 'Per Area');
+    var dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
+    var act = mtdInsBuildItems(MTD_FILTERED).items, full = mtdInsBuildItems(MTD_DATA).items;
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    var ws1 = wb.addWorksheet('Active (Filtered)'), ws2 = wb.addWorksheet('Full Data');
+    mtdInsWriteSheet(ws1, 'MTD Insights — Active data (current filters) · ' + act.length + ' stores · ' + modeTxt + dateTxt, mtdInsBuildBlocks(act, pace, metric, view));
+    mtdInsWriteSheet(ws2, 'MTD Insights — Full data (all stores) · ' + full.length + ' stores · ' + modeTxt + dateTxt, mtdInsBuildBlocks(full, pace, metric, view));
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'MTD_Insights_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    console.error('[MTD Insights export]', e);
+    alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
 }
 
 </script>
