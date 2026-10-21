@@ -10389,6 +10389,7 @@ function mtdInsAgg(items, pace) {
     var pr = mtdInsProjOf(i.a, 'mobileProj', Number(i.a.mobileSubs) || 0, pace) / T;
     if (pr >= 1) o.bands[0]++; else if (pr >= 0.8) o.bands[1]++; else if (pr >= 0.7) o.bands[2]++; else o.bands[3]++;
   });
+  o._items = items;
   return o;
 }
 
@@ -10580,6 +10581,90 @@ function mtdInsCriticalTable(rmItems, pace, metric) {
   return { k: 'tbl', title: [{ t: 'CRITICAL CASES ', c: '#111827', b: 1 }, { t: '(IMMEDIATE ACTION REQUIRED):', c: '#dc2626', b: 1 }], head: head, body: body, minW: 520 };
 }
 
+
+// ── Branch Achievement card (Mobile | Wallet): stores, Target, Ach, Ach%, Proj%, stores below 100 / 90 / 70 (by projection) ──
+var MTD_INS_BA = 'mobile';   // 'mobile' | 'wallet'
+function setMTDInsBA(m) { MTD_INS_BA = m; mtdInsRerender(); }
+function mtdInsBAKeys(ba) {
+  return ba === 'wallet' ? { src: 'w', t: 'walletTarget', v: 'walletSales', p: 'walletProj' }
+                         : { src: 'a', t: 'mobileTarget', v: 'mobileSubs',  p: 'mobileProj' };
+}
+function mtdInsBAAgg(items, pace, ba) {
+  var k = mtdInsBAKeys(ba), o = { n: 0, T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 };
+  items.forEach(function (i) {
+    var s = i[k.src], t = Number(s[k.t]) || 0, a = Number(s[k.v]) || 0, p = mtdInsProjOf(s, k.p, a, pace);
+    o.T += t; o.A += a; o.P += p;
+    if (!(t > 0)) return;
+    o.n++;
+    var r = p / t;
+    if (r < 1) o.l100++; if (r < 0.9) o.l90++; if (r < 0.7) o.l70++;
+  });
+  return o;
+}
+function mtdInsBACount(n, kind, fgOn) {
+  var base = mtdInsBase(kind);
+  if (!n) return { v: null, f: 'int', bg: base.bg, fg: kind === 'am' ? '#9ca3af' : base.fg, al: 'c' };
+  return { v: n, f: 'int', bg: base.bg, fg: kind === 'am' ? fgOn : base.fg, b: 1, al: 'c' };
+}
+function mtdInsBATable(rmItems, pace, ba) {
+  var label = ba === 'wallet' ? 'Wallet' : 'Mobile';
+  var head = [[
+    mtdInsH('Area Manager', { rs: 2, al: 'l' }), mtdInsH('Stores', { rs: 2 }),
+    mtdInsH(label + ' Performance', { cs: 4 }), mtdInsH('Stores Below Target (Projection)', { cs: 3 })
+  ], [
+    mtdInsH('Target', { bg: '#6d3fa8' }), mtdInsH('Ach', { bg: '#6d3fa8' }), mtdInsH('Ach %', { bg: '#6d3fa8' }), mtdInsH('Proj %', { bg: '#6d3fa8' }),
+    mtdInsH('< 100%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }),
+    mtdInsH('< 90%',  { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }),
+    mtdInsH('< 70%',  { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })
+  ]];
+  return {
+    k: 'tbl', minW: 640, head: head, title: [{ t: 'Branch Achievement — ' + label + ':', c: '#5E2D91', b: 1 }],
+    body: mtdInsHierBody(rmItems, pace, function (kind, g) {
+      var d = mtdInsBAAgg(g._items, pace, ba), x = { T: d.T, A: d.A, P: d.P };
+      return [mtdInsPlain(d.n, kind), mtdInsPlain(Math.round(d.T), kind), mtdInsPlain(Math.round(d.A), kind),
+        mtdInsPct(x, kind, pace, 'ach'), mtdInsPct(x, kind, pace, 'proj'),
+        mtdInsBACount(d.l100, kind, '#a16207'), mtdInsBACount(d.l90, kind, '#b91c1c'), mtdInsBACount(d.l70, kind, '#dc2626')];
+    })
+  };
+}
+function mtdInsBAExportBlocks(items, pace, ba) {
+  var rmMap = {}, order = [], blocks = [];
+  items.forEach(function (i) { if (!rmMap[i.rm]) { rmMap[i.rm] = []; order.push(i.rm); } rmMap[i.rm].push(i); });
+  order.forEach(function (rm) {
+    blocks.push({ k: 'rm', t: rm + ' · ' + rmMap[rm].length + ' stores' });
+    blocks.push({ k: 'bar2', t: 'Branch Achievement', ba: ba });
+    blocks.push(mtdInsBATable(rmMap[rm], pace, ba));
+  });
+  return blocks;
+}
+async function exportMTDBranchAch(btn) {
+  if (!(MTD_FILTERED && MTD_FILTERED.length) && !(MTD_DATA && MTD_DATA.length)) { alert('⚠️ مفيش بيانات للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var pace = mtdInsPace(), ba = MTD_INS_BA, lbl = ba === 'wallet' ? 'Wallet' : 'Mobile';
+    var dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
+    var act = mtdInsBuildItems(MTD_FILTERED).items, full = mtdInsBuildItems(MTD_DATA).items;
+    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
+    mtdInsWriteSheet(wb.addWorksheet('Active (Filtered)'), 'Branch Achievement (' + lbl + ') — Active data (current filters) · ' + act.length + ' stores' + dateTxt, mtdInsBAExportBlocks(act, pace, ba));
+    mtdInsWriteSheet(wb.addWorksheet('Full Data'), 'Branch Achievement (' + lbl + ') — Full data (all stores) · ' + full.length + ' stores' + dateTxt, mtdInsBAExportBlocks(full, pace, ba));
+    var buf = await wb.xlsx.writeBuffer(), now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'MTD_Branch_Achievement_' + lbl + '_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    console.error('[Branch Achievement export]', e);
+    alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
 // ── full model for a set of stores ──
 function mtdInsBuildBlocks(items, pace, metric, view) {
   var rmMap = {}, rmOrder = [], blocks = [];
@@ -10590,6 +10675,8 @@ function mtdInsBuildBlocks(items, pace, metric, view) {
     blocks.push(mtdInsPairTable('Prepaid & Control Products:', MTD_INS_PREPAID, 'prepaid', rmItems, pace, metric));
     blocks.push(mtdInsPairTable('Strategic Products:', MTD_INS_STRATEGIC, 'strategic', rmItems, pace, metric));
     blocks.push(mtdInsIdleTable(rmItems, pace));
+    blocks.push({ k: 'bar2', t: 'Branch Achievement', ba: MTD_INS_BA });
+    blocks.push(mtdInsBATable(rmItems, pace, MTD_INS_BA));
     blocks.push({ k: 'bar', t: 'Stores Breakdown', view: view });
     var svOrder = [], svMap = {};
     rmItems.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
@@ -10634,6 +10721,13 @@ function mtdInsBlocksHtml(blocks) {
         '<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:white">' +
         '<button onclick="setMTDInsView(\'area\')" style="' + mtdInsSegStyle(b.view === 'area') + '"><i class="fas fa-user mr-1"></i>Per Area</button>' +
         '<button onclick="setMTDInsView(\'sup\')" style="' + mtdInsSegStyle(b.view === 'sup') + '"><i class="fas fa-users mr-1"></i>Per Supervisor</button></div></div>';
+    } else if (b.k === 'bar2') {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:4px 0 10px;padding:8px 12px;background:#f5f3ff;border-radius:10px">' +
+        '<span style="font-size:12px;font-weight:800;color:#5E2D91"><i class="fas fa-bullseye mr-1"></i>' + mtdInsEsc(b.t) + '</span>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:white">' +
+        '<button onclick="setMTDInsBA(\'mobile\')" style="' + mtdInsSegStyle(b.ba !== 'wallet') + '"><i class="fas fa-mobile-alt mr-1"></i>Mobile</button>' +
+        '<button onclick="setMTDInsBA(\'wallet\')" style="' + mtdInsSegStyle(b.ba === 'wallet') + '"><i class="fas fa-wallet mr-1"></i>Wallet</button></div>' +
+        '<button onclick="exportMTDBranchAch(this)" style="padding:6px 14px;border-radius:20px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-file-export mr-1"></i>Export</button></div></div>';
     } else if (b.k === 'tbl') {
       html += '<div style="margin-bottom:16px"><div style="font-size:12px;margin:0 0 6px 2px">' + mtdInsTitleHtml(b.title) + '</div>' +
         '<div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb"><table style="border-collapse:collapse;width:100%;font-size:12px;min-width:' + b.minW + 'px"><thead>' +
@@ -10708,6 +10802,9 @@ function mtdInsWriteSheet(ws, heading, blocks) {
     if (b.k === 'rm') {
       mtdInsXlMerged(ws, r, 1, N, b.t, { bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'l', bd: '#5E2D91' });
       ws.getRow(r).height = 22; r++;
+    } else if (b.k === 'bar2') {
+      mtdInsXlMerged(ws, r, 1, N, b.t + ' — ' + (b.ba === 'wallet' ? 'Wallet' : 'Mobile'), { bg: '#F5F3FF', fg: '#5E2D91', b: 1, al: 'l', bd: '#DDD6FE' });
+      r++;
     } else if (b.k === 'bar') {
       mtdInsXlMerged(ws, r, 1, N, b.t + ' — ' + (b.view === 'sup' ? 'Per Supervisor' : 'Per Area'), { bg: '#F5F3FF', fg: '#5E2D91', b: 1, al: 'l', bd: '#DDD6FE' });
       r++;
