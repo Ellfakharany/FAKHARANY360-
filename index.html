@@ -1530,6 +1530,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <i class="fas fa-wallet"></i> Upload Wallet
             <input type="file" id="wallet-import-input" accept="*/*" style="display:none" onchange="loadWalletFile(this.files[0])">
           </label>
+          <label title="ملف MTD الشامل لكل الشركة (كل الـ Regions)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border-radius:20px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(15,118,110,0.3)">
+            <i class="fas fa-globe"></i> Upload MTD NW
+            <input type="file" id="mtd-nw-import-input" accept=".xlsx,.xls,.xlsb,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="loadMTDNWFile(this.files[0]); this.value=''">
+          </label>
           <span id="mtd-converting-badge" style="display:none;background:#f59e0b;color:white;font-size:10px;font-weight:700;padding:5px 12px;border-radius:12px"><i class="fas fa-spinner fa-spin mr-1"></i>Converting xlsb...</span>
         </div>
       </div>
@@ -1537,6 +1541,17 @@ document.addEventListener('DOMContentLoaded', function() {
       <!-- ── Data Freshness / Source bar (Mobile + WE Pay, auto vs manual) ── -->
       <div id="mtd-data-freshness-note" style="display:none;font-size:12px;color:#374151;margin-bottom:14px;background:#f9fafb;border:1px solid #eef0f2;border-radius:10px;padding:8px 14px">
         <i class="fas fa-info-circle mr-1" style="color:#9ca3af"></i><span id="mtd-data-freshness-text"></span>
+      </div>
+
+      <!-- ── Data Source switch (visible only after an MTD NW file was uploaded) ── -->
+      <div id="mtd-src-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;background:white;border:1.5px solid #ccfbf1;border-radius:12px;padding:8px 14px">
+        <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em">Data Source:</span>
+        <div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+          <button id="mtd-src-main" onclick="setMTDSource('main')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#0f766e;color:white"><i class="fas fa-map-marker-alt mr-1"></i>Regional</button>
+          <button id="mtd-src-nw" onclick="setMTDSource('nw')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280"><i class="fas fa-globe mr-1"></i>NW — All Company</button>
+        </div>
+        <span id="mtd-src-info" style="font-size:11px;color:#374151"></span>
+        <button onclick="removeMTDNW()" title="مسح بيانات NW من المتصفح" style="margin-left:auto;background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer">✕</button>
       </div>
 
       <!-- ── Empty State (shown until an MTD file is uploaded) ── -->
@@ -1616,6 +1631,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="mtd-store-overlay" class="hidden fixed inset-0 z-20" onclick="closeMTDStoreDropdown()"></div>
 
       <!-- ── Projected Month-End Forecast (run-rate) ── -->
+      <div id="mtd-nw-extras" style="display:none;margin-bottom:14px"></div>
       <div id="mtd-forecast-banner" class="mb-5"></div>
 
       <!-- ── MTD KPI Cards ── -->
@@ -10747,8 +10763,12 @@ function renderMTDInsights() {
   if (!items.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">No data for the current filters</div>'; return; }
   var pace = mtdInsPace(), notes = '';
   function warn(t) { return '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ ' + t + '</div>'; }
-  if (!items.some(function (i) { return (Number(i.a.kixTarget) || 0) > 0; })) notes += warn('تارجتات الباقات الفرعية (Kix / Tazbeet / SIM-MIFI / PAYG / WE Club / WE Mix) مش موجودة في الداتا الحالية — ارفع ملف MTD تاني عشان تتحمّل.');
-  if (!built.hasSales) notes += warn('مفيش داتا Sales منفصلة — الـ IDLE و Fixed (S) هيظهروا بنفس أرقام Activation.');
+  if (typeof MTD_SRC !== 'undefined' && MTD_SRC === 'nw') {
+    notes += warn('مصدر MTD NW مفيهوش Gold ولا تفاصيل الباقات (Kix / Tazbeet…) ولا Activation منفصل — الأعمدة دي فاضية والـ IDLE = 0. أرقام Mobile و FBB و Fixed و Wallet حقيقية.');
+  } else {
+    if (!items.some(function (i) { return (Number(i.a.kixTarget) || 0) > 0; })) notes += warn('تارجتات الباقات الفرعية (Kix / Tazbeet / SIM-MIFI / PAYG / WE Club / WE Mix) مش موجودة في الداتا الحالية — ارفع ملف MTD تاني عشان تتحمّل.');
+    if (!built.hasSales) notes += warn('مفيش داتا Sales منفصلة — الـ IDLE و Fixed (S) هيظهروا بنفس أرقام Activation.');
+  }
   if (!items.some(function (i) { return (Number(i.w.walletTarget) || 0) > 0; })) notes += warn('داتا WE Pay (Wallet) مش محمّلة.');
   el.innerHTML = notes + mtdInsBlocksHtml(mtdInsBuildBlocks(items, pace, MTD_INS_METRIC, MTD_INS_VIEW));
 }
@@ -10866,6 +10886,293 @@ async function exportMTDInsights() {
     if (btn) { btn.disabled = false; btn.innerHTML = old; }
   }
 }
+
+</script>
+<script>
+// ════════════════════════════════════════════════════════════════
+//  MTD NW — company-wide source (all regions / all products, one Excel)
+//  • Manual upload from the MTD tab ("Upload MTD NW"), parsed in the browser.
+//  • Lives in its OWN dataset (MTD_NW). The Regional (Cairo & Canal) data is never
+//    modified or deleted: switching source just swaps the MTD globals in/out and
+//    swaps them back, so the old sources keep working exactly as before.
+//  • Hierarchy: stores that also exist in the Regional data keep their real
+//    Regional Manager / Supervisor / Area Manager / Region / Classification.
+//    Other stores: Regional Manager ← Senior Manager, Supervisor & Area ← Partner.
+//  • Kept in this browser (localStorage) so it survives a reload; removable (✕).
+// ════════════════════════════════════════════════════════════════
+var MTD_SRC = 'main';          // 'main' (Regional) | 'nw'
+var MTD_NW = null;             // { raw:[[...]], label, fileName, savedAt, stats }
+var MTD_MAIN_BACKUP = null;    // snapshot of the Regional globals while NW is shown
+var MTD_NW_LS_KEY = 'fk360_mtd_nw_v1';
+
+function mtdNwEl(id) { return document.getElementById(id); }
+function mtdNwNorm(s) {
+  return String(s == null ? '' : s).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase().replace(/achievement/g, 'achievment');
+}
+function mtdNwNum(v) { var n = Number(v); return (v === null || v === undefined || v === '' || isNaN(n)) ? 0 : n; }
+
+// ── Parse the NW workbook → compact raw records ─────────────────
+var MTD_NW_COLS = {
+  code:   ['store code', 'storecode', 'storecodebss'],
+  name:   ['store name', 'branch name'],
+  senior: ['senior manager'],
+  partner:['partner'],
+  mS: ['mobile sales'],  mT: ['mobile tgt', 'mobile target'],  mP: ['mobile projection'],
+  fS: ['fbb sale', 'fbb sales'], fT: ['fbb tgt', 'fbb target'], fP: ['fbb projection'],
+  vS: ['fv sales', 'fv sale'],   vT: ['fv tgt', 'fv target'],   vP: ['fv projection'],
+  dv: ['device', 'devices'],     dT: ['devices tgt', 'devices target'], dP: ['devices projection'],
+  wC: ['count of wallet created', 'wallet created', 'wallet sales'], wT: ['wallet tgt', 'wallet target'], wP: ['wallet projection'],
+  cT: ['collection trxs', 'collection trx'], cA: ['collection amount']
+};
+var MTD_NW_REQUIRED = ['code', 'mS', 'mT'];
+function mtdNwParseWorkbook(wb) {
+  var found = null, headersSeen = [];
+  for (var s = 0; s < wb.SheetNames.length && !found; s++) {
+    var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[s]], { header: 1, raw: true, defval: null });
+    for (var r = 0; r < Math.min(aoa.length, 15); r++) {
+      var norm = (aoa[r] || []).map(mtdNwNorm);
+      if (!norm.some(function (x) { return MTD_NW_COLS.code.indexOf(x) >= 0; })) continue;
+      var idx = {};
+      Object.keys(MTD_NW_COLS).forEach(function (k) {
+        idx[k] = -1;
+        for (var a = 0; a < MTD_NW_COLS[k].length && idx[k] < 0; a++) idx[k] = norm.indexOf(MTD_NW_COLS[k][a]);
+      });
+      headersSeen = norm.filter(Boolean);
+      var missing = MTD_NW_REQUIRED.filter(function (k) { return idx[k] < 0; });
+      if (!missing.length) { found = { aoa: aoa, hr: r, idx: idx, sheet: wb.SheetNames[s] }; break; }
+    }
+  }
+  if (!found) throw new Error('الملف مش بصيغة MTD NW المتوقعة — لازم يكون فيه أعمدة Store Code و Mobile Sales و Mobile TGT.' + (headersSeen.length ? '\nالأعمدة اللي لقيتها: ' + headersSeen.slice(0, 12).join(' | ') : ''));
+  var I = found.idx, raw = [], seen = {}, stats = { total: 0, kept: 0, skipped: 0, dups: 0, sheet: found.sheet };
+  function cell(row, k) { return I[k] >= 0 ? row[I[k]] : null; }
+  for (var i = found.hr + 1; i < found.aoa.length; i++) {
+    var row = found.aoa[i] || [];
+    var code = String(cell(row, 'code') == null ? '' : cell(row, 'code')).trim();
+    if (!code || /^(grand\s*)?total$/i.test(code)) continue;
+    stats.total++;
+    var key = code.toUpperCase();
+    if (seen[key]) { stats.dups++; continue; }
+    seen[key] = 1;
+    var rec = [code, String(cell(row, 'name') || '').trim(), String(cell(row, 'senior') || '').trim(), String(cell(row, 'partner') || '').trim(),
+      mtdNwNum(cell(row, 'mS')), mtdNwNum(cell(row, 'mT')), mtdNwNum(cell(row, 'mP')),
+      mtdNwNum(cell(row, 'fS')), mtdNwNum(cell(row, 'fT')), mtdNwNum(cell(row, 'fP')),
+      mtdNwNum(cell(row, 'vS')), mtdNwNum(cell(row, 'vT')), mtdNwNum(cell(row, 'vP')),
+      mtdNwNum(cell(row, 'dv')), mtdNwNum(cell(row, 'dT')), mtdNwNum(cell(row, 'dP')),
+      mtdNwNum(cell(row, 'wC')), mtdNwNum(cell(row, 'wT')), mtdNwNum(cell(row, 'wP')),
+      mtdNwNum(cell(row, 'cT')), mtdNwNum(cell(row, 'cA'))];
+    // stores with no target and no sales at all (inactive / not yet in the plan) add nothing but noise
+    if (!(rec[4] || rec[5] || rec[7] || rec[8] || rec[10] || rec[11] || rec[16] || rec[17])) { stats.skipped++; continue; }
+    raw.push(rec); stats.kept++;
+  }
+  if (!raw.length) throw new Error('لم يتم العثور على فروع ليها تارجت أو مبيعات في الملف');
+  return { raw: raw, stats: stats };
+}
+
+// "…till_21_Oct__2026.xlsx" → "21 أكتوبر 2026" (same label format the other MTD loaders use)
+function mtdNwDateLabel(fileName) {
+  var en = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  var name = String(fileName || '').replace(/\.[^.]+$/, '');
+  var m = name.match(/(\d{1,2})[\s_\-.]*([A-Za-z]{3,9})[\s_\-.]*(20\d{2})/);
+  if (m) { var mi = en.indexOf(m[2].slice(0, 3).toLowerCase()); if (mi >= 0 && +m[1] >= 1 && +m[1] <= 31) return +m[1] + ' ' + AR_MONTHS_FULL[mi] + ' ' + m[3]; }
+  var l = (typeof extractDateFromFilename === 'function') ? extractDateFromFilename(fileName) : '';
+  if (/\d{1,2}\s+\S+\s+\d{4}/.test(l)) return l;
+  var t = new Date();
+  return t.getDate() + ' ' + AR_MONTHS_FULL[t.getMonth()] + ' ' + t.getFullYear();
+}
+
+// ── Raw records → rows in the exact shape the MTD tab already understands ──
+function mtdNwBuild(raw, mainRows) {
+  var mainMap = {};
+  (mainRows || []).forEach(function (r) { mainMap[String(r.storeCode || '').trim().toUpperCase()] = r; });
+  var zeroKeys = [], seenK = {};
+  Object.keys(MTD_COL_MAP).forEach(function (k) { var v = MTD_COL_MAP[k]; if (MTD_TEXT_KEYS.indexOf(v) < 0 && !seenK[v]) { seenK[v] = 1; zeroKeys.push(v); } });
+  var rows = [], wallet = {}, matched = 0;
+  raw.forEach(function (x) {
+    var code = x[0], up = code.toUpperCase(), m = mainMap[up], senior = x[2], partner = x[3];
+    var row = {};
+    zeroKeys.forEach(function (k) { row[k] = 0; });
+    row.storeCode = code; row.store = x[1] || (m && m.store) || code; row.partner = partner || (m && m.partner) || '';
+    if (m) {
+      matched++;
+      row.regionalManager = m.regionalManager || ''; row.supervisor = m.supervisor || ''; row.areaManager = m.areaManager || '';
+      row.region = m.region || ''; row.classification = m.classification || ''; row.accountManager = m.accountManager || '';
+      row.channelManager = m.channelManager || ''; row.seniorSupervisor = m.seniorSupervisor || '';
+    } else {
+      row.regionalManager = senior || 'Unassigned'; row.supervisor = partner || 'Unassigned'; row.areaManager = partner || 'Unassigned';
+      row.region = 'Other Regions'; row.classification = 'Unclassified'; row.accountManager = ''; row.channelManager = ''; row.seniorSupervisor = '';
+    }
+    row.seniorManager = senior;
+    function prod(p, S, T, P) {
+      row[p + 'Target'] = T; row[p + 'Subs'] = S; row[p + 'Pct'] = T > 0 ? S / T : 0;
+      row[p + 'Proj'] = P; row[p + 'ProjPct'] = T > 0 ? P / T : 0;
+    }
+    prod('mobile', x[4], x[5], x[6]);
+    prod('fbb', x[7], x[8], x[9]);
+    prod('fixed', x[10], x[11], x[12]);
+    row.devices = x[13]; row.devicesTarget = x[14]; row.devicesProj = x[15];     // NW-only extras
+    row.collectionTrx = x[19]; row.collectionAmount = x[20];
+    rows.push(row);
+    if (x[16] || x[17] || x[18]) wallet[up] = { storeCode: code, store: row.store, walletTarget: x[17], walletSales: x[16], walletPct: x[17] > 0 ? x[16] / x[17] : 0, walletProj: x[18], walletProjPct: x[17] > 0 ? x[18] / x[17] : 0 };
+  });
+  return { rows: rows, wallet: wallet, matched: matched };
+}
+
+// ── Swap the MTD globals between Regional and NW (nothing is ever overwritten for good) ──
+function mtdNwCaptureMain() {
+  MTD_MAIN_BACKUP = {
+    data: MTD_DATA, sales: MTD_SALES_DATA, wallet: WALLET_DATA, pkg: MTD_PKGMIX, daily: MTD_DAILY, wdaily: MTD_WALLET_DAILY,
+    mLabel: MTD_MOBILE_DATE_LABEL, wLabel: MTD_WALLET_DATE_LABEL, mSrc: MTD_SOURCE_MOBILE, wSrc: MTD_SOURCE_WALLET,
+    mSync: MTD_MOBILE_SYNCED_AT, wSync: MTD_WALLET_SYNCED_AT, mode: MTD_MODE
+  };
+}
+function mtdNwSwapIn() {
+  var b = mtdNwBuild(MTD_NW.raw, MTD_MAIN_BACKUP ? MTD_MAIN_BACKUP.data : []);
+  MTD_NW.stats = MTD_NW.stats || {}; MTD_NW.stats.matched = b.matched;
+  MTD_DATA = b.rows; MTD_SALES_DATA = []; WALLET_DATA = b.wallet; MTD_PKGMIX = null; MTD_DAILY = null; MTD_WALLET_DAILY = null;
+  MTD_MOBILE_DATE_LABEL = MTD_NW.label; MTD_WALLET_DATE_LABEL = MTD_NW.label;
+  MTD_SOURCE_MOBILE = 'manual'; MTD_SOURCE_WALLET = 'manual'; MTD_MOBILE_SYNCED_AT = null; MTD_WALLET_SYNCED_AT = null;
+}
+function mtdNwSwapOut() {
+  var b = MTD_MAIN_BACKUP;
+  if (!b) { MTD_DATA = []; MTD_SALES_DATA = []; WALLET_DATA = {}; MTD_PKGMIX = null; MTD_DAILY = null; MTD_WALLET_DAILY = null; return; }
+  MTD_DATA = b.data; MTD_SALES_DATA = b.sales; WALLET_DATA = b.wallet; MTD_PKGMIX = b.pkg; MTD_DAILY = b.daily; MTD_WALLET_DAILY = b.wdaily;
+  MTD_MOBILE_DATE_LABEL = b.mLabel; MTD_WALLET_DATE_LABEL = b.wLabel; MTD_SOURCE_MOBILE = b.mSrc; MTD_SOURCE_WALLET = b.wSrc;
+  MTD_MOBILE_SYNCED_AT = b.mSync; MTD_WALLET_SYNCED_AT = b.wSync;
+}
+
+function mtdNwSegStyle(on) {
+  return 'padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;transition:all .2s;' + (on ? 'background:#0f766e;color:white' : 'background:white;color:#6b7280');
+}
+function mtdNwUpdateBar() {
+  var bar = mtdNwEl('mtd-src-bar');
+  if (!bar) return;
+  if (!MTD_NW) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  var m = mtdNwEl('mtd-src-main'), n = mtdNwEl('mtd-src-nw'), info = mtdNwEl('mtd-src-info');
+  if (m) m.setAttribute('style', mtdNwSegStyle(MTD_SRC === 'main'));
+  if (n) n.setAttribute('style', mtdNwSegStyle(MTD_SRC === 'nw'));
+  var st = MTD_NW.stats || {};
+  if (info) info.innerHTML = '🌐 NW حتى <b>' + MTD_NW.label + '</b> — <b>' + (st.kept || MTD_NW.raw.length).toLocaleString('en-US') + '</b> فرع' +
+    (st.matched != null ? ' · ' + st.matched + ' متطابق مع Regional (الهيراركي الحقيقي)' : '') +
+    (st.skipped ? ' · ' + st.skipped.toLocaleString('en-US') + ' فرع بدون تارجت/مبيعات اتجاهلوا' : '');
+}
+function mtdNwAfterSwap() {
+  ['mtd-f-region', 'mtd-f-rm', 'mtd-f-am', 'mtd-f-sv', 'mtd-f-cls', 'mtd-f-acc', 'mtd-f-partner', 'mtd-f-day'].forEach(function (id) { var el = mtdNwEl(id); if (el) el.value = ''; });
+  var se = mtdNwEl('mtd-f-search'); if (se) se.value = '';
+  var sb2 = mtdNwEl('mtd-store-selected-badge'); if (sb2) sb2.style.display = 'none';
+  MTD_SELECTED_STORE = ''; MTD_DAY_FILTER = null; MTD_DAY_SELECTED = null;
+  MTD_FILTERED = MTD_DATA.slice();
+  try { populateMTDFilters(); } catch (e) { console.warn('[MTD NW] filters:', e); }
+  updateMTDFreshnessNote();
+  var wc = Object.keys(WALLET_DATA || {}).length, show = wc > 0 ? '' : 'none';
+  ['mtd-wallet-badge', 'mtd-pill-wallet', 'mtd-lp-pill-wallet', 'mtd-kpi-wallet'].forEach(function (id) { var el = mtdNwEl(id); if (el) el.style.display = show; });
+  var wb = mtdNwEl('mtd-wallet-badge'); if (wb && wc > 0) wb.textContent = '✅ Wallet: ' + wc + ' فرع';
+  var modeAct = mtdNwEl('mtd-mode-act'); if (modeAct && modeAct.parentElement) modeAct.parentElement.style.display = (MTD_SRC === 'nw') ? 'none' : '';
+  var has = MTD_DATA.length > 0, es = mtdNwEl('mtd-empty-state'), dc = mtdNwEl('mtd-dashboard-content');
+  if (es) es.style.display = has ? 'none' : ''; if (dc) dc.style.display = has ? '' : 'none';
+  mtdNwUpdateBar();
+  setMTDMode('activation');      // resets the Activation/Sales toggle and re-renders
+}
+function setMTDSource(src) {
+  if (src === MTD_SRC) return;
+  if (src === 'nw') {
+    if (!MTD_NW) { alert('ارفع ملف MTD NW الأول'); return; }
+    mtdNwCaptureMain(); mtdNwSwapIn(); MTD_SRC = 'nw';
+  } else {
+    mtdNwSwapOut(); MTD_SRC = 'main';
+  }
+  mtdNwAfterSwap();
+}
+function removeMTDNW() {
+  if (!MTD_NW) return;
+  if (!confirm('مسح بيانات MTD NW من المتصفح؟ (بيانات Regional مش هتتأثر)')) return;
+  if (MTD_SRC === 'nw') setMTDSource('main');
+  MTD_NW = null; MTD_MAIN_BACKUP = null;
+  try { localStorage.removeItem(MTD_NW_LS_KEY); } catch (e) { }
+  mtdNwUpdateBar();
+}
+
+// ── Upload ──────────────────────────────────────────────────────
+function loadMTDNWFile(file) {
+  if (!file) return;
+  var conv = mtdNwEl('mtd-converting-badge');
+  if (conv) conv.style.display = 'inline-flex';
+  var reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      var cleaned = await stripXlsbMetadata(e.target.result);
+      var wb = XLSX.read(new Uint8Array(cleaned), { type: 'array', cellDates: false, raw: true });
+      var p = mtdNwParseWorkbook(wb);
+      MTD_NW = { raw: p.raw, label: mtdNwDateLabel(file.name), fileName: file.name, savedAt: new Date().toISOString(), stats: p.stats };
+      try { localStorage.setItem(MTD_NW_LS_KEY, JSON.stringify({ v: 1, raw: MTD_NW.raw, label: MTD_NW.label, fileName: MTD_NW.fileName, savedAt: MTD_NW.savedAt, stats: MTD_NW.stats })); }
+      catch (err) { console.warn('[MTD NW] could not cache in localStorage:', err.message); }
+      var dz = mtdNwEl('drop-zone'); if (dz) dz.style.display = 'none';
+      var tb = mtdNwEl('mtd-tab-btn'); if (tb) tb.style.display = '';
+      if (MTD_SRC === 'main') mtdNwCaptureMain();        // keep Regional safe; re-uploading while on NW keeps the existing backup
+      mtdNwSwapIn(); MTD_SRC = 'nw';
+      if (conv) conv.style.display = 'none';
+      mtdNwAfterSwap();
+      if (!appInitialized) { initAppWithData([]); setTimeout(function () { switchTab('mtd'); }, 500); }
+      else switchTab('mtd');
+    } catch (err) {
+      if (conv) conv.style.display = 'none';
+      console.error('[MTD NW]', err);
+      alert('❌ خطأ MTD NW:\n' + err.message);
+    }
+  };
+  reader.onerror = function () { if (conv) conv.style.display = 'none'; alert('❌ تعذّر قراءة ملف MTD NW'); };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── NW-only extras strip (Collection) ───────────────────────────
+function mtdNwRenderExtras() {
+  var el = mtdNwEl('mtd-nw-extras');
+  if (!el) return;
+  if (MTD_SRC !== 'nw' || !MTD_FILTERED || !MTD_FILTERED.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var trx = 0, amt = 0, n = MTD_FILTERED.length;
+  MTD_FILTERED.forEach(function (r) { trx += Number(r.collectionTrx) || 0; amt += Number(r.collectionAmount) || 0; });
+  function card(label, val, sub) {
+    return '<div style="flex:1;min-width:150px;background:white;border-radius:12px;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-left:4px solid #0f766e">' +
+      '<div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">' + label + '</div>' +
+      '<div style="font-size:20px;font-weight:800;color:#0f766e">' + val + '</div>' + (sub ? '<div style="font-size:10px;color:#9ca3af">' + sub + '</div>' : '') + '</div>';
+  }
+  el.style.display = 'flex'; el.style.gap = '10px'; el.style.flexWrap = 'wrap';
+  el.innerHTML = card('NW Stores', n.toLocaleString('en-US'), 'في الفلاتر الحالية') +
+    card('Collection TRXs', Math.round(trx).toLocaleString('en-US'), '') +
+    card('Collection Amount (EGP)', Math.round(amt).toLocaleString('en-US'), trx > 0 ? 'متوسط ' + Math.round(amt / trx).toLocaleString('en-US') + ' / TRX' : '');
+}
+
+// ── Hooks: keep the old sources + loaders working with NW around ──
+(function () {
+  var _render = renderMTD;
+  renderMTD = function () { var r = _render.apply(this, arguments); try { mtdNwRenderExtras(); } catch (e) { console.warn('[MTD NW] extras:', e); } return r; };
+
+  // Auto refresh from Supabase while NW is shown: refresh the Regional data in the background, then show NW again.
+  var _auto = fetchAutoMTDData;
+  fetchAutoMTDData = async function () {
+    if (MTD_SRC !== 'nw') return _auto.apply(this, arguments);
+    mtdNwSwapOut();
+    try { return await _auto.apply(this, arguments); }
+    finally { mtdNwCaptureMain(); mtdNwSwapIn(); mtdNwAfterSwap(); }
+  };
+
+  // A manual Regional upload (MTD / Wallet) goes back to the Regional view first, so it loads into the right place.
+  ['loadMTDFile', 'loadWalletFile'].forEach(function (name) {
+    var orig = window[name];
+    if (typeof orig !== 'function') return;
+    window[name] = function () { if (MTD_SRC === 'nw') setMTDSource('main'); return orig.apply(this, arguments); };
+  });
+
+  // Restore a previously uploaded NW file (kept in this browser). It does NOT switch the view by itself.
+  try {
+    var saved = JSON.parse(localStorage.getItem(MTD_NW_LS_KEY) || 'null');
+    if (saved && saved.raw && saved.raw.length) {
+      MTD_NW = { raw: saved.raw, label: saved.label, fileName: saved.fileName, savedAt: saved.savedAt, stats: saved.stats };
+      var t = mtdNwEl('mtd-tab-btn'); if (t) t.style.display = '';
+      mtdNwUpdateBar();
+    }
+  } catch (e) { console.warn('[MTD NW] restore failed:', e.message); }
+})();
 
 </script>
 </body>
