@@ -1530,9 +1530,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <i class="fas fa-wallet"></i> Upload Wallet
             <input type="file" id="wallet-import-input" accept="*/*" style="display:none" onchange="loadWalletFile(this.files[0])">
           </label>
-          <label title="ملف MTD الشامل لكل الشركة (كل الـ Regions)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border-radius:20px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(15,118,110,0.3)">
+          <label title="ملف MTD الشامل لكل الشركة — تقدر تختار معاه ملف We Pay (شيت Sales VS Target) في نفس المرة عشان الهيراركي" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border-radius:20px;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(15,118,110,0.3)">
             <i class="fas fa-globe"></i> Upload MTD NW
-            <input type="file" id="mtd-nw-import-input" accept=".xlsx,.xls,.xlsb,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="loadMTDNWFile(this.files[0]); this.value=''">
+            <input type="file" id="mtd-nw-import-input" multiple accept=".xlsx,.xls,.xlsb,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="loadMTDNWFiles(this.files); this.value=''">
           </label>
           <span id="mtd-converting-badge" style="display:none;background:#f59e0b;color:white;font-size:10px;font-weight:700;padding:5px 12px;border-radius:12px"><i class="fas fa-spinner fa-spin mr-1"></i>Converting xlsb...</span>
         </div>
@@ -1578,6 +1578,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
       <!-- ── MTD Filters ── -->
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;align-items:center;background:white;padding:12px 16px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07)">
+        <div class="filter-group" id="mtd-f-sr-group" style="display:none">
+          <label class="filter-label">Senior Mgr</label>
+          <select id="mtd-f-sr" onchange="onMTDFilterChange()" class="filter-select"><option value="">All</option></select>
+        </div>
         <div class="filter-group">
           <label class="filter-label">Region</label>
           <select id="mtd-f-region" onchange="onMTDFilterChange()" class="filter-select"><option value="">All</option></select>
@@ -10368,6 +10372,7 @@ function mtdInsBuildItems(rowsIn) {
     return {
       code: code, store: a.store || fr.store || code,
       rm: a.regionalManager || fr.regionalManager || 'Unassigned',
+      sr: a.seniorManager || fr.seniorManager || '',
       sv: a.supervisor || fr.supervisor || 'Unassigned',
       am: a.areaManager || fr.areaManager || 'Unassigned',
       a: a, s: s, w: w
@@ -10644,12 +10649,12 @@ function mtdInsBATable(rmItems, pace, ba) {
   };
 }
 function mtdInsBAExportBlocks(items, pace, ba) {
-  var rmMap = {}, order = [], blocks = [];
-  items.forEach(function (i) { if (!rmMap[i.rm]) { rmMap[i.rm] = []; order.push(i.rm); } rmMap[i.rm].push(i); });
-  order.forEach(function (rm) {
-    blocks.push({ k: 'rm', t: rm + ' · ' + rmMap[rm].length + ' stores' });
+  var blocks = [], lastSr = null;
+  mtdInsGroups(items).forEach(function (g) {
+    if (g.sr && g.sr !== lastSr) { blocks.push({ k: 'sr', t: g.sr + ' · ' + g.srCount + ' stores' }); lastSr = g.sr; }
+    blocks.push({ k: 'rm', t: g.rm + ' · ' + g.items.length + ' stores' });
     blocks.push({ k: 'bar2', t: 'Branch Achievement', ba: ba });
-    blocks.push(mtdInsBATable(rmMap[rm], pace, ba));
+    blocks.push(mtdInsBATable(g.items, pace, ba));
   });
   return blocks;
 }
@@ -10682,11 +10687,26 @@ async function exportMTDBranchAch(btn) {
 }
 
 // ── full model for a set of stores ──
+// Regional-Manager groups; when the data carries a Senior Manager (MTD NW) they are nested under it.
+function mtdInsGroups(items) {
+  var hasSr = items.some(function (i) { return i.sr; });
+  var map = {}, order = [], srCount = {};
+  items.forEach(function (i) {
+    var sr = hasSr ? (i.sr || 'Unassigned') : '', key = sr + '\u0001' + i.rm;
+    if (!map[key]) { map[key] = { sr: sr, rm: i.rm, items: [] }; order.push(key); }
+    map[key].items.push(i); srCount[sr] = (srCount[sr] || 0) + 1;
+  });
+  var srOrder = [];
+  order.forEach(function (k) { if (srOrder.indexOf(map[k].sr) < 0) srOrder.push(map[k].sr); });
+  var out = [];
+  srOrder.forEach(function (sr) { order.forEach(function (k) { if (map[k].sr === sr) { map[k].srCount = srCount[sr]; out.push(map[k]); } }); });
+  return out;
+}
 function mtdInsBuildBlocks(items, pace, metric, view) {
-  var rmMap = {}, rmOrder = [], blocks = [];
-  items.forEach(function (i) { if (!rmMap[i.rm]) { rmMap[i.rm] = []; rmOrder.push(i.rm); } rmMap[i.rm].push(i); });
-  rmOrder.forEach(function (rm) {
-    var rmItems = rmMap[rm];
+  var blocks = [], lastSr = null;
+  mtdInsGroups(items).forEach(function (g) {
+    var rmItems = g.items, rm = g.rm;
+    if (g.sr && g.sr !== lastSr) { blocks.push({ k: 'sr', t: g.sr + ' · ' + g.srCount + ' stores' }); lastSr = g.sr; }
     blocks.push({ k: 'rm', t: rm + ' · ' + rmItems.length + ' stores' });
     blocks.push(mtdInsPairTable('Prepaid & Control Products:', MTD_INS_PREPAID, 'prepaid', rmItems, pace, metric));
     blocks.push(mtdInsPairTable('Strategic Products:', MTD_INS_STRATEGIC, 'strategic', rmItems, pace, metric));
@@ -10727,7 +10747,10 @@ function mtdInsTitleHtml(parts) {
 function mtdInsBlocksHtml(blocks) {
   var html = '', open = false;
   blocks.forEach(function (b) {
-    if (b.k === 'rm') {
+    if (b.k === 'sr') {
+      if (open) { html += '</div>'; open = false; }
+      html += '<div style="background:#111827;color:#fff;border-radius:12px;padding:12px 16px;margin:6px 0 14px;font-size:15px;font-weight:800"><i class="fas fa-crown mr-2" style="color:#fbbf24"></i>Senior Manager: ' + mtdInsEsc(b.t) + '</div>';
+    } else if (b.k === 'rm') {
       if (open) html += '</div>';
       open = true;
       html += '<div style="margin-bottom:26px"><div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:14px;font-weight:800"><i class="fas fa-user-tie mr-2"></i>' + mtdInsEsc(b.t) + '</div>';
@@ -10819,7 +10842,10 @@ function mtdInsWriteSheet(ws, heading, blocks) {
   mtdInsXlMerged(ws, r, 1, N, heading, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
   ws.getRow(r).height = 24; r += 2;
   blocks.forEach(function (b) {
-    if (b.k === 'rm') {
+    if (b.k === 'sr') {
+      mtdInsXlMerged(ws, r, 1, N, 'Senior Manager: ' + b.t, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
+      ws.getRow(r).height = 24; r += 2;
+    } else if (b.k === 'rm') {
       mtdInsXlMerged(ws, r, 1, N, b.t, { bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'l', bd: '#5E2D91' });
       ws.getRow(r).height = 22; r++;
     } else if (b.k === 'bar2') {
@@ -10895,15 +10921,19 @@ async function exportMTDInsights() {
 //  • Lives in its OWN dataset (MTD_NW). The Regional (Cairo & Canal) data is never
 //    modified or deleted: switching source just swaps the MTD globals in/out and
 //    swaps them back, so the old sources keep working exactly as before.
-//  • Hierarchy: stores that also exist in the Regional data keep their real
-//    Regional Manager / Supervisor / Area Manager / Region / Classification.
-//    Other stores: Regional Manager ← Senior Manager, Supervisor & Area ← Partner.
+//  • Hierarchy comes from the WE Pay file (sheet "Sales VS Target": Area Manager,
+//    Supervisor, Regional Manager, Region, Zone, Classification, Account Manager),
+//    uploaded together with the NW file (or later, on its own) and kept in this browser.
+//    The NW file's "Senior Manager" is the TOP level above Regional Manager.
+//    Stores missing from that sheet → Regional data hierarchy if available, else Unassigned.
 //  • Kept in this browser (localStorage) so it survives a reload; removable (✕).
 // ════════════════════════════════════════════════════════════════
 var MTD_SRC = 'main';          // 'main' (Regional) | 'nw'
 var MTD_NW = null;             // { raw:[[...]], label, fileName, savedAt, stats }
 var MTD_MAIN_BACKUP = null;    // snapshot of the Regional globals while NW is shown
 var MTD_NW_LS_KEY = 'fk360_mtd_nw_v1';
+var MTD_NW_HIER = null;        // { map:{CODE:{partner,pam,pm,cls,region,am,sv,rm,zone}}, count, fileName, savedAt }
+var MTD_NW_HIER_KEY = 'fk360_nw_hier_v1';
 
 function mtdNwEl(id) { return document.getElementById(id); }
 function mtdNwNorm(s) {
@@ -10968,7 +10998,52 @@ function mtdNwParseWorkbook(wb) {
   return { raw: raw, stats: stats };
 }
 
-// "…till_21_Oct__2026.xlsx" → "21 أكتوبر 2026" (same label format the other MTD loaders use)
+// ── Parse the hierarchy (WE Pay file, sheet "Sales VS Target") ──
+function mtdNwClean(v) { var t = String(v == null ? '' : v).trim(); return /^\(?blank\)?$|^null$|^nan$/i.test(t) ? '' : t; }
+var MTD_NW_HCOLS = {
+  code: ['storecodebss', 'storecode'], partner: ['partner'], pam: ['partneraccountmanager'], pm: ['partnermanager'],
+  cls: ['classification'], region: ['region'], am: ['areamanger', 'areamanager'], sv: ['supervisor'], rm: ['regionalmanager'], zone: ['channelmanager']
+};
+function mtdNwFindHierarchy(wb) {
+  var names = wb.SheetNames.slice().sort(function (a, b) { return (/sales\s*vs\s*target/i.test(b) ? 1 : 0) - (/sales\s*vs\s*target/i.test(a) ? 1 : 0); });
+  for (var s = 0; s < names.length; s++) {
+    var aoa = XLSX.utils.sheet_to_json(wb.Sheets[names[s]], { header: 1, raw: true, defval: null });
+    for (var r = 0; r < Math.min(aoa.length, 10); r++) {
+      var norm = (aoa[r] || []).map(function (x) { return String(x == null ? '' : x).replace(/\s+/g, '').toLowerCase(); });
+      var idx = {};
+      Object.keys(MTD_NW_HCOLS).forEach(function (k) { idx[k] = -1; for (var a = 0; a < MTD_NW_HCOLS[k].length && idx[k] < 0; a++) idx[k] = norm.indexOf(MTD_NW_HCOLS[k][a]); });
+      if (idx.code < 0 || idx.rm < 0) continue;
+      var map = {}, count = 0;
+      for (var i = r + 1; i < aoa.length; i++) {
+        var row = aoa[i] || [], code = mtdNwClean(row[idx.code]).toUpperCase();
+        if (!code) continue;
+        var g = function (k) { return idx[k] >= 0 ? mtdNwClean(row[idx[k]]) : ''; };
+        map[code] = { partner: g('partner'), pam: g('pam'), pm: g('pm'), cls: g('cls'), region: g('region'), am: g('am'), sv: g('sv'), rm: g('rm'), zone: g('zone') };
+        count++;
+      }
+      if (count) return { map: map, count: count, sheet: names[s] };
+    }
+  }
+  return null;
+}
+function mtdNwSaveHier() {
+  try {
+    var arr = [];
+    Object.keys(MTD_NW_HIER.map).forEach(function (c) { var h = MTD_NW_HIER.map[c]; arr.push([c, h.partner, h.pam, h.pm, h.cls, h.region, h.am, h.sv, h.rm, h.zone]); });
+    localStorage.setItem(MTD_NW_HIER_KEY, JSON.stringify({ v: 1, rows: arr, fileName: MTD_NW_HIER.fileName, savedAt: MTD_NW_HIER.savedAt }));
+  } catch (e) { console.warn('[MTD NW] could not cache hierarchy:', e.message); }
+}
+function mtdNwLoadHier() {
+  try {
+    var d = JSON.parse(localStorage.getItem(MTD_NW_HIER_KEY) || 'null');
+    if (!d || !d.rows || !d.rows.length) return;
+    var map = {};
+    d.rows.forEach(function (a) { map[a[0]] = { partner: a[1], pam: a[2], pm: a[3], cls: a[4], region: a[5], am: a[6], sv: a[7], rm: a[8], zone: a[9] }; });
+    MTD_NW_HIER = { map: map, count: d.rows.length, fileName: d.fileName, savedAt: d.savedAt };
+  } catch (e) { console.warn('[MTD NW] hierarchy restore failed:', e.message); }
+}
+
+// "…till_21_Oct__2026.xlsx" → "21 أكتوبر 2026\" (same label format the other MTD loaders use)
 function mtdNwDateLabel(fileName) {
   var en = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
   var name = String(fileName || '').replace(/\.[^.]+$/, '');
@@ -10986,22 +11061,28 @@ function mtdNwBuild(raw, mainRows) {
   (mainRows || []).forEach(function (r) { mainMap[String(r.storeCode || '').trim().toUpperCase()] = r; });
   var zeroKeys = [], seenK = {};
   Object.keys(MTD_COL_MAP).forEach(function (k) { var v = MTD_COL_MAP[k]; if (MTD_TEXT_KEYS.indexOf(v) < 0 && !seenK[v]) { seenK[v] = 1; zeroKeys.push(v); } });
-  var rows = [], wallet = {}, matched = 0;
+  var rows = [], wallet = {}, matched = 0, hierMatched = 0, unmapped = 0, H = MTD_NW_HIER ? MTD_NW_HIER.map : null;
   raw.forEach(function (x) {
-    var code = x[0], up = code.toUpperCase(), m = mainMap[up], senior = x[2], partner = x[3];
+    var code = x[0], up = code.toUpperCase(), m = mainMap[up], hm = H ? H[up] : null, senior = x[2], partner = x[3];
     var row = {};
     zeroKeys.forEach(function (k) { row[k] = 0; });
     row.storeCode = code; row.store = x[1] || (m && m.store) || code; row.partner = partner || (m && m.partner) || '';
-    if (m) {
+    if (hm) {                                   // 1) WE Pay hierarchy (whole company)
+      hierMatched++;
+      row.regionalManager = hm.rm || 'Unassigned'; row.supervisor = hm.sv || 'Unassigned'; row.areaManager = hm.am || 'Unassigned';
+      row.region = hm.region || 'Unassigned'; row.classification = hm.cls || 'Unclassified'; row.accountManager = hm.pam || '';
+      row.channelManager = hm.zone || ''; row.seniorSupervisor = ''; row.partnerManager = hm.pm || '';
+    } else if (m) {                             // 2) Regional data hierarchy
       matched++;
-      row.regionalManager = m.regionalManager || ''; row.supervisor = m.supervisor || ''; row.areaManager = m.areaManager || '';
-      row.region = m.region || ''; row.classification = m.classification || ''; row.accountManager = m.accountManager || '';
+      row.regionalManager = m.regionalManager || 'Unassigned'; row.supervisor = m.supervisor || 'Unassigned'; row.areaManager = m.areaManager || 'Unassigned';
+      row.region = m.region || 'Unassigned'; row.classification = m.classification || 'Unclassified'; row.accountManager = m.accountManager || '';
       row.channelManager = m.channelManager || ''; row.seniorSupervisor = m.seniorSupervisor || '';
-    } else {
-      row.regionalManager = senior || 'Unassigned'; row.supervisor = partner || 'Unassigned'; row.areaManager = partner || 'Unassigned';
-      row.region = 'Other Regions'; row.classification = 'Unclassified'; row.accountManager = ''; row.channelManager = ''; row.seniorSupervisor = '';
+    } else {                                    // 3) no hierarchy anywhere
+      unmapped++;
+      row.regionalManager = 'Unassigned'; row.supervisor = 'Unassigned'; row.areaManager = 'Unassigned';
+      row.region = 'Unassigned'; row.classification = 'Unclassified'; row.accountManager = ''; row.channelManager = ''; row.seniorSupervisor = '';
     }
-    row.seniorManager = senior;
+    row.seniorManager = senior || 'Unassigned';
     function prod(p, S, T, P) {
       row[p + 'Target'] = T; row[p + 'Subs'] = S; row[p + 'Pct'] = T > 0 ? S / T : 0;
       row[p + 'Proj'] = P; row[p + 'ProjPct'] = T > 0 ? P / T : 0;
@@ -11014,7 +11095,7 @@ function mtdNwBuild(raw, mainRows) {
     rows.push(row);
     if (x[16] || x[17] || x[18]) wallet[up] = { storeCode: code, store: row.store, walletTarget: x[17], walletSales: x[16], walletPct: x[17] > 0 ? x[16] / x[17] : 0, walletProj: x[18], walletProjPct: x[17] > 0 ? x[18] / x[17] : 0 };
   });
-  return { rows: rows, wallet: wallet, matched: matched };
+  return { rows: rows, wallet: wallet, matched: matched, hierMatched: hierMatched, unmapped: unmapped };
 }
 
 // ── Swap the MTD globals between Regional and NW (nothing is ever overwritten for good) ──
@@ -11027,7 +11108,7 @@ function mtdNwCaptureMain() {
 }
 function mtdNwSwapIn() {
   var b = mtdNwBuild(MTD_NW.raw, MTD_MAIN_BACKUP ? MTD_MAIN_BACKUP.data : []);
-  MTD_NW.stats = MTD_NW.stats || {}; MTD_NW.stats.matched = b.matched;
+  MTD_NW.stats = MTD_NW.stats || {}; MTD_NW.stats.matched = b.matched; MTD_NW.stats.hierMatched = b.hierMatched; MTD_NW.stats.unmapped = b.unmapped;
   MTD_DATA = b.rows; MTD_SALES_DATA = []; WALLET_DATA = b.wallet; MTD_PKGMIX = null; MTD_DAILY = null; MTD_WALLET_DAILY = null;
   MTD_MOBILE_DATE_LABEL = MTD_NW.label; MTD_WALLET_DATE_LABEL = MTD_NW.label;
   MTD_SOURCE_MOBILE = 'manual'; MTD_SOURCE_WALLET = 'manual'; MTD_MOBILE_SYNCED_AT = null; MTD_WALLET_SYNCED_AT = null;
@@ -11053,11 +11134,14 @@ function mtdNwUpdateBar() {
   if (n) n.setAttribute('style', mtdNwSegStyle(MTD_SRC === 'nw'));
   var st = MTD_NW.stats || {};
   if (info) info.innerHTML = '🌐 NW حتى <b>' + MTD_NW.label + '</b> — <b>' + (st.kept || MTD_NW.raw.length).toLocaleString('en-US') + '</b> فرع' +
-    (st.matched != null ? ' · ' + st.matched + ' متطابق مع Regional (الهيراركي الحقيقي)' : '') +
+    (MTD_NW_HIER
+      ? ' · هيراركي We Pay: ' + (st.hierMatched || 0) + ' فرع' + (st.unmapped ? ' (' + st.unmapped + ' Unassigned)' : '')
+      : ' · <span style="color:#b45309;font-weight:700">⚠️ من غير هيراركي — ارفع ملف We Pay (شيت Sales VS Target) مع ملف NW</span>') +
     (st.skipped ? ' · ' + st.skipped.toLocaleString('en-US') + ' فرع بدون تارجت/مبيعات اتجاهلوا' : '');
 }
 function mtdNwAfterSwap() {
-  ['mtd-f-region', 'mtd-f-rm', 'mtd-f-am', 'mtd-f-sv', 'mtd-f-cls', 'mtd-f-acc', 'mtd-f-partner', 'mtd-f-day'].forEach(function (id) { var el = mtdNwEl(id); if (el) el.value = ''; });
+  ['mtd-f-region', 'mtd-f-rm', 'mtd-f-am', 'mtd-f-sv', 'mtd-f-cls', 'mtd-f-acc', 'mtd-f-partner', 'mtd-f-sr', 'mtd-f-day'].forEach(function (id) { var el = mtdNwEl(id); if (el) el.value = ''; });
+  var srg = mtdNwEl('mtd-f-sr-group'); if (srg) srg.style.display = (MTD_SRC === 'nw') ? '' : 'none';
   var se = mtdNwEl('mtd-f-search'); if (se) se.value = '';
   var sb2 = mtdNwEl('mtd-store-selected-badge'); if (sb2) sb2.style.display = 'none';
   MTD_SELECTED_STORE = ''; MTD_DAY_FILTER = null; MTD_DAY_SELECTED = null;
@@ -11092,36 +11176,63 @@ function removeMTDNW() {
   mtdNwUpdateBar();
 }
 
-// ── Upload ──────────────────────────────────────────────────────
-function loadMTDNWFile(file) {
-  if (!file) return;
+// ── Upload (one button, 1–2 files: the NW file and/or the WE Pay file that carries the hierarchy) ──
+function loadMTDNWFile(file) { return loadMTDNWFiles(file ? [file] : []); }
+function loadMTDNWFiles(files) {
+  var list = Array.prototype.slice.call(files || []);      // copy first: the caller clears the input right after
+  if (!list.length) return;
   var conv = mtdNwEl('mtd-converting-badge');
   if (conv) conv.style.display = 'inline-flex';
-  var reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      var cleaned = await stripXlsbMetadata(e.target.result);
-      var wb = XLSX.read(new Uint8Array(cleaned), { type: 'array', cellDates: false, raw: true });
-      var p = mtdNwParseWorkbook(wb);
-      MTD_NW = { raw: p.raw, label: mtdNwDateLabel(file.name), fileName: file.name, savedAt: new Date().toISOString(), stats: p.stats };
+  function readOne(file) {
+    return new Promise(function (res, rej) {
+      var rd = new FileReader();
+      rd.onload = async function (e) {
+        try {
+          var cleaned = await stripXlsbMetadata(e.target.result);
+          var wb = XLSX.read(new Uint8Array(cleaned), { type: 'array', cellDates: false, raw: true });
+          var hier = mtdNwFindHierarchy(wb), nw = null, nwErr = null;
+          try { nw = mtdNwParseWorkbook(wb); } catch (er) { nwErr = er; }
+          if (!hier && !nw) throw new Error('"' + file.name + '": ' + (nwErr ? nwErr.message : 'ملف غير معروف'));
+          res({ file: file, hier: hier, nw: nw });
+        } catch (er) { rej(er); }
+      };
+      rd.onerror = function () { rej(new Error('تعذّر قراءة الملف: ' + file.name)); };
+      rd.readAsArrayBuffer(file);
+    });
+  }
+  Promise.all(list.map(readOne)).then(function (parts) {
+    var gotNW = null, gotHier = null;
+    parts.forEach(function (p) {
+      if (p.nw && !(p.hier && !p.nw)) gotNW = gotNW || p;       // a file with Store Code + Mobile Sales + Mobile TGT is the NW file
+      else if (p.hier) gotHier = gotHier || p;
+      if (p.hier && !p.nw) gotHier = p;
+    });
+    if (gotHier) {
+      MTD_NW_HIER = { map: gotHier.hier.map, count: gotHier.hier.count, fileName: gotHier.file.name, savedAt: new Date().toISOString() };
+      mtdNwSaveHier();
+    }
+    if (gotNW) {
+      MTD_NW = { raw: gotNW.nw.raw, label: mtdNwDateLabel(gotNW.file.name), fileName: gotNW.file.name, savedAt: new Date().toISOString(), stats: gotNW.nw.stats };
       try { localStorage.setItem(MTD_NW_LS_KEY, JSON.stringify({ v: 1, raw: MTD_NW.raw, label: MTD_NW.label, fileName: MTD_NW.fileName, savedAt: MTD_NW.savedAt, stats: MTD_NW.stats })); }
       catch (err) { console.warn('[MTD NW] could not cache in localStorage:', err.message); }
-      var dz = mtdNwEl('drop-zone'); if (dz) dz.style.display = 'none';
-      var tb = mtdNwEl('mtd-tab-btn'); if (tb) tb.style.display = '';
-      if (MTD_SRC === 'main') mtdNwCaptureMain();        // keep Regional safe; re-uploading while on NW keeps the existing backup
-      mtdNwSwapIn(); MTD_SRC = 'nw';
-      if (conv) conv.style.display = 'none';
-      mtdNwAfterSwap();
-      if (!appInitialized) { initAppWithData([]); setTimeout(function () { switchTab('mtd'); }, 500); }
-      else switchTab('mtd');
-    } catch (err) {
-      if (conv) conv.style.display = 'none';
-      console.error('[MTD NW]', err);
-      alert('❌ خطأ MTD NW:\n' + err.message);
     }
-  };
-  reader.onerror = function () { if (conv) conv.style.display = 'none'; alert('❌ تعذّر قراءة ملف MTD NW'); };
-  reader.readAsArrayBuffer(file);
+    if (conv) conv.style.display = 'none';
+    if (!MTD_NW) {                      // hierarchy only, no NW file yet
+      alert('✅ اتحفظ هيراركي الشركة (' + MTD_NW_HIER.count + ' فرع) — ارفع ملف MTD NW وهيتربط تلقائي.');
+      return;
+    }
+    var dz = mtdNwEl('drop-zone'); if (dz) dz.style.display = 'none';
+    var tb = mtdNwEl('mtd-tab-btn'); if (tb) tb.style.display = '';
+    if (MTD_SRC === 'main') mtdNwCaptureMain();        // keep Regional safe; re-uploading while on NW keeps the existing backup
+    mtdNwSwapIn(); MTD_SRC = 'nw';
+    mtdNwAfterSwap();
+    if (!appInitialized) { initAppWithData([]); setTimeout(function () { switchTab('mtd'); }, 500); }
+    else switchTab('mtd');
+  }).catch(function (err) {
+    if (conv) conv.style.display = 'none';
+    console.error('[MTD NW]', err);
+    alert('❌ خطأ MTD NW:\n' + err.message);
+  });
 }
 
 // ── NW-only extras strip (Collection) ───────────────────────────
@@ -11163,6 +11274,20 @@ function mtdNwRenderExtras() {
     window[name] = function () { if (MTD_SRC === 'nw') setMTDSource('main'); return orig.apply(this, arguments); };
   });
 
+  // Senior Manager filter (NW only): plugs into the existing cascading filters and the two filter functions.
+  MTD_FILTER_IDS.sr = 'mtd-f-sr'; MTD_FILTER_FIELD.sr = 'seniorManager';
+  function bySenior(rows) {
+    var v = (mtdNwEl('mtd-f-sr') || {}).value || '';
+    return (MTD_SRC === 'nw' && v) ? rows.filter(function (r) { return r.seniorManager === v; }) : rows;
+  }
+  var _gf = getMTDFiltered;
+  getMTDFiltered = function () { return bySenior(_gf.apply(this, arguments)); };
+  var _gx = getMTDDataExceptClassFilter;
+  getMTDDataExceptClassFilter = function () { return bySenior(_gx.apply(this, arguments)); };
+  var _rf = resetMTDFilters;
+  resetMTDFilters = function () { var e = mtdNwEl('mtd-f-sr'); if (e) e.value = ''; return _rf.apply(this, arguments); };
+
+  mtdNwLoadHier();
   // Restore a previously uploaded NW file (kept in this browser). It does NOT switch the view by itself.
   try {
     var saved = JSON.parse(localStorage.getItem(MTD_NW_LS_KEY) || 'null');
