@@ -1910,6 +1910,26 @@ document.addEventListener('DOMContentLoaded', function() {
           <div id="mtd-insights-content"></div>
         </div>
       </div>
+
+      <!-- ── Branch Achievement (standalone card, collapsed by default) ── -->
+      <div id="mtd-ba-wrap" style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div class="section-title" style="margin:0"><i class="fas fa-bullseye mr-2"></i>Branch Achievement</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button id="mtd-ba-export" onclick="exportMTDBA(this)"
+              style="padding:7px 16px;border-radius:20px;border:2px solid #5E2D91;background:white;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif">
+              <i class="fas fa-file-export mr-1"></i>Export
+            </button>
+            <button id="mtd-ba-toggle" onclick="toggleMTDBA()"
+              style="padding:7px 16px;border-radius:20px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif">
+              <i class="fas fa-eye mr-1"></i>Show
+            </button>
+          </div>
+        </div>
+        <div id="mtd-ba-body" style="display:none">
+          <div id="mtd-ba-content"></div>
+        </div>
+      </div>
     </div><!-- /mtd-dashboard-content -->
     </div>
 
@@ -8861,6 +8881,7 @@ function renderMTD() {
     if (sumDiv) sumDiv.style.display = 'none';
     if (detDiv) detDiv.style.display = 'none';
     var insD = document.getElementById('mtd-insights-wrap'); if (insD) insD.style.display = 'none';
+    var baD = document.getElementById('mtd-ba-wrap'); if (baD) baD.style.display = 'none';
   } else {
     // Normal MTD mode
     var kpiParent = document.getElementById('mtd-kpi-mobile');
@@ -8888,6 +8909,8 @@ function renderMTD() {
     renderMTDTable();
     var insW = document.getElementById('mtd-insights-wrap'); if (insW) insW.style.display = '';
     if (MTD_INS_OPEN) renderMTDInsights();
+    var baW = document.getElementById('mtd-ba-wrap'); if (baW) baW.style.display = '';
+    if (MTD_BA_OPEN) renderMTDBA();
   }
 }
 
@@ -10603,89 +10626,6 @@ function mtdInsCriticalTable(rmItems, pace, metric) {
 }
 
 
-// ── Branch Achievement card (Mobile | Wallet): stores, Target, Ach, Ach%, Proj%, stores below 100 / 90 / 70 (by projection) ──
-var MTD_INS_BA = 'mobile';   // 'mobile' | 'wallet'
-function setMTDInsBA(m) { MTD_INS_BA = m; mtdInsRerender(); }
-function mtdInsBAKeys(ba) {
-  return ba === 'wallet' ? { src: 'w', t: 'walletTarget', v: 'walletSales', p: 'walletProj' }
-                         : { src: 'a', t: 'mobileTarget', v: 'mobileSubs',  p: 'mobileProj' };
-}
-function mtdInsBAAgg(items, pace, ba) {
-  var k = mtdInsBAKeys(ba), o = { n: 0, T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 };
-  items.forEach(function (i) {
-    var s = i[k.src], t = Number(s[k.t]) || 0, a = Number(s[k.v]) || 0, p = mtdInsProjOf(s, k.p, a, pace);
-    o.T += t; o.A += a; o.P += p;
-    if (!(t > 0)) return;
-    o.n++;
-    var r = p / t;
-    if (r < 1) o.l100++; if (r < 0.9) o.l90++; if (r < 0.7) o.l70++;
-  });
-  return o;
-}
-function mtdInsBACount(n, kind, fgOn) {
-  var base = mtdInsBase(kind);
-  if (!n) return { v: null, f: 'int', bg: base.bg, fg: kind === 'am' ? '#9ca3af' : base.fg, al: 'c' };
-  return { v: n, f: 'int', bg: base.bg, fg: kind === 'am' ? fgOn : base.fg, b: 1, al: 'c' };
-}
-function mtdInsBATable(rmItems, pace, ba) {
-  var label = ba === 'wallet' ? 'Wallet' : 'Mobile';
-  var head = [[
-    mtdInsH('Area Manager', { rs: 2, al: 'l' }), mtdInsH('Stores', { rs: 2 }),
-    mtdInsH(label + ' Performance', { cs: 4 }), mtdInsH('Stores Below Target (Projection)', { cs: 3 })
-  ], [
-    mtdInsH('Target', { bg: '#6d3fa8' }), mtdInsH('Ach', { bg: '#6d3fa8' }), mtdInsH('Ach %', { bg: '#6d3fa8' }), mtdInsH('Proj %', { bg: '#6d3fa8' }),
-    mtdInsH('< 100%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }),
-    mtdInsH('< 90%',  { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }),
-    mtdInsH('< 70%',  { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })
-  ]];
-  return {
-    k: 'tbl', minW: 640, head: head, title: [{ t: 'Branch Achievement — ' + label + ':', c: '#5E2D91', b: 1 }],
-    body: mtdInsHierBody(rmItems, pace, function (kind, g) {
-      var d = mtdInsBAAgg(g._items, pace, ba), x = { T: d.T, A: d.A, P: d.P };
-      return [mtdInsPlain(d.n, kind), mtdInsPlain(Math.round(d.T), kind), mtdInsPlain(Math.round(d.A), kind),
-        mtdInsPct(x, kind, pace, 'ach'), mtdInsPct(x, kind, pace, 'proj'),
-        mtdInsBACount(d.l100, kind, '#a16207'), mtdInsBACount(d.l90, kind, '#b91c1c'), mtdInsBACount(d.l70, kind, '#dc2626')];
-    })
-  };
-}
-function mtdInsBAExportBlocks(items, pace, ba) {
-  var blocks = [], lastSr = null;
-  mtdInsGroups(items).forEach(function (g) {
-    if (g.sr && g.sr !== lastSr) { blocks.push({ k: 'sr', t: g.sr + ' · ' + g.srCount + ' stores' }); lastSr = g.sr; }
-    blocks.push({ k: 'rm', t: g.rm + ' · ' + g.items.length + ' stores' });
-    blocks.push({ k: 'bar2', t: 'Branch Achievement', ba: ba });
-    blocks.push(mtdInsBATable(g.items, pace, ba));
-  });
-  return blocks;
-}
-async function exportMTDBranchAch(btn) {
-  if (!(MTD_FILTERED && MTD_FILTERED.length) && !(MTD_DATA && MTD_DATA.length)) { alert('⚠️ مفيش بيانات للتصدير'); return; }
-  if (!(await mtdInsAuth())) return;
-  var old = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
-  try {
-    await mtdInsLoadExcelJS();
-    var pace = mtdInsPace(), ba = MTD_INS_BA, lbl = ba === 'wallet' ? 'Wallet' : 'Mobile';
-    var dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
-    var act = mtdInsBuildItems(MTD_FILTERED).items, full = mtdInsBuildItems(MTD_DATA).items;
-    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
-    mtdInsWriteSheet(wb.addWorksheet('Active (Filtered)'), 'Branch Achievement (' + lbl + ') — Active data (current filters) · ' + act.length + ' stores' + dateTxt, mtdInsBAExportBlocks(act, pace, ba));
-    mtdInsWriteSheet(wb.addWorksheet('Full Data'), 'Branch Achievement (' + lbl + ') — Full data (all stores) · ' + full.length + ' stores' + dateTxt, mtdInsBAExportBlocks(full, pace, ba));
-    var buf = await wb.xlsx.writeBuffer(), now = new Date();
-    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    a.download = 'MTD_Branch_Achievement_' + lbl + '_' + stamp + '.xlsx';
-    document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  } catch (e) {
-    console.error('[Branch Achievement export]', e);
-    alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = old; }
-  }
-}
-
 // ── full model for a set of stores ──
 // Regional-Manager groups; when the data carries a Senior Manager (MTD NW) they are nested under it.
 function mtdInsGroups(items) {
@@ -10711,8 +10651,6 @@ function mtdInsBuildBlocks(items, pace, metric, view) {
     blocks.push(mtdInsPairTable('Prepaid & Control Products:', MTD_INS_PREPAID, 'prepaid', rmItems, pace, metric));
     blocks.push(mtdInsPairTable('Strategic Products:', MTD_INS_STRATEGIC, 'strategic', rmItems, pace, metric));
     blocks.push(mtdInsIdleTable(rmItems, pace));
-    blocks.push({ k: 'bar2', t: 'Branch Achievement', ba: MTD_INS_BA });
-    blocks.push(mtdInsBATable(rmItems, pace, MTD_INS_BA));
     blocks.push({ k: 'bar', t: 'Stores Breakdown', view: view });
     var svOrder = [], svMap = {};
     rmItems.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
@@ -10760,13 +10698,6 @@ function mtdInsBlocksHtml(blocks) {
         '<div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:white">' +
         '<button onclick="setMTDInsView(\'area\')" style="' + mtdInsSegStyle(b.view === 'area') + '"><i class="fas fa-user mr-1"></i>Per Area</button>' +
         '<button onclick="setMTDInsView(\'sup\')" style="' + mtdInsSegStyle(b.view === 'sup') + '"><i class="fas fa-users mr-1"></i>Per Supervisor</button></div></div>';
-    } else if (b.k === 'bar2') {
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:4px 0 10px;padding:8px 12px;background:#f5f3ff;border-radius:10px">' +
-        '<span style="font-size:12px;font-weight:800;color:#5E2D91"><i class="fas fa-bullseye mr-1"></i>' + mtdInsEsc(b.t) + '</span>' +
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:white">' +
-        '<button onclick="setMTDInsBA(\'mobile\')" style="' + mtdInsSegStyle(b.ba !== 'wallet') + '"><i class="fas fa-mobile-alt mr-1"></i>Mobile</button>' +
-        '<button onclick="setMTDInsBA(\'wallet\')" style="' + mtdInsSegStyle(b.ba === 'wallet') + '"><i class="fas fa-wallet mr-1"></i>Wallet</button></div>' +
-        '<button onclick="exportMTDBranchAch(this)" style="padding:6px 14px;border-radius:20px;border:1.5px solid #5E2D91;background:white;color:#5E2D91;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-file-export mr-1"></i>Export</button></div></div>';
     } else if (b.k === 'tbl') {
       html += '<div style="margin-bottom:16px"><div style="font-size:12px;margin:0 0 6px 2px">' + mtdInsTitleHtml(b.title) + '</div>' +
         '<div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb"><table style="border-collapse:collapse;width:100%;font-size:12px;min-width:' + b.minW + 'px"><thead>' +
@@ -10848,9 +10779,6 @@ function mtdInsWriteSheet(ws, heading, blocks) {
     } else if (b.k === 'rm') {
       mtdInsXlMerged(ws, r, 1, N, b.t, { bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'l', bd: '#5E2D91' });
       ws.getRow(r).height = 22; r++;
-    } else if (b.k === 'bar2') {
-      mtdInsXlMerged(ws, r, 1, N, b.t + ' — ' + (b.ba === 'wallet' ? 'Wallet' : 'Mobile'), { bg: '#F5F3FF', fg: '#5E2D91', b: 1, al: 'l', bd: '#DDD6FE' });
-      r++;
     } else if (b.k === 'bar') {
       mtdInsXlMerged(ws, r, 1, N, b.t + ' — ' + (b.view === 'sup' ? 'Per Supervisor' : 'Per Area'), { bg: '#F5F3FF', fg: '#5E2D91', b: 1, al: 'l', bd: '#DDD6FE' });
       r++;
@@ -10907,6 +10835,290 @@ async function exportMTDInsights() {
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   } catch (e) {
     console.error('[MTD Insights export]', e);
+    alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+</script>
+<script>
+// ════════════════════════════════════════════════════════════════
+//  BRANCH ACHIEVEMENT — standalone card under Insights (Show / Hide)
+//  Mobile + Wallet side by side:  Stores · Target · Ach · Ach % · Proj % · stores below 100 / 90 / 70 %
+//  (store counts are by PROJECTION). Rows: Supervisor (blue) → Area Managers, per Regional Manager,
+//  zone subtotal after the last Regional of each zone (e.g. "Cairo & Canal Subtotal").
+//  Export (active filters): 3 sheets → Per Regions · Per Supers & Areas · All Branches.
+//  The screen and the Excel are rendered from the same model, so numbers / colours / layout match.
+// ════════════════════════════════════════════════════════════════
+var MTD_BA_OPEN = false;
+var MTD_BA_NC = 16;     // columns of the table (Excel merge width)
+// Name shown on top of each Regional Manager's table. Edit here if a Regional's label changes.
+var MTD_BA_REGION_LABELS = { 'ahmed elananey': 'East Cairo', 'mohamed elsisiy': 'West Cairo', 'mamdouh farag': 'Canal' };
+// Display order of known Regionals inside their zone (others follow in data order).
+var MTD_BA_RM_ORDER = ['ahmed elananey', 'mohamed elsisiy', 'mamdouh farag'];
+// Zone of a store = by its Region (order, label). Unknown regions keep their own name.
+var MTD_BA_ZONES = { 'greater cairo': [1, 'Cairo & Canal'], 'canal': [1, 'Cairo & Canal'], 'upper egypt': [2, 'Upper Egypt'], 'alex': [3, 'Alex & Delta'], 'delta': [3, 'Alex & Delta'], 'tka': [4, 'TKA'] };
+
+function toggleMTDBA() {
+  MTD_BA_OPEN = !MTD_BA_OPEN;
+  var body = document.getElementById('mtd-ba-body'), btn = document.getElementById('mtd-ba-toggle');
+  if (body) body.style.display = MTD_BA_OPEN ? '' : 'none';
+  if (btn) btn.innerHTML = MTD_BA_OPEN ? '<i class="fas fa-eye-slash mr-1"></i>Hide' : '<i class="fas fa-eye mr-1"></i>Show';
+  if (MTD_BA_OPEN) renderMTDBA();
+}
+
+// ── aggregation: one store = 1, a group = sum; "below" = stores whose projection is under 100 / 90 / 70 % ──
+function mtdBAAgg(items, pace) {
+  var o = { n: items.length, m: { T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 }, w: { T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 } };
+  items.forEach(function (i) {
+    [['m', i.a, 'mobileTarget', 'mobileSubs', 'mobileProj'], ['w', i.w, 'walletTarget', 'walletSales', 'walletProj']].forEach(function (d) {
+      var s = d[1], t = Number(s[d[2]]) || 0, a = Number(s[d[3]]) || 0, p = mtdInsProjOf(s, d[4], a, pace), g = o[d[0]];
+      g.T += t; g.A += a; g.P += p;
+      if (t > 0) { var r = p / t; if (r < 1) g.l100++; if (r < 0.9) g.l90++; if (r < 0.7) g.l70++; }
+    });
+  });
+  return o;
+}
+function mtdBAZone(region) {
+  var z = MTD_BA_ZONES[String(region || '').trim().toLowerCase()];
+  return z ? { o: z[0], label: z[1] } : { o: 99, label: region || 'Other' };
+}
+function mtdBAGroups(items) {            // Regional Manager groups, ordered by zone then first appearance
+  var map = {}, order = [];
+  items.forEach(function (i) {
+    if (!map[i.rm]) { map[i.rm] = { rm: i.rm, items: [], regions: {} }; order.push(i.rm); }
+    var g = map[i.rm]; g.items.push(i); var rg = i.a.region || ''; g.regions[rg] = (g.regions[rg] || 0) + 1;
+  });
+  var out = order.map(function (rm, idx) {
+    var g = map[rm], best = '', n = 0;
+    Object.keys(g.regions).forEach(function (k) { if (g.regions[k] > n) { n = g.regions[k]; best = k; } });
+    g.zone = mtdBAZone(best);
+    var pos = MTD_BA_RM_ORDER.indexOf(String(rm).trim().toLowerCase());
+    g.idx = pos >= 0 ? pos : 1000 + idx;
+    g.label = MTD_BA_REGION_LABELS[String(rm).trim().toLowerCase()] || best || rm;
+    return g;
+  });
+  out.sort(function (a, b) { return (a.zone.o - b.zone.o) || (a.zone.label < b.zone.label ? -1 : a.zone.label > b.zone.label ? 1 : 0) || (a.idx - b.idx); });
+  return out;
+}
+
+// ── cells ──
+var MTD_BA_LIGHT = '#dbe8f7';
+function mtdBAKind(kind, idx) {
+  if (kind === 'sv' || kind === 'sub') return { bg: MTD_BA_LIGHT, fg: '#1e3a5f', b: 1 };
+  if (kind === 'total') return { bg: '#111827', fg: '#ffffff', b: 1 };
+  return { bg: (kind !== 'store' && idx % 2) ? '#f3f4f6' : '#ffffff', fg: '#1f2937', b: kind === 'store' ? 0 : 1 };
+}
+function mtdBATier(r) {
+  if (r >= 0.9)  return { bg: '#dcfce7', fg: '#15803d' };
+  if (r >= 0.75) return { bg: '#fef3c7', fg: '#a16207' };
+  if (r >= 0.55) return { bg: '#fee2e2', fg: '#b91c1c' };
+  return { bg: '#fecaca', fg: '#991b1b' };
+}
+function mtdBAPct(T, val, kind, idx, pace, isProj) {
+  var k = mtdBAKind(kind, idx), dec = (kind === 'sub' || kind === 'total');
+  if (!(T > 0)) return { v: null, f: dec ? 'pct1' : 'pct', bg: k.bg, fg: k.fg, b: 0, al: 'c' };
+  var ratio = val / T;
+  if (kind === 'sv' || kind === 'sub' || kind === 'total') return { v: ratio, f: dec ? 'pct1' : 'pct', bg: k.bg, fg: k.fg, b: 1, al: 'c' };
+  var t = mtdBATier(isProj ? ratio : (pace > 0 ? ratio / pace : ratio));
+  return { v: ratio, f: 'pct', bg: t.bg, fg: t.fg, b: 1, al: 'c' };
+}
+function mtdBANum(v, kind, idx) { var k = mtdBAKind(kind, idx); return { v: v, f: 'int', bg: k.bg, fg: k.fg, b: kind === 'store' ? 0 : 1, al: 'c' }; }
+function mtdBABelow(v, which, kind, idx) {
+  var k = mtdBAKind(kind, idx), dark = kind === 'total';
+  var fg = dark ? '#ffffff' : (which === 70 ? '#b91c1c' : (which === 100 ? '#a16207' : '#1f2937'));
+  return { v: v, f: 'int', bg: k.bg, fg: fg, b: (which === 70 || which === 100 || dark) ? 1 : 0, al: 'c' };
+}
+function mtdBARow(kind, name, g, pace, idx) {
+  var k = mtdBAKind(kind, idx);
+  var row = [{ v: name, f: 'txt', bg: k.bg, fg: k.fg, b: k.b, al: 'l', sticky: 1, rtl: kind === 'store' ? 1 : 0, indent: kind === 'sv' ? 1 : (kind === 'store' ? 2 : 0) }, mtdBANum(g.n, kind, idx)];
+  [g.m, g.w].forEach(function (x) {
+    row.push(mtdBANum(Math.round(x.T), kind, idx), mtdBANum(Math.round(x.A), kind, idx),
+      mtdBAPct(x.T, x.A, kind, idx, pace, false), mtdBAPct(x.T, x.P, kind, idx, pace, true),
+      mtdBABelow(x.l100, 100, kind, idx), mtdBABelow(x.l90, 90, kind, idx), mtdBABelow(x.l70, 70, kind, idx));
+  });
+  return row;
+}
+function mtdBAHead(label) {
+  var r1 = [mtdInsH(label, { rs: 2, al: 'l' }), mtdInsH('Stores', { rs: 2 }),
+    mtdInsH('Mobile Performance', { cs: 4 }), mtdInsH('Below', { cs: 3 }), mtdInsH('Wallet / WE Pay Performance', { cs: 4 }), mtdInsH('Below', { cs: 3 })];
+  function below() {
+    return [mtdInsH('< 100%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }), mtdInsH('< 90%', { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }), mtdInsH('< 70%', { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })];
+  }
+  var sub = '#6d3fa8';
+  var r2 = [mtdInsH('Target', { bg: sub }), mtdInsH('Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })].concat(below(),
+    [mtdInsH('Wallet TGT', { bg: sub }), mtdInsH('Wallet Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })], below());
+  return [r1, r2];
+}
+
+// ── model: mode = 'areas' (the card + sheet 2) | 'stores' (sheet 3: branches under each area) | 'regions' (sheet 1) ──
+function mtdBAModel(items, pace, mode) {
+  var groups = mtdBAGroups(items), blocks = [];
+  var zoneOf = {};                                   // zone label → groups in it
+  groups.forEach(function (g) { (zoneOf[g.zone.label] = zoneOf[g.zone.label] || []).push(g); });
+  var zoneCount = Object.keys(zoneOf).length;
+  function zoneItems(z) { var a = []; zoneOf[z].forEach(function (g) { a = a.concat(g.items); }); return a; }
+  function closing(g, idxInGroups, body) {           // zone subtotal / grand total rows attached to the last table of a zone / of the report
+    var zg = zoneOf[g.zone.label], lastOfZone = zg[zg.length - 1] === g;
+    if (lastOfZone && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0));
+    if (idxInGroups === groups.length - 1 && zoneCount > 1) body.push(mtdBARow('total', 'All Regions Total', mtdBAAgg(items, pace), pace, 0));
+  }
+  if (mode === 'regions') {
+    var body = [], seenZ = {};
+    groups.forEach(function (g, gi) {
+      body.push(mtdBARow('reg', (g.label && g.label !== g.rm ? g.label + ' — ' : '') + g.rm, mtdBAAgg(g.items, pace), pace, gi));
+      var zg = zoneOf[g.zone.label];
+      if (zg[zg.length - 1] === g && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0));
+    });
+    body.push(mtdBARow('total', 'Total', mtdBAAgg(items, pace), pace, 0));
+    blocks.push({ k: 'tbl', head: mtdBAHead('Region — Regional Manager'), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet · per Region', c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
+    return blocks;
+  }
+  groups.forEach(function (g, gi) {
+    blocks.push({ k: 'rm', t: g.rm + ' · ' + g.items.length + ' stores' });
+    var svOrder = [], svMap = {};
+    g.items.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
+    var body = [];
+    svOrder.forEach(function (sv) {
+      body.push(mtdBARow('sv', sv, mtdBAAgg(svMap[sv].items, pace), pace, 0));
+      svMap[sv].amOrder.forEach(function (am, ai) {
+        var amItems = svMap[sv].ams[am];
+        body.push(mtdBARow('am', am, mtdBAAgg(amItems, pace), pace, ai));
+        if (mode === 'stores') {
+          amItems.slice().sort(function (x, y) {
+            var tx = Number(x.a.mobileTarget) || 0, ty = Number(y.a.mobileTarget) || 0;
+            return (ty > 0 ? (Number(y.a.mobileSubs) || 0) / ty : -1) - (tx > 0 ? (Number(x.a.mobileSubs) || 0) / tx : -1);
+          }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si)); });
+        }
+      });
+    });
+    body.push(mtdBARow('total', 'Total', mtdBAAgg(g.items, pace), pace, 0));
+    closing(g, gi, body);
+    blocks.push({ k: 'tbl', head: mtdBAHead(g.label), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet', c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
+  });
+  return blocks;
+}
+
+// ── HTML ──
+var MTD_BA_WIDTHS = [250, 56, 72, 72, 60, 60, 54, 54, 54, 72, 72, 60, 60, 54, 54, 54];
+function mtdBAFmt(c) {
+  if (c.v === null || c.v === undefined || c.v === '') return c.f === 'txt' ? '' : '–';
+  if (c.f === 'pct') return Math.round(c.v * 100) + '%';
+  if (c.f === 'pct1') return (c.v * 100).toFixed(1) + '%';
+  if (c.f === 'int') return Math.round(c.v).toLocaleString('en-US');
+  return mtdInsEsc(c.v);
+}
+function mtdBACellHtml(c) {
+  var tag = c.hd ? 'th' : 'td', al = c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center');
+  var pl = c.hd ? 8 : (c.al === 'l' ? 10 + (c.indent || 0) * 14 : 6);
+  var st = 'padding:' + (c.hd ? '6px 8px' : '5px 6px') + ' 5px ' + pl + 'px;text-align:' + al + ';background:' + c.bg + ';color:' + c.fg + ';font-weight:' + (c.b ? 800 : 600) +
+    ';font-size:' + (c.hd ? 11 : 12) + 'px;border:1px solid ' + (c.bd || '#e5e7eb') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis' + (c.sticky ? ';position:sticky;left:0;z-index:1' : '');
+  return '<' + tag + (c.cs ? ' colspan="' + c.cs + '"' : '') + (c.rs ? ' rowspan="' + c.rs + '"' : '') + (c.rtl ? ' dir="auto"' : '') + ' style="' + st + '">' + mtdBAFmt(c) + '</' + tag + '>';
+}
+function mtdBAHtml(blocks) {
+  var html = '', open = false, total = MTD_BA_WIDTHS.reduce(function (a, b) { return a + b; }, 0);
+  blocks.forEach(function (b) {
+    if (b.k === 'rm') {
+      if (open) html += '</div>';
+      open = true;
+      html += '<div style="margin-bottom:26px"><div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);color:#fff;border-radius:12px 12px 0 0;padding:10px 14px;font-size:15px;font-weight:800"><i class="fas fa-user-tie mr-2"></i>' + mtdInsEsc(b.t) + '</div>';
+    } else if (b.k === 'tbl') {
+      if (!open) { open = true; html += '<div style="margin-bottom:26px">'; }
+      html += '<div style="background:' + b.titleBg + ';padding:6px 12px;font-size:12px">' + b.title.map(function (p) { return '<span style="color:' + p.c + ';font-weight:800">' + mtdInsEsc(p.t) + '</span>'; }).join('') + '</div>' +
+        '<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:0 0 10px 10px"><table style="border-collapse:collapse;table-layout:fixed;width:' + total + 'px"><colgroup>' +
+        MTD_BA_WIDTHS.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup><thead>' +
+        b.head.map(function (r) { return '<tr>' + r.map(mtdBACellHtml).join('') + '</tr>'; }).join('') + '</thead><tbody>' +
+        b.body.map(function (r) { return '<tr>' + r.map(mtdBACellHtml).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+    }
+  });
+  if (open) html += '</div>';
+  return html;
+}
+function renderMTDBA() {
+  var el = document.getElementById('mtd-ba-content');
+  if (!el) return;
+  var items = mtdInsBuildItems(MTD_FILTERED).items;
+  if (!items.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">No data for the current filters</div>'; return; }
+  var note = '';
+  if (!items.some(function (i) { return (Number(i.w.walletTarget) || 0) > 0; })) note = '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ داتا WE Pay (Wallet) مش محمّلة — أعمدة الـ Wallet فاضية.</div>';
+  el.innerHTML = note + '<div style="font-size:10px;color:#6b7280;margin-bottom:10px">Ach % = الفعلي لحد اليوم · Proj % = المتوقع آخر الشهر · أعمدة Below = عدد الفروع اللي المتوقع بتاعها أقل من 100% / 90% / 70% من التارجت</div>' +
+    mtdBAHtml(mtdBAModel(items, mtdInsPace(), 'areas'));
+}
+
+// ── Excel: 3 sheets, active filters ──
+var MTD_BA_XL_WIDTHS = [46, 8, 11, 11, 9, 9, 8, 8, 8, 11, 11, 9, 9, 8, 8, 8];
+function mtdBAXlValue(cell, c) {
+  if (c.v === null || c.v === undefined || c.v === '') { cell.value = c.f === 'txt' ? '' : '–'; return; }
+  cell.value = c.v;
+  if (c.f === 'pct') cell.numFmt = '0%'; else if (c.f === 'pct1') cell.numFmt = '0.0%'; else if (c.f === 'int') cell.numFmt = '#,##0';
+}
+function mtdBAXlStyle(cell, c) {
+  mtdInsXlStyle(cell, c);
+  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: c.al === 'l' ? (c.indent || 0) + 1 : 0 };
+}
+function mtdBAWriteSheet(ws, heading, blocks) {
+  var N = MTD_BA_NC, r = 1;
+  ws.views = [{ showGridLines: false }];
+  ws.properties.tabColor = { argb: 'FF5E2D91' };
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  MTD_BA_XL_WIDTHS.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  mtdInsXlMerged(ws, r, 1, N, heading, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
+  ws.getRow(r).height = 24; r += 2;
+  blocks.forEach(function (b) {
+    if (b.k === 'rm') {
+      mtdInsXlMerged(ws, r, 1, N, b.t, { bg: '#5E2D91', fg: '#ffffff', b: 1, al: 'l', bd: '#5E2D91' });
+      ws.getRow(r).height = 22; r++;
+    } else if (b.k === 'tbl') {
+      ws.mergeCells(r, 1, r, N);
+      var tc = ws.getCell(r, 1);
+      tc.value = { richText: b.title.map(function (p) { return { text: p.t, font: { name: 'Calibri', size: 11, bold: true, color: { argb: mtdInsArgb(p.c) } } }; }) };
+      tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: mtdInsArgb(b.titleBg) } };
+      tc.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      r++;
+      var occ = {};
+      b.head.concat(b.body).forEach(function (row) {
+        var col = 1;
+        row.forEach(function (c) {
+          while (occ[r + ':' + col]) col++;
+          var cs = c.cs || 1, rs = c.rs || 1;
+          if (cs > 1 || rs > 1) {
+            ws.mergeCells(r, col, r + rs - 1, col + cs - 1);
+            for (var rr = r; rr < r + rs; rr++) for (var cc = col; cc < col + cs; cc++) { occ[rr + ':' + cc] = 1; mtdBAXlStyle(ws.getCell(rr, cc), c); }
+          } else { occ[r + ':' + col] = 1; }
+          var cell = ws.getCell(r, col);
+          mtdBAXlStyle(cell, c); mtdBAXlValue(cell, c);
+          col += cs;
+        });
+        r++;
+      });
+      r++;
+    }
+  });
+}
+async function exportMTDBA(btn) {
+  var items = mtdInsBuildItems(MTD_FILTERED).items;
+  if (!items.length) { alert('⚠️ مفيش بيانات للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var pace = mtdInsPace(), dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
+    var head = function (what) { return 'Branch Achievement (Mobile & Wallet) — ' + what + ' · ' + items.length + ' stores' + dateTxt; };
+    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
+    mtdBAWriteSheet(wb.addWorksheet('Per Regions'), head('Per Regions'), mtdBAModel(items, pace, 'regions'));
+    mtdBAWriteSheet(wb.addWorksheet('Per Supers & Areas'), head('Per Supervisors & Area Managers'), mtdBAModel(items, pace, 'areas'));
+    mtdBAWriteSheet(wb.addWorksheet('All Branches'), head('All Data with Branches'), mtdBAModel(items, pace, 'stores'));
+    var buf = await wb.xlsx.writeBuffer(), now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'MTD_Branch_Achievement_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    console.error('[Branch Achievement export]', e);
     alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = old; }
