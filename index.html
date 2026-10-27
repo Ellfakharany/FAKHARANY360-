@@ -1928,6 +1928,12 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div id="mtd-ba-body" style="display:none">
           <div id="mtd-ba-content"></div>
+          <div style="display:flex;justify-content:center;margin:18px 0 4px">
+            <button id="mtd-ba-email" onclick="sendMTDBAEmail(this)"
+              style="padding:10px 26px;border-radius:24px;border:none;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;font-size:13px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif;box-shadow:0 4px 14px rgba(94,45,145,.35)">
+              <i class="fas fa-envelope mr-2"></i>Send Email
+            </button>
+          </div>
         </div>
       </div>
     </div><!-- /mtd-dashboard-content -->
@@ -4951,16 +4957,16 @@ async function generateMTDExecutiveReportAsync() {
 }
 
 function exportExcel() {
-  const headers = ['Month','Store','Partner','Region','Account Manager','Area Manager','Supervisor','Regional Manager',
+  const headers = ['Month','Store','Partner','Region','Account Manager','Classification','Area Manager','Supervisor','Regional Manager',
     'Mobile Target','Mobile Subs','Gold Target','Gold Subs','FBB Target','FBB Subs',
     'Fixed Target','Fixed Subs','Wallet Target','Wallet Sales','FWA Target','FWA Subs','Low T','Mid T','High T'];
   const rows = filteredData.map(r=>[
-    r.month,r.store,r.partner,r.region,r.accountManager,r.areaManager,r.supervisor,r.regionalManager,
+    r.month,r.store,r.partner,r.region,r.accountManager,r.classification,r.areaManager,r.supervisor,r.regionalManager,
     r.mobileTarget,r.mobileSubs,r.goldTarget,r.goldSubs,r.fbbTarget,r.fbbSubs,
     r.fixedTarget,r.fixedSubs,r.walletTarget,r.walletSales,r.fwaTarget,r.fwaSubs,r.lowT,r.midT,r.highT
   ]);
   const ws = XLSX.utils.aoa_to_sheet([headers,...rows]);
-  ws['!cols'] = headers.map((_,i)=>({wch:i<8?20:12}));
+  ws['!cols'] = headers.map((_,i)=>({wch:i<9?20:12}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Performance Data');
   exportWithPassword(wb, 'WE_Performance');
@@ -9289,7 +9295,7 @@ function exportMTDLowPerf() {
     data = MTD_FILTERED.map(function(r){
       var code=String(r.storeCode||'').trim().toUpperCase();
       var w=WALLET_DATA[code]||{};
-      return {store:r.store,storeCode:code,supervisor:r.supervisor,areaManager:r.areaManager,
+      return {store:r.store,storeCode:code,supervisor:r.supervisor,areaManager:r.areaManager,accountManager:r.accountManager,classification:r.classification,partner:r.partner,
               tgt:w.walletTarget||0,act:w.walletSales||0,proj:w.walletProj||0,projPct:w.walletProjPct||0};
     }).filter(function(r){return r.projPct<1;});
   } else {
@@ -9297,19 +9303,19 @@ function exportMTDLowPerf() {
       var code=String(r.storeCode||'').trim().toUpperCase();
       return MTD_FILTERED.some(function(f){return String(f.storeCode||'').trim().toUpperCase()===code;});
     }).map(function(r){
-      return {store:r.store,storeCode:r.storeCode,supervisor:r.supervisor,areaManager:r.areaManager,
+      return {store:r.store,storeCode:r.storeCode,supervisor:r.supervisor,areaManager:r.areaManager,accountManager:r.accountManager,classification:r.classification,partner:r.partner,
               tgt:r[prod.tKey]||0,act:r[prod.aKey]||0,proj:r[prod.projKey]||0,projPct:r[prod.projPctKey]||0};
     }).filter(function(r){return r.projPct<1;});
   }
   data.sort(function(a,b){return a.projPct-b.projPct;});
   if(data.length===0){alert('⚠️ مفيش فروع Low Performance');return;}
   var sheetData=data.map(function(r){
-    return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'',
+    return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'','Account Manager':r.accountManager||'','Classification':r.classification||'','Partner':r.partner||'',
             'Product':(MTD_LP_PROD==='wallet'?'Wallet':(prod&&prod.label)||MTD_LP_PROD),
             'Target':r.tgt,'Actual':r.act,'Projection':Math.round(r.proj),'Proj%':(r.projPct*100).toFixed(1)};
   });
   var ws=XLSX.utils.json_to_sheet(sheetData);
-  ws['!cols']=[{wch:28},{wch:16},{wch:22},{wch:22},{wch:10},{wch:10},{wch:10},{wch:12},{wch:8}];
+  ws['!cols']=[{wch:28},{wch:16},{wch:22},{wch:22},{wch:22},{wch:14},{wch:22},{wch:10},{wch:10},{wch:10},{wch:12},{wch:8}];
   var wb2=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb2,ws,'Low Performance');
   exportWithPassword(wb2,'MTD_LowPerf_'+(MTD_LP_PROD==='wallet'?'Wallet':(prod&&prod.label)||MTD_LP_PROD));
@@ -9334,7 +9340,7 @@ function exportMTDLowPerfAll() {
       data = MTD_FILTERED.map(function(r){
         var code=String(r.storeCode||'').trim().toUpperCase();
         var w=WALLET_DATA[code]||{};
-        return {store:r.store,storeCode:code,supervisor:r.supervisor,areaManager:r.areaManager,
+        return {store:r.store,storeCode:code,supervisor:r.supervisor,areaManager:r.areaManager,accountManager:r.accountManager,classification:r.classification,partner:r.partner,
                 tgt:w.walletTarget||0,act:w.walletSales||0,proj:w.walletProj||0,projPct:w.walletProjPct||0};
       }).filter(function(r){return r.projPct<1;});
     } else {
@@ -9343,7 +9349,7 @@ function exportMTDLowPerfAll() {
         var code=String(r.storeCode||'').trim().toUpperCase();
         return MTD_FILTERED.some(function(f){return String(f.storeCode||'').trim().toUpperCase()===code;});
       }).map(function(r){
-        return {store:r.store,storeCode:r.storeCode,supervisor:r.supervisor,areaManager:r.areaManager,
+        return {store:r.store,storeCode:r.storeCode,supervisor:r.supervisor,areaManager:r.areaManager,accountManager:r.accountManager,classification:r.classification,partner:r.partner,
                 tgt:r[pr.tKey]||0,act:r[pr.aKey]||0,proj:r[pr.projKey]||0,projPct:r[pr.projPctKey]||0};
       }).filter(function(r){return r.projPct<1;});
     }
@@ -9351,11 +9357,11 @@ function exportMTDLowPerfAll() {
     if (data.length === 0) return;
     anySheet = true;
     var sheetData = data.map(function(r){
-      return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'',
+      return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'','Account Manager':r.accountManager||'','Classification':r.classification||'','Partner':r.partner||'',
               'Target':r.tgt,'Actual':r.act,'Projection':Math.round(r.proj),'Proj%':(r.projPct*100).toFixed(1)};
     });
     var ws = XLSX.utils.json_to_sheet(sheetData);
-    ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:10},{wch:10},{wch:12},{wch:8}];
+    ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:22},{wch:14},{wch:22},{wch:10},{wch:10},{wch:12},{wch:8}];
     XLSX.utils.book_append_sheet(wb2, ws, p.label);
   });
 
@@ -9643,13 +9649,14 @@ function exportMTDStoreDetails() {
     return {
       'Store': r.store || '', 'Store Code': r.storeCode || '',
       'Supervisor': r.supervisor || '', 'Area Manager': r.areaManager || '', 'Region': r.region || '',
+      'Account Manager': r.accountManager || '', 'Classification': r.classification || '', 'Partner': r.partner || '',
       'Product': label, 'Target': tgt, 'Actual': act, 'Ach%': Number(pctv).toFixed(1),
       'Projection': proj, 'Proj%': Number(projPct).toFixed(1)
     };
   });
   if (data.length === 0) { alert('⚠️ مفيش بيانات للتصدير'); return; }
   var ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:14},{wch:10},{wch:10},{wch:10},{wch:8},{wch:12},{wch:8}];
+  ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:14},{wch:22},{wch:14},{wch:22},{wch:10},{wch:10},{wch:10},{wch:8},{wch:12},{wch:8}];
   var wb2 = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb2, ws, label.slice(0,28));
   exportWithPassword(wb2, 'MTD_'+label.replace(/\s+/g,''));
@@ -9685,11 +9692,11 @@ function exportMTDAllProducts() {
         var pr=MTD_PRODS[p.key];
         tgt=r[pr.tKey]||0;act=r[pr.aKey]||0;pct=(r[pr.pctKey]||0)*100;proj=r[pr.projKey]||0;projPct=(r[pr.projPctKey]||0)*100;
       }
-      return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'','Region':r.region||'',
+      return {'Store':r.store||'','Store Code':r.storeCode||'','Supervisor':r.supervisor||'','Area Manager':r.areaManager||'','Region':r.region||'','Account Manager':r.accountManager||'','Classification':r.classification||'','Partner':r.partner||'',
         'Target':tgt,'Actual':act,'Ach%':Number(pct).toFixed(1),'Projection':Math.round(proj),'Proj%':Number(projPct).toFixed(1)};
     });
     var ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:14},{wch:10},{wch:10},{wch:8},{wch:12},{wch:8}];
+    ws['!cols'] = [{wch:28},{wch:16},{wch:22},{wch:22},{wch:14},{wch:22},{wch:14},{wch:22},{wch:10},{wch:10},{wch:8},{wch:12},{wch:8}];
     XLSX.utils.book_append_sheet(wb2, ws, p.label);
   });
 
@@ -10314,7 +10321,8 @@ var MTD_INS_OPEN = false;
 var MTD_INS_METRIC = 'ach';     // 'ach' | 'proj'
 var MTD_INS_VIEW = 'area';      // 'area' | 'sup'
 var MTD_INS_CRITICAL_N = 7;     // lowest-Mobile stores listed in Critical Cases per Regional Manager
-var MTD_INS_NCOLS = 13;         // widest table (Excel merge width)
+var MTD_INS_NCOLS = 16;         // widest table (Excel merge width)
+var MTD_INS_META = false;       // export-only: Account Manager / Classification / Partner on store tables
 
 // ── UI state ───────────────────────────────────────────────────
 function mtdInsSegStyle(on) {
@@ -10550,13 +10558,18 @@ function mtdInsStoreCalc(i, pace) {
 function mtdInsStoreIdle(i) { return (Number(i.s.mobileSubs) || 0) - (Number(i.a.mobileSubs) || 0); }
 function mtdInsMobShare(c, metric) { return c[1].T > 0 ? (metric === 'proj' ? c[1].P : c[1].A) / c[1].T : -1; }
 
+function mtdInsMetaHead() { return MTD_INS_META ? [mtdInsH('Account Manager', { al: 'l' }), mtdInsH('Classification', { al: 'l' }), mtdInsH('Partner', { al: 'l' })] : []; }
+function mtdInsMetaCells(i) {
+  return MTD_INS_META ? [i.a.accountManager, i.a.classification, i.a.partner].map(function (t) { return { v: t || '', f: 'txt', bg: '#ffffff', fg: '#374151', b: 0, al: 'l', wrap: 1 }; }) : [];
+}
+function mtdInsMetaBlank() { return MTD_INS_META ? [0, 1, 2].map(function () { return mtdInsName('', 'total', 0); }) : []; }
 function mtdInsStoreHead(withArea) {
   var th = [mtdInsH('Branch Name', { al: 'r' })];
   if (withArea) th.push(mtdInsH('Area Manager', { al: 'l' }));
   MTD_INS_SKEYS.forEach(function (k) { th.push(mtdInsH(k[0])); });
   th.push(mtdInsH('IDLE', { bg: '#4b5563', bd: '#4b5563' }));
   MTD_INS_SKEYS.forEach(function (k) { th.push(mtdInsH(k[0] + ' Rem', { bg: '#111827', bd: '#111827' })); });
-  return [th];
+  return [th.concat(mtdInsMetaHead())];
 }
 function mtdInsStoreRow(x, withArea, pace, metric) {
   var r = [{ v: x.i.store, f: 'txt', bg: '#ffffff', fg: '#1f2937', b: 1, al: 'r', rtl: 1 }];
@@ -10564,7 +10577,7 @@ function mtdInsStoreRow(x, withArea, pace, metric) {
   x.c.forEach(function (t) { r.push(mtdInsPct(t, 'am', pace, metric)); });
   r.push(mtdInsIdle(mtdInsStoreIdle(x.i)));
   x.c.forEach(function (t) { r.push(mtdInsRem(t, 'am')); });
-  return r;
+  return r.concat(mtdInsMetaCells(x.i));
 }
 function mtdInsStoreTable(titleParts, items, withArea, pace, metric, withTotal) {
   var calc = items.map(function (i) { return { i: i, c: mtdInsStoreCalc(i, pace) }; });
@@ -10578,13 +10591,13 @@ function mtdInsStoreTable(titleParts, items, withArea, pace, metric, withTotal) 
     var idl = mtdInsPlain(Math.round(g.idleMob), 'total');
     tot.push(idl);
     MTD_INS_SKEYS.forEach(function (k) { tot.push(mtdInsRem(g.strategic[k[1]], 'total')); });
-    body.push(tot);
+    body.push(tot.concat(mtdInsMetaBlank()));
   }
   return { k: 'tbl', title: titleParts, head: mtdInsStoreHead(withArea), body: body, minW: 760 };
 }
 function mtdInsSupAreasTable(svName, sv, pace, metric) {
   // One table per supervisor: Supervisor (+ store count) → each Area Manager band → that area's stores
-  var NC = 12, body = [];
+  var NC = 12 + (MTD_INS_META ? 3 : 0), body = [];
   sv.amOrder.forEach(function (am) {
     var items = sv.ams[am], g = mtdInsAgg(items, pace), m = g.strategic[1];
     var share = m.T > 0 ? (metric === 'proj' ? m.P : m.A) / m.T : 0;
@@ -10616,11 +10629,12 @@ function mtdInsCriticalTable(rmItems, pace, metric) {
   var head = [[mtdInsH('Branch Name', { al: 'r', bg: '#111827', bd: '#111827' })]];
   MTD_INS_SKEYS.forEach(function (k) { head[0].push(mtdInsH(k[0])); });
   head[0].push(mtdInsH('IDLE'));
+  head[0] = head[0].concat(mtdInsMetaHead());
   var body = calc.map(function (x) {
     var r = [{ v: x.i.store, f: 'txt', bg: '#ffffff', fg: '#1f2937', b: 1, al: 'r', rtl: 1 }];
     x.c.forEach(function (t) { r.push(mtdInsPct(t, 'am', pace, metric)); });
     r.push(mtdInsIdle(mtdInsStoreIdle(x.i)));
-    return r;
+    return r.concat(mtdInsMetaCells(x.i));
   });
   return { k: 'tbl', title: [{ t: 'CRITICAL CASES ', c: '#111827', b: 1 }, { t: '(IMMEDIATE ACTION REQUIRED):', c: '#dc2626', b: 1 }], head: head, body: body, minW: 520 };
 }
@@ -10750,7 +10764,7 @@ function mtdInsXlStyle(cell, c) {
   var border = { style: 'thin', color: { argb: mtdInsArgb(c.bd || '#E5E7EB') } };
   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: mtdInsArgb(c.bg) } };
   cell.font = { name: 'Calibri', size: c.hd ? 11 : 11, bold: !!c.b, color: { argb: mtdInsArgb(c.fg) } };
-  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: (c.al === 'l' || c.al === 'r') ? 1 : 0 };
+  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: (c.al === 'l' || c.al === 'r') ? 1 : 0, wrapText: !!c.wrap };
   cell.border = { top: border, left: border, bottom: border, right: border };
 }
 function mtdInsXlValue(cell, c) {
@@ -10769,7 +10783,7 @@ function mtdInsWriteSheet(ws, heading, blocks) {
   var N = MTD_INS_NCOLS, r = 1;
   ws.views = [{ showGridLines: false }];
   ws.getColumn(1).width = 34; ws.getColumn(2).width = 26;
-  for (var ci = 3; ci <= N; ci++) ws.getColumn(ci).width = 12;
+  for (var ci = 3; ci <= N; ci++) ws.getColumn(ci).width = (ci >= 13) ? 20 : ((ci >= 8 && ci <= 10) ? 14 : 12);
   mtdInsXlMerged(ws, r, 1, N, heading, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
   ws.getRow(r).height = 24; r += 2;
   blocks.forEach(function (b) {
@@ -10824,8 +10838,11 @@ async function exportMTDInsights() {
     var wb = new ExcelJS.Workbook();
     wb.creator = 'FAKHARANY360';
     var ws1 = wb.addWorksheet('Active (Filtered)'), ws2 = wb.addWorksheet('Full Data');
-    mtdInsWriteSheet(ws1, 'MTD Insights — Active data (current filters) · ' + act.length + ' stores · ' + modeTxt + dateTxt, mtdInsBuildBlocks(act, pace, metric, view));
-    mtdInsWriteSheet(ws2, 'MTD Insights — Full data (all stores) · ' + full.length + ' stores · ' + modeTxt + dateTxt, mtdInsBuildBlocks(full, pace, metric, view));
+    var blocksAct, blocksFull;
+    MTD_INS_META = true;                                 // store tables also carry Account Manager / Classification / Partner
+    try { blocksAct = mtdInsBuildBlocks(act, pace, metric, view); blocksFull = mtdInsBuildBlocks(full, pace, metric, view); } finally { MTD_INS_META = false; }
+    mtdInsWriteSheet(ws1, 'MTD Insights — Active data (current filters) · ' + act.length + ' stores · ' + modeTxt + dateTxt, blocksAct);
+    mtdInsWriteSheet(ws2, 'MTD Insights — Full data (all stores) · ' + full.length + ' stores · ' + modeTxt + dateTxt, blocksFull);
     var buf = await wb.xlsx.writeBuffer();
     var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
     var a = document.createElement('a');
@@ -10853,6 +10870,7 @@ async function exportMTDInsights() {
 // ════════════════════════════════════════════════════════════════
 var MTD_BA_OPEN = false;
 var MTD_BA_NC = 16;     // columns of the table (Excel merge width)
+var MTD_BA_META = false; // export-only: adds Account Manager / Classification / Partner columns (store rows)
 // Name shown on top of each Regional Manager's table. Edit here if a Regional's label changes.
 var MTD_BA_REGION_LABELS = { 'ahmed elananey': 'East Cairo', 'mohamed elsisiy': 'West Cairo', 'mamdouh farag': 'Canal' };
 // Display order of known Regionals inside their zone (others follow in data order).
@@ -10930,7 +10948,7 @@ function mtdBABelow(v, which, kind, idx) {
   var fg = dark ? '#ffffff' : (which === 70 ? '#b91c1c' : (which === 100 ? '#a16207' : '#1f2937'));
   return { v: v, f: 'int', bg: k.bg, fg: fg, b: (which === 70 || which === 100 || dark) ? 1 : 0, al: 'c' };
 }
-function mtdBARow(kind, name, g, pace, idx) {
+function mtdBARow(kind, name, g, pace, idx, item) {
   var k = mtdBAKind(kind, idx);
   var row = [{ v: name, f: 'txt', bg: k.bg, fg: k.fg, b: k.b, al: 'l', sticky: 1, rtl: kind === 'store' ? 1 : 0, indent: kind === 'sv' ? 1 : (kind === 'store' ? 2 : 0) }, mtdBANum(g.n, kind, idx)];
   [g.m, g.w].forEach(function (x) {
@@ -10938,6 +10956,10 @@ function mtdBARow(kind, name, g, pace, idx) {
       mtdBAPct(x.T, x.A, kind, idx, pace, false), mtdBAPct(x.T, x.P, kind, idx, pace, true),
       mtdBABelow(x.l100, 100, kind, idx), mtdBABelow(x.l90, 90, kind, idx), mtdBABelow(x.l70, 70, kind, idx));
   });
+  if (MTD_BA_META) {
+    var meta = item ? [item.a.accountManager, item.a.classification, item.a.partner] : ['', '', ''];
+    meta.forEach(function (t) { row.push({ v: t || '', f: 'txt', bg: k.bg, fg: k.fg, b: 0, al: 'l', wrap: 1 }); });
+  }
   return row;
 }
 function mtdBAHead(label) {
@@ -10947,6 +10969,7 @@ function mtdBAHead(label) {
     return [mtdInsH('< 100%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }), mtdInsH('< 90%', { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }), mtdInsH('< 70%', { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })];
   }
   var sub = '#6d3fa8';
+  if (MTD_BA_META) ['Account Manager', 'Classification', 'Partner'].forEach(function (t) { r1.push(mtdInsH(t, { rs: 2, al: 'l' })); });
   var r2 = [mtdInsH('Target', { bg: sub }), mtdInsH('Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })].concat(below(),
     [mtdInsH('Wallet TGT', { bg: sub }), mtdInsH('Wallet Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })], below());
   return [r1, r2];
@@ -10989,7 +11012,7 @@ function mtdBAModel(items, pace, mode) {
           amItems.slice().sort(function (x, y) {
             var tx = Number(x.a.mobileTarget) || 0, ty = Number(y.a.mobileTarget) || 0;
             return (ty > 0 ? (Number(y.a.mobileSubs) || 0) / ty : -1) - (tx > 0 ? (Number(x.a.mobileSubs) || 0) / tx : -1);
-          }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si)); });
+          }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si, it)); });
         }
       });
     });
@@ -11047,7 +11070,7 @@ function renderMTDBA() {
 }
 
 // ── Excel: 3 sheets, active filters ──
-var MTD_BA_XL_WIDTHS = [46, 8, 11, 11, 9, 9, 8, 8, 8, 11, 11, 9, 9, 8, 8, 8];
+var MTD_BA_XL_WIDTHS = [46, 8, 11, 11, 9, 9, 8, 8, 8, 11, 11, 9, 9, 8, 8, 8, 24, 16, 24];
 function mtdBAXlValue(cell, c) {
   if (c.v === null || c.v === undefined || c.v === '') { cell.value = c.f === 'txt' ? '' : '–'; return; }
   cell.value = c.v;
@@ -11055,14 +11078,14 @@ function mtdBAXlValue(cell, c) {
 }
 function mtdBAXlStyle(cell, c) {
   mtdInsXlStyle(cell, c);
-  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: c.al === 'l' ? (c.indent || 0) + 1 : 0 };
+  cell.alignment = { horizontal: c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center'), vertical: 'middle', indent: c.al === 'l' ? (c.indent || 0) + 1 : 0, wrapText: !!c.wrap };
 }
-function mtdBAWriteSheet(ws, heading, blocks) {
-  var N = MTD_BA_NC, r = 1;
+function mtdBAWriteSheet(ws, heading, blocks, ncols) {
+  var N = ncols || MTD_BA_NC, r = 1;
   ws.views = [{ showGridLines: false }];
   ws.properties.tabColor = { argb: 'FF5E2D91' };
   ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
-  MTD_BA_XL_WIDTHS.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  MTD_BA_XL_WIDTHS.slice(0, N).forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
   mtdInsXlMerged(ws, r, 1, N, heading, { bg: '#111827', fg: '#ffffff', b: 1, al: 'l', bd: '#111827' });
   ws.getRow(r).height = 24; r += 2;
   blocks.forEach(function (b) {
@@ -11109,7 +11132,10 @@ async function exportMTDBA(btn) {
     var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
     mtdBAWriteSheet(wb.addWorksheet('Per Regions'), head('Per Regions'), mtdBAModel(items, pace, 'regions'));
     mtdBAWriteSheet(wb.addWorksheet('Per Supers & Areas'), head('Per Supervisors & Area Managers'), mtdBAModel(items, pace, 'areas'));
-    mtdBAWriteSheet(wb.addWorksheet('All Branches'), head('All Data with Branches'), mtdBAModel(items, pace, 'stores'));
+    var storeBlocks;
+    MTD_BA_META = true;                                  // the branch sheet also carries Account Manager / Classification / Partner
+    try { storeBlocks = mtdBAModel(items, pace, 'stores'); } finally { MTD_BA_META = false; }
+    mtdBAWriteSheet(wb.addWorksheet('All Branches'), head('All Data with Branches'), storeBlocks, MTD_BA_NC + 3);
     var buf = await wb.xlsx.writeBuffer(), now = new Date();
     var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
     var a = document.createElement('a');
@@ -11122,6 +11148,196 @@ async function exportMTDBA(btn) {
     alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e));
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+// ════════════════ SEND EMAIL (end of the card) ════════════════
+//  PC     → a ready-to-send draft (.eml, formatted HTML body) that opens in Outlook.
+//  Mobile → opens the share sheet with the tables as an image + the written text (pick Gmail / Outlook / default mail app);
+//           if the phone can't share files it falls back to a plain-text mailto: in the default mail app.
+//  A mailto: link alone can't carry coloured tables (plain text only), which is why it's done this way.
+var MTD_BA_SIGNATURE = ['Best regards,', 'Mohamed Elfakharany', 'East Cairo Team'];
+var MTD_BA_EMAIL_W = [230, 50, 64, 64, 52, 52, 46, 46, 46, 64, 64, 52, 52, 46, 46, 46];
+var MTD_BA_EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+var MTD_BA_PENDING = null;     // a prepared share (if the browser asked for a fresh tap)
+
+function mtdBAEnDate() {
+  var m = String(MTD_MOBILE_DATE_LABEL || '').match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if (m) { var mi = AR_MONTHS_FULL.indexOf(m[2]); if (mi >= 0) return (+m[1]) + ' ' + MTD_BA_EN_MONTHS[mi] + ' ' + m[3]; }
+  var t = new Date();
+  return t.getDate() + ' ' + MTD_BA_EN_MONTHS[t.getMonth()] + ' ' + t.getFullYear();
+}
+function mtdBAScope(items) {
+  var g = mtdBAGroups(items);
+  if (g.length === 1) return g[0].label;
+  var z = {}; g.forEach(function (x) { z[x.zone.label] = 1; });
+  var zs = Object.keys(z);
+  return zs.length === 1 ? zs[0] : 'All Regions';
+}
+function mtdBAEmailIsMobile() {
+  var ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+}
+function mtdBAToast(msg) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90%;text-align:center';
+  document.body.appendChild(t);
+  setTimeout(function () { t.remove(); }, 5000);
+}
+function mtdBAIntro(scope, date) {
+  return 'Kindly find below the Branch Achievement performance (Mobile & Wallet) for ' + scope + ' till ' + date +
+    ' — target, achievement, projected month-end achievement, and the number of stores projected to finish below 100% / 90% / 70% of target.';
+}
+
+// email-safe HTML table (inline styles + bgcolor attrs so Outlook keeps the colours)
+function mtdBAEmailCell(c, col) {
+  var w = 0, n = c.cs || 1;
+  for (var i = 0; i < n; i++) w += MTD_BA_EMAIL_W[col + i] || 50;
+  var al = c.al === 'l' ? 'left' : (c.al === 'r' ? 'right' : 'center');
+  var st = 'background:' + c.bg + ';color:' + c.fg + ';font-weight:' + (c.b ? 'bold' : 'normal') + ';font-size:12px;font-family:Calibri,Arial,sans-serif;text-align:' + al +
+    ';padding:4px 6px 4px ' + (c.al === 'l' ? 8 + (c.indent || 0) * 14 : 6) + 'px;border:1px solid ' + (c.bd || '#e5e7eb') + ';white-space:nowrap;mso-line-height-rule:exactly';
+  return '<td bgcolor="' + c.bg + '" width="' + w + '"' + (c.cs ? ' colspan="' + c.cs + '"' : '') + (c.rs ? ' rowspan="' + c.rs + '"' : '') + ' align="' + al + '" style="' + st + '">' + mtdBAFmt(c) + '</td>';
+}
+function mtdBAEmailTable(b) {
+  var total = MTD_BA_EMAIL_W.reduce(function (a, x) { return a + x; }, 0), occ = {}, html = '';
+  b.head.forEach(function (row, ri) {
+    var col = 0; html += '<tr>';
+    row.forEach(function (c) {
+      while (occ[ri + ':' + col]) col++;
+      var cs = c.cs || 1, rs = c.rs || 1;
+      for (var r = 0; r < rs; r++) for (var k = 0; k < cs; k++) occ[(ri + r) + ':' + (col + k)] = 1;
+      html += mtdBAEmailCell(c, col); col += cs;
+    });
+    html += '</tr>';
+  });
+  b.body.forEach(function (row) { var col = 0; html += '<tr>' + row.map(function (c) { var h = mtdBAEmailCell(c, col); col += (c.cs || 1); return h; }).join('') + '</tr>'; });
+  return '<table cellspacing="0" cellpadding="0" border="0" width="' + total + '" style="border-collapse:collapse;width:' + total + 'px;table-layout:fixed">' + html + '</table>';
+}
+function mtdBAEmailTables(items, pace) {
+  var total = MTD_BA_EMAIL_W.reduce(function (a, x) { return a + x; }, 0), out = '';
+  mtdBAModel(items, pace, 'areas').forEach(function (b) {
+    if (b.k === 'rm') {
+      out += '<table cellspacing="0" cellpadding="0" border="0" width="' + total + '" style="border-collapse:collapse;width:' + total + 'px"><tr><td bgcolor="#5E2D91" style="background:#5E2D91;color:#ffffff;font-weight:bold;font-size:15px;font-family:Calibri,Arial,sans-serif;padding:8px 12px">' + mtdInsEsc(b.t) + '</td></tr>';
+    } else if (b.k === 'tbl') {
+      out += '<tr><td bgcolor="' + b.titleBg + '" style="background:' + b.titleBg + ';padding:4px 12px;font-size:12px;font-weight:bold;color:#5E2D91;font-family:Calibri,Arial,sans-serif">' + b.title.map(function (p) { return mtdInsEsc(p.t); }).join('') + '</td></tr></table>' +
+        mtdBAEmailTable(b) + '<div style="height:18px;line-height:18px;font-size:1px">&nbsp;</div>';
+    }
+  });
+  return out;
+}
+function mtdBAEmailDoc(items, pace, scope, date) {
+  var f = 'font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1f2937';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="' + f + '">' +
+    '<p style="' + f + '">Dear All,</p><p style="' + f + '">' + mtdInsEsc(mtdBAIntro(scope, date)) + '</p>' +
+    mtdBAEmailTables(items, pace) +
+    '<p style="' + f + ';margin-top:14px">' + MTD_BA_SIGNATURE.map(mtdInsEsc).join('<br>') + '</p></body></html>';
+}
+// plain text (fallback for phones that can't share files)
+function mtdBAEmailText(items, pace, scope, date, level) {
+  function line(name, g, pad) {
+    function part(x) { return 'T ' + Math.round(x.T).toLocaleString('en-US') + ' · Ach ' + Math.round(x.A).toLocaleString('en-US') + ' (' + (x.T > 0 ? Math.round(x.A / x.T * 100) : 0) + '%) · Proj ' + (x.T > 0 ? Math.round(x.P / x.T * 100) : 0) + '% · <100/90/70: ' + x.l100 + '/' + x.l90 + '/' + x.l70; }
+    return pad + name + ' (' + g.n + ' stores)\r\n' + pad + '  Mobile: ' + part(g.m) + '\r\n' + pad + '  Wallet: ' + part(g.w) + '\r\n';
+  }
+  var t = 'Dear All,\r\n\r\n' + mtdBAIntro(scope, date) + '\r\n\r\n';
+  mtdBAGroups(items).forEach(function (g) {
+    t += '== ' + g.label + ' — ' + g.rm + ' ==\r\n' + line('Total', mtdBAAgg(g.items, pace), '');
+    if (level >= 2) {
+      var svs = {}, order = []; g.items.forEach(function (i) { if (!svs[i.sv]) { svs[i.sv] = { items: [], ams: {}, ao: [] }; order.push(i.sv); } var s = svs[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.ao.push(i.am); } s.ams[i.am].push(i); });
+      order.forEach(function (sv) {
+        t += '\r\n' + line(sv, mtdBAAgg(svs[sv].items, pace), '');
+        if (level >= 3) svs[sv].ao.forEach(function (am) { t += line(am, mtdBAAgg(svs[sv].ams[am], pace), '   '); });
+      });
+    }
+    t += '\r\n';
+  });
+  return t + MTD_BA_SIGNATURE.join('\r\n');
+}
+function mtdBAMailto(subject, items, pace, scope, date) {
+  var lvl = 3, body = mtdBAEmailText(items, pace, scope, date, lvl);
+  while (encodeURIComponent(body).length > 6500 && lvl > 1) { lvl--; body = mtdBAEmailText(items, pace, scope, date, lvl); }
+  window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+// PC: .eml draft (X-Unsent: 1 → Outlook opens it as a new message, body is the formatted HTML)
+function mtdBAEml(subject, html) {
+  function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  return 'X-Unsent: 1\r\nSubject: =?UTF-8?B?' + b64(subject) + '?=\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' +
+    b64(html).replace(/.{1,76}/g, '$&\r\n');
+}
+function mtdBALoadH2C() {
+  if (window.html2canvas) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = function () { window.html2canvas ? res() : rej(new Error('html2canvas not available')); };
+    s.onerror = function () { rej(new Error('تعذر تحميل مكتبة الصورة')); };
+    document.head.appendChild(s);
+  });
+}
+async function mtdBAImageFile(items, pace, fileName) {
+  await mtdBALoadH2C();
+  var host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1060px;background:#ffffff;padding:12px;z-index:-1';
+  host.innerHTML = mtdBAEmailTables(items, pace);
+  document.body.appendChild(host);
+  try {
+    var w = host.offsetWidth || 1060, h = host.offsetHeight || 1000;
+    var scale = Math.max(1, Math.min(2, Math.sqrt(12000000 / (w * h))));
+    var canvas = await html2canvas(host, { scale: scale, backgroundColor: '#ffffff', logging: false });
+    var blob = await new Promise(function (r) { canvas.toBlob(r, 'image/png'); });
+    return new File([blob], fileName, { type: 'image/png' });
+  } finally { host.remove(); }
+}
+async function sendMTDBAEmail(btn) {
+  var items = mtdInsBuildItems(MTD_FILTERED).items;
+  if (!items.length) { alert('⚠️ مفيش بيانات للإرسال'); return; }
+  var pace = mtdInsPace(), scope = mtdBAScope(items), date = mtdBAEnDate();
+  var subject = 'MTD Branch Achievement (Mobile & Wallet) – ' + scope + ' – till ' + date;
+  var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+  var LABEL = '<i class="fas fa-envelope mr-2"></i>Send Email';
+  function busy(msg) { if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>' + msg; } }
+  function idle() { if (btn) { btn.disabled = false; btn.innerHTML = LABEL; } }
+  try {
+    if (!mtdBAEmailIsMobile()) {                      // ── PC → Outlook draft
+      var eml = mtdBAEml(subject, mtdBAEmailDoc(items, pace, scope, date));
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
+      a.download = 'MTD_Branch_Achievement_' + stamp + '.eml';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      mtdBAToast('📧 افتح الملف اللي اتحمّل (.eml) — هيفتح في Outlook جاهز للإرسال');
+      return;
+    }
+    // ── Mobile
+    var textBody = 'Dear All,\n\n' + mtdBAIntro(scope, date) + '\n\n(Performance tables are attached as an image.)\n\n' + MTD_BA_SIGNATURE.join('\n');
+    if (MTD_BA_PENDING && MTD_BA_PENDING.key === items.length + '|' + date + '|' + scope) {      // tap again after the browser asked for a fresh tap
+      var p = MTD_BA_PENDING; MTD_BA_PENDING = null;
+      await navigator.share(p.data); return;
+    }
+    busy('Preparing...');
+    var data = null;
+    try {
+      var file = await mtdBAImageFile(items, pace, 'MTD_Branch_Achievement_' + stamp + '.png');
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) data = { files: [file], title: subject, text: textBody };
+    } catch (e) { console.warn('[Branch Achievement email] image path failed:', e); }
+    if (data) {
+      try { await navigator.share(data); return; }
+      catch (e) {
+        if (e && e.name === 'AbortError') return;
+        if (e && e.name === 'NotAllowedError') {           // the browser wants a fresh tap
+          MTD_BA_PENDING = { key: items.length + '|' + date + '|' + scope, data: data };
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Tap again to send'; }
+          return;
+        }
+        console.warn('[Branch Achievement email] share failed:', e);
+      }
+    }
+    mtdBAMailto(subject, items, pace, scope, date);         // fallback: plain-text mailto in the default mail app
+  } catch (e) {
+    console.error('[Branch Achievement email]', e);
+    alert('❌ فشل تجهيز الإيميل: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (!(MTD_BA_PENDING && btn)) idle();
   }
 }
 
