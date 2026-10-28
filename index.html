@@ -11119,15 +11119,9 @@ function mtdBAWriteSheet(ws, heading, blocks, ncols) {
     }
   });
 }
-async function exportMTDBA(btn) {
-  var items = mtdInsBuildItems(MTD_FILTERED).items;
-  if (!items.length) { alert('⚠️ مفيش بيانات للتصدير'); return; }
-  if (!(await mtdInsAuth())) return;
-  var old = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
-  try {
-    await mtdInsLoadExcelJS();
-    var pace = mtdInsPace(), dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
+// The 3-sheet workbook (needs ExcelJS loaded). Used by Export and by Send Email (attachment).
+function mtdBAWorkbook(items, pace) {
+  var dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
     var head = function (what) { return 'Branch Achievement (Mobile & Wallet) — ' + what + ' · ' + items.length + ' stores' + dateTxt; };
     var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
     mtdBAWriteSheet(wb.addWorksheet('Per Regions'), head('Per Regions'), mtdBAModel(items, pace, 'regions'));
@@ -11136,6 +11130,17 @@ async function exportMTDBA(btn) {
     MTD_BA_META = true;                                  // the branch sheet also carries Account Manager / Classification / Partner
     try { storeBlocks = mtdBAModel(items, pace, 'stores'); } finally { MTD_BA_META = false; }
     mtdBAWriteSheet(wb.addWorksheet('All Branches'), head('All Data with Branches'), storeBlocks, MTD_BA_NC + 3);
+  return wb;
+}
+async function exportMTDBA(btn) {
+  var items = mtdInsBuildItems(MTD_FILTERED).items;
+  if (!items.length) { alert('⚠️ مفيش بيانات للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = mtdBAWorkbook(items, mtdInsPace());
     var buf = await wb.xlsx.writeBuffer(), now = new Date();
     var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
     var a = document.createElement('a');
@@ -11259,10 +11264,21 @@ function mtdBAMailto(subject, items, pace, scope, date) {
   window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
 }
 // PC: .eml draft (X-Unsent: 1 → Outlook opens it as a new message, body is the formatted HTML)
-function mtdBAEml(subject, html) {
+function mtdBABytesB64(buf) {
+  var bytes = new Uint8Array(buf), bin = '';
+  for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function mtdBAEml(subject, html, attach) {      // attach = { name, buffer } (optional) → multipart/mixed with the Excel attached
   function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
-  return 'X-Unsent: 1\r\nSubject: =?UTF-8?B?' + b64(subject) + '?=\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' +
-    b64(html).replace(/.{1,76}/g, '$&\r\n');
+  function wrap(x) { return x.replace(/.{1,76}/g, '$&\r\n'); }
+  var head = 'X-Unsent: 1\r\nSubject: =?UTF-8?B?' + b64(subject) + '?=\r\nMIME-Version: 1.0\r\n';
+  if (!attach) return head + 'Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64(html));
+  var bd = '----=_FK360_' + Date.now().toString(36);
+  return head + 'Content-Type: multipart/mixed; boundary="' + bd + '"\r\n\r\n' +
+    '--' + bd + '\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap(b64(html)) +
+    '--' + bd + '\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + attach.name + '"\r\nContent-Transfer-Encoding: base64\r\n' +
+    'Content-Disposition: attachment; filename="' + attach.name + '"\r\n\r\n' + wrap(mtdBABytesB64(attach.buffer)) + '--' + bd + '--\r\n';
 }
 function mtdBALoadH2C() {
   if (window.html2canvas) return Promise.resolve();
@@ -11298,18 +11314,25 @@ async function sendMTDBAEmail(btn) {
   function busy(msg) { if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>' + msg; } }
   function idle() { if (btn) { btn.disabled = false; btn.innerHTML = LABEL; } }
   try {
-    if (!mtdBAEmailIsMobile()) {                      // ── PC → Outlook draft
-      var eml = mtdBAEml(subject, mtdBAEmailDoc(items, pace, scope, date));
+    if (!(MTD_BA_PENDING && MTD_BA_PENDING.key === items.length + '|' + date + '|' + scope)) {
+      if (!(await mtdInsAuth())) return;                // the email carries the Excel export → same password as Export
+    }
+    var xlName = 'MTD_Branch_Achievement_' + stamp + '.xlsx';
+    if (!mtdBAEmailIsMobile()) {                      // ── PC → Outlook draft (HTML body + Excel attached)
+      busy('Preparing...');
+      await mtdInsLoadExcelJS();
+      var xlBuf = await mtdBAWorkbook(items, pace).xlsx.writeBuffer();
+      var eml = mtdBAEml(subject, mtdBAEmailDoc(items, pace, scope, date), { name: xlName, buffer: xlBuf });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
       a.download = 'MTD_Branch_Achievement_' + stamp + '.eml';
       document.body.appendChild(a); a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-      mtdBAToast('📧 افتح الملف اللي اتحمّل (.eml) — هيفتح في Outlook جاهز للإرسال');
+      mtdBAToast('📧 افتح الملف اللي اتحمّل (.eml) — هيفتح في Outlook جاهز للإرسال والإكسيل مرفق');
       return;
     }
     // ── Mobile
-    var textBody = 'Dear All,\n\n' + mtdBAIntro(scope, date) + '\n\n(Performance tables are attached as an image.)\n\n' + MTD_BA_SIGNATURE.join('\n');
+    var textBody = 'Dear All,\n\n' + mtdBAIntro(scope, date) + '\n\n(Performance tables are attached as an image, together with the Excel file.)\n\n' + MTD_BA_SIGNATURE.join('\n');
     if (MTD_BA_PENDING && MTD_BA_PENDING.key === items.length + '|' + date + '|' + scope) {      // tap again after the browser asked for a fresh tap
       var p = MTD_BA_PENDING; MTD_BA_PENDING = null;
       await navigator.share(p.data); return;
@@ -11317,8 +11340,13 @@ async function sendMTDBAEmail(btn) {
     busy('Preparing...');
     var data = null;
     try {
-      var file = await mtdBAImageFile(items, pace, 'MTD_Branch_Achievement_' + stamp + '.png');
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) data = { files: [file], title: subject, text: textBody };
+      var file = await mtdBAImageFile(items, pace, 'MTD_Branch_Achievement_' + stamp + '.png'), files = [file];
+      try {                                             // Excel too, if this phone can share it
+        await mtdInsLoadExcelJS();
+        var xlFile = new File([await mtdBAWorkbook(items, pace).xlsx.writeBuffer()], xlName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        if (navigator.canShare && navigator.canShare({ files: [file, xlFile] })) files = [file, xlFile];
+      } catch (e) { console.warn('[Branch Achievement email] Excel attachment skipped:', e); }
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: files })) data = { files: files, title: subject, text: textBody };
     } catch (e) { console.warn('[Branch Achievement email] image path failed:', e); }
     if (data) {
       try { await navigator.share(data); return; }
