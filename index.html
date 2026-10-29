@@ -1927,6 +1927,13 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         </div>
         <div id="mtd-ba-body" style="display:none">
+          <div id="mtd-ba-basis-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <div style="display:flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
+              <button id="mtd-ba-basis-act" onclick="setMTDBABasis('activation')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:#5E2D91;color:white">Activation</button>
+              <button id="mtd-ba-basis-sales" onclick="setMTDBABasis('sales')" style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280">Sales</button>
+            </div>
+            <span style="font-size:10px;color:#6b7280">أرقام الـ Mobile على أساس Activation أو Sales (الـ Wallet واحد في الحالتين)</span>
+          </div>
           <div id="mtd-ba-content"></div>
           <div style="display:flex;justify-content:center;margin:18px 0 4px">
             <button id="mtd-ba-email" onclick="sendMTDBAEmail(this)"
@@ -10869,6 +10876,20 @@ async function exportMTDInsights() {
 //  The screen and the Excel are rendered from the same model, so numbers / colours / layout match.
 // ════════════════════════════════════════════════════════════════
 var MTD_BA_OPEN = false;
+var MTD_BA_BASIS = 'activation';     // 'activation' | 'sales'  (Mobile numbers; Wallet is the same in both)
+function mtdBAHasSales() { return (MTD_SALES_DATA || []).length > 0 && !(typeof MTD_SRC !== 'undefined' && MTD_SRC === 'nw'); }
+function mtdBABasisLabel() { return mtdBAHasSales() ? (MTD_BA_BASIS === 'sales' ? 'Sales' : 'Activation') : ''; }
+function mtdBARowOf(i) { return (MTD_BA_BASIS === 'sales' && mtdBAHasSales()) ? i.s : i.a; }
+function mtdBASyncBasis() {
+  var bar = document.getElementById('mtd-ba-basis-bar');
+  if (!bar) return;
+  var has = mtdBAHasSales();
+  bar.style.display = has ? 'flex' : 'none';
+  var a = document.getElementById('mtd-ba-basis-act'), s = document.getElementById('mtd-ba-basis-sales');
+  if (a) a.setAttribute('style', mtdInsSegStyle(MTD_BA_BASIS !== 'sales'));
+  if (s) s.setAttribute('style', mtdInsSegStyle(MTD_BA_BASIS === 'sales'));
+}
+function setMTDBABasis(b) { MTD_BA_BASIS = b; mtdBASyncBasis(); if (MTD_BA_OPEN) renderMTDBA(); }
 var MTD_BA_NC = 16;     // columns of the table (Excel merge width)
 var MTD_BA_META = false; // export-only: adds Account Manager / Classification / Partner columns (store rows)
 // Name shown on top of each Regional Manager's table. Edit here if a Regional's label changes.
@@ -10883,6 +10904,7 @@ function toggleMTDBA() {
   var body = document.getElementById('mtd-ba-body'), btn = document.getElementById('mtd-ba-toggle');
   if (body) body.style.display = MTD_BA_OPEN ? '' : 'none';
   if (btn) btn.innerHTML = MTD_BA_OPEN ? '<i class="fas fa-eye-slash mr-1"></i>Hide' : '<i class="fas fa-eye mr-1"></i>Show';
+  mtdBASyncBasis();
   if (MTD_BA_OPEN) renderMTDBA();
 }
 
@@ -10890,7 +10912,7 @@ function toggleMTDBA() {
 function mtdBAAgg(items, pace) {
   var o = { n: items.length, m: { T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 }, w: { T: 0, A: 0, P: 0, l100: 0, l90: 0, l70: 0 } };
   items.forEach(function (i) {
-    [['m', i.a, 'mobileTarget', 'mobileSubs', 'mobileProj'], ['w', i.w, 'walletTarget', 'walletSales', 'walletProj']].forEach(function (d) {
+    [['m', mtdBARowOf(i), 'mobileTarget', 'mobileSubs', 'mobileProj'], ['w', i.w, 'walletTarget', 'walletSales', 'walletProj']].forEach(function (d) {
       var s = d[1], t = Number(s[d[2]]) || 0, a = Number(s[d[3]]) || 0, p = mtdInsProjOf(s, d[4], a, pace), g = o[d[0]];
       g.T += t; g.A += a; g.P += p;
       if (t > 0) { var r = p / t; if (r < 1) g.l100++; if (r < 0.9) g.l90++; if (r < 0.7) g.l70++; }
@@ -10975,6 +10997,7 @@ function mtdBAHead(label) {
   return [r1, r2];
 }
 
+function mtdBASfx() { var b = mtdBABasisLabel(); return b ? ' · ' + b : ''; }
 // ── model: mode = 'areas' (the card + sheet 2) | 'stores' (sheet 3: branches under each area) | 'regions' (sheet 1) ──
 function mtdBAModel(items, pace, mode) {
   var groups = mtdBAGroups(items), blocks = [];
@@ -10995,7 +11018,7 @@ function mtdBAModel(items, pace, mode) {
       if (zg[zg.length - 1] === g && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0));
     });
     body.push(mtdBARow('total', 'Total', mtdBAAgg(items, pace), pace, 0));
-    blocks.push({ k: 'tbl', head: mtdBAHead('Region — Regional Manager'), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet · per Region', c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
+    blocks.push({ k: 'tbl', head: mtdBAHead('Region — Regional Manager'), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet · per Region' + mtdBASfx(), c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
     return blocks;
   }
   groups.forEach(function (g, gi) {
@@ -11010,15 +11033,15 @@ function mtdBAModel(items, pace, mode) {
         body.push(mtdBARow('am', am, mtdBAAgg(amItems, pace), pace, ai));
         if (mode === 'stores') {
           amItems.slice().sort(function (x, y) {
-            var tx = Number(x.a.mobileTarget) || 0, ty = Number(y.a.mobileTarget) || 0;
-            return (ty > 0 ? (Number(y.a.mobileSubs) || 0) / ty : -1) - (tx > 0 ? (Number(x.a.mobileSubs) || 0) / tx : -1);
+            var rx = mtdBARowOf(x), ry = mtdBARowOf(y), tx = Number(rx.mobileTarget) || 0, ty = Number(ry.mobileTarget) || 0;
+            return (ty > 0 ? (Number(ry.mobileSubs) || 0) / ty : -1) - (tx > 0 ? (Number(rx.mobileSubs) || 0) / tx : -1);
           }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si, it)); });
         }
       });
     });
     body.push(mtdBARow('total', 'Total', mtdBAAgg(g.items, pace), pace, 0));
     closing(g, gi, body);
-    blocks.push({ k: 'tbl', head: mtdBAHead(g.label), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet', c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
+    blocks.push({ k: 'tbl', head: mtdBAHead(g.label), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet' + mtdBASfx(), c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
   });
   return blocks;
 }
@@ -11065,7 +11088,8 @@ function renderMTDBA() {
   if (!items.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">No data for the current filters</div>'; return; }
   var note = '';
   if (!items.some(function (i) { return (Number(i.w.walletTarget) || 0) > 0; })) note = '<div style="background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;margin-bottom:10px">⚠️ داتا WE Pay (Wallet) مش محمّلة — أعمدة الـ Wallet فاضية.</div>';
-  el.innerHTML = note + '<div style="font-size:10px;color:#6b7280;margin-bottom:10px">Ach % = الفعلي لحد اليوم · Proj % = المتوقع آخر الشهر · أعمدة Below = عدد الفروع اللي المتوقع بتاعها أقل من 100% / 90% / 70% من التارجت</div>' +
+  mtdBASyncBasis();
+  el.innerHTML = note + '<div style="font-size:10px;color:#6b7280;margin-bottom:10px">' + (mtdBABasisLabel() ? 'Mobile على أساس ' + mtdBABasisLabel() + ' · ' : '') + 'Ach % = الفعلي لحد اليوم · Proj % = المتوقع آخر الشهر · أعمدة Below = عدد الفروع اللي المتوقع بتاعها أقل من 100% / 90% / 70% من التارجت</div>' +
     mtdBAHtml(mtdBAModel(items, mtdInsPace(), 'areas'));
 }
 
@@ -11122,7 +11146,7 @@ function mtdBAWriteSheet(ws, heading, blocks, ncols) {
 // The 3-sheet workbook (needs ExcelJS loaded). Used by Export and by Send Email (attachment).
 function mtdBAWorkbook(items, pace) {
   var dateTxt = MTD_MOBILE_DATE_LABEL ? ' · ' + MTD_MOBILE_DATE_LABEL : '';
-    var head = function (what) { return 'Branch Achievement (Mobile & Wallet) — ' + what + ' · ' + items.length + ' stores' + dateTxt; };
+    var head = function (what) { return 'Branch Achievement (Mobile & Wallet' + (mtdBABasisLabel() ? ' · ' + mtdBABasisLabel() : '') + ') — ' + what + ' · ' + items.length + ' stores' + dateTxt; };
     var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
     mtdBAWriteSheet(wb.addWorksheet('Per Regions'), head('Per Regions'), mtdBAModel(items, pace, 'regions'));
     mtdBAWriteSheet(wb.addWorksheet('Per Supers & Areas'), head('Per Supervisors & Area Managers'), mtdBAModel(items, pace, 'areas'));
@@ -11191,7 +11215,8 @@ function mtdBAToast(msg) {
   setTimeout(function () { t.remove(); }, 5000);
 }
 function mtdBAIntro(scope, date) {
-  return 'Kindly find below the Branch Achievement performance (Mobile & Wallet) for ' + scope + ' till ' + date +
+  var b = mtdBABasisLabel();
+  return 'Kindly find below the Branch Achievement performance (Mobile & Wallet' + (b ? ', ' + b + ' basis' : '') + ') for ' + scope + ' till ' + date +
     ' — target, achievement, projected month-end achievement, and the number of stores projected to finish below 100% / 90% / 70% of target.';
 }
 
@@ -11307,22 +11332,20 @@ async function mtdBAImageFile(items, pace, fileName) {
 async function sendMTDBAEmail(btn) {
   var items = mtdInsBuildItems(MTD_FILTERED).items;
   if (!items.length) { alert('⚠️ مفيش بيانات للإرسال'); return; }
-  var pace = mtdInsPace(), scope = mtdBAScope(items), date = mtdBAEnDate();
-  var subject = 'MTD Branch Achievement (Mobile & Wallet) – ' + scope + ' – till ' + date;
+  var pace = mtdInsPace(), scope = mtdBAScope(items), date = mtdBAEnDate(), bs = mtdBABasisLabel();
+  var subject = 'MTD Branch Achievement (Mobile & Wallet) – ' + scope + (bs ? ' – ' + bs : '') + ' – till ' + date;
   var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
   var LABEL = '<i class="fas fa-envelope mr-2"></i>Send Email';
+  var key = items.length + '|' + date + '|' + scope + '|' + bs;
   function busy(msg) { if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>' + msg; } }
   function idle() { if (btn) { btn.disabled = false; btn.innerHTML = LABEL; } }
   try {
-    if (!(MTD_BA_PENDING && MTD_BA_PENDING.key === items.length + '|' + date + '|' + scope)) {
-      if (!(await mtdInsAuth())) return;                // the email carries the Excel export → same password as Export
-    }
-    var xlName = 'MTD_Branch_Achievement_' + stamp + '.xlsx';
-    if (!mtdBAEmailIsMobile()) {                      // ── PC → Outlook draft (HTML body + Excel attached)
+    if (!mtdBAEmailIsMobile()) {                      // ── PC → Outlook draft (HTML body + the Excel attached)
+      if (!(await mtdInsAuth())) return;              // the draft carries the Excel export → same password as Export
       busy('Preparing...');
       await mtdInsLoadExcelJS();
       var xlBuf = await mtdBAWorkbook(items, pace).xlsx.writeBuffer();
-      var eml = mtdBAEml(subject, mtdBAEmailDoc(items, pace, scope, date), { name: xlName, buffer: xlBuf });
+      var eml = mtdBAEml(subject, mtdBAEmailDoc(items, pace, scope, date), { name: 'MTD_Branch_Achievement_' + stamp + '.xlsx', buffer: xlBuf });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
       a.download = 'MTD_Branch_Achievement_' + stamp + '.eml';
@@ -11331,38 +11354,37 @@ async function sendMTDBAEmail(btn) {
       mtdBAToast('📧 افتح الملف اللي اتحمّل (.eml) — هيفتح في Outlook جاهز للإرسال والإكسيل مرفق');
       return;
     }
-    // ── Mobile
-    var textBody = 'Dear All,\n\n' + mtdBAIntro(scope, date) + '\n\n(Performance tables are attached as an image, together with the Excel file.)\n\n' + MTD_BA_SIGNATURE.join('\n');
-    if (MTD_BA_PENDING && MTD_BA_PENDING.key === items.length + '|' + date + '|' + scope) {      // tap again after the browser asked for a fresh tap
+    // ── Mobile: tables as an image + the written text. No Excel attachment (phones don't accept it through the share sheet);
+    //    attach it manually if you need it. Anything that goes wrong falls back to a plain-text mail in the default mail app.
+    var textBody = 'Dear All,\n\n' + mtdBAIntro(scope, date) + '\n\n(Performance tables are attached as an image.)\n\n' + MTD_BA_SIGNATURE.join('\n');
+    if (MTD_BA_PENDING && MTD_BA_PENDING.key === key) {            // second tap after the browser asked for a fresh tap
       var p = MTD_BA_PENDING; MTD_BA_PENDING = null;
-      await navigator.share(p.data); return;
+      try { await navigator.share(p.data); }
+      catch (e) { if (!(e && e.name === 'AbortError')) { console.warn('[Branch Achievement email] share failed:', e); mtdBAMailto(subject, items, pace, scope, date); } }
+      return;
     }
     busy('Preparing...');
     var data = null;
     try {
-      var file = await mtdBAImageFile(items, pace, 'MTD_Branch_Achievement_' + stamp + '.png'), files = [file];
-      try {                                             // Excel too, if this phone can share it
-        await mtdInsLoadExcelJS();
-        var xlFile = new File([await mtdBAWorkbook(items, pace).xlsx.writeBuffer()], xlName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        if (navigator.canShare && navigator.canShare({ files: [file, xlFile] })) files = [file, xlFile];
-      } catch (e) { console.warn('[Branch Achievement email] Excel attachment skipped:', e); }
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: files })) data = { files: files, title: subject, text: textBody };
+      var file = await mtdBAImageFile(items, pace, 'MTD_Branch_Achievement_' + stamp + '.png');
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) data = { files: [file], title: subject, text: textBody };
     } catch (e) { console.warn('[Branch Achievement email] image path failed:', e); }
     if (data) {
       try { await navigator.share(data); return; }
       catch (e) {
         if (e && e.name === 'AbortError') return;
-        if (e && e.name === 'NotAllowedError') {           // the browser wants a fresh tap
-          MTD_BA_PENDING = { key: items.length + '|' + date + '|' + scope, data: data };
+        if (e && e.name === 'NotAllowedError') {                   // the browser wants a fresh tap
+          MTD_BA_PENDING = { key: key, data: data };
           if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>Tap again to send'; }
           return;
         }
         console.warn('[Branch Achievement email] share failed:', e);
       }
     }
-    mtdBAMailto(subject, items, pace, scope, date);         // fallback: plain-text mailto in the default mail app
+    mtdBAMailto(subject, items, pace, scope, date);                // fallback: plain-text mail in the default mail app
   } catch (e) {
     console.error('[Branch Achievement email]', e);
+    if (mtdBAEmailIsMobile()) { try { mtdBAMailto(subject, items, pace, scope, date); return; } catch (e2) { } }
     alert('❌ فشل تجهيز الإيميل: ' + (e && e.message ? e.message : e));
   } finally {
     if (!(MTD_BA_PENDING && btn)) idle();
