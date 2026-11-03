@@ -1081,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <button class="tab-btn" onclick="switchTab('products')"><i class="fas fa-boxes mr-1"></i>Products</button>
       <button class="tab-btn" onclick="switchTab('tariff')"><i class="fas fa-layer-group mr-1"></i>Tariff Mix</button>
       <button class="tab-btn" onclick="switchTab('rankings')"><i class="fas fa-trophy mr-1"></i>Rankings</button>
+      <button class="tab-btn" onclick="switchTab('managers')"><i class="fas fa-users mr-1"></i>Managers</button>
       <button class="tab-btn" onclick="switchTab('heatmap')"><i class="fas fa-th mr-1"></i>Heatmap</button>
       <button class="tab-btn" onclick="switchTab('packages')"><i class="fas fa-th-list mr-1"></i>Package Mix</button>
       <button class="tab-btn" onclick="switchTab('charts')"><i class="fas fa-chart-bar mr-1"></i>Charts</button>
@@ -1383,6 +1384,27 @@ document.addEventListener('DOMContentLoaded', function() {
           <div id="rank-store" class="rank-list"></div>
         </div>
       </div>
+    </div>
+
+    <!-- MANAGERS TAB — Evaluation-based manager performance (new) -->
+    <div id="tab-managers" class="tab-content hidden">
+      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers Performance — by Month</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">هذا التاب يعتمد على ملف Evaluation الذي ترفعه هنا فقط، وليس على فلاتر الفروع العامة أعلاه. ارفع ملف Evaluation_2026.xlsx وسيتم تجميع أداء كل مدير شهرياً: متوسط Evaluation لفروعه، ومتوسط Ach. Activation، ومتوسط Mobile و Sales Mix. الجدول مرتب بحيث يظهر كل مدير وتحته شهوره بالترتيب، ثم صف المتوسط الخاص به.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+        <button onclick="document.getElementById('mgr-eval-input').click()" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>Upload Evaluation (.xlsx)</button>
+        <input type="file" id="mgr-eval-input" accept=".xlsx,.xls" style="display:none" onchange="mgrLoadEvaluation(this.files[0])">
+        <button onclick="mgrExportExcel(this)" style="padding:8px 18px;background:linear-gradient(135deg,#217346,#1e8449);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-export mr-1"></i>Export Excel (formatted)</button>
+        <span id="mgr-status" style="font-size:11px;color:#6b7280">لم يتم رفع ملف Evaluation بعد.</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
+        <div class="filter-group"><label class="filter-label">Manager Level</label><select id="mgr-level" onchange="mgrSetLevel(this.value)" class="filter-select"><option value="regional">Regional Manager</option><option value="area">Area Manager</option></select></div>
+        <div class="filter-group"><label class="filter-label">Manager</label><select id="mgr-manager" onchange="mgrSetManager(this.value)" class="filter-select"><option value="">All Managers</option></select></div>
+        <div class="filter-group"><label class="filter-label">Region</label><select id="mgr-region" onchange="mgrSetRegion(this.value)" class="filter-select"><option value="">All Regions</option></select></div>
+        <button onclick="mgrResetFilters()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
+      </div>
+      <div id="mgr-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
+      <div id="mgr-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">تعريف المتوسط: متوسط Evaluation = متوسط مجموع نقاط كل فرع في ذلك الشهر (TNPS 10 + Mobile 35 + Sales Mix 30 + 5×5)، موزوناً بعدد الفروع. صف واحد في شيت Evaluation = موظف واحد لفرع واحد في شهر واحد. أسماء المديرين وأكواد الفروع يتم تطبيعها (إزالة المسافات الزائدة، وأكواد الفروع بحروف كبيرة) قبل التجميع، والشهر يؤخذ من اسم الشيت (EV Jan 26 … EV September 26).</div>
     </div>
 
     <!-- HEATMAP TAB -->
@@ -2424,6 +2446,7 @@ function renderAll() {
   if (activeTab === 'products') { renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (activeTab === 'tariff') { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (activeTab === 'rankings') { renderAllRankings(); }
+  if (activeTab === 'managers') { renderManagers(); }
   if (activeTab === 'heatmap') { renderHeatmap(); }
   if (activeTab === 'charts') { renderContribCharts(); }
   if (activeTab === 'packages') { renderPackages(); }
@@ -3980,7 +4003,7 @@ function switchTab(name) {
   // Hide global filters + exec banner when on MTD tab (MTD has its own filters)
   var filtersBarMtd = document.getElementById('filters-bar');
   var execBannerMtd = document.getElementById('exec-banner');
-  if (name === 'mtd') {
+  if (name === 'mtd' || name === 'managers') {
     if (filtersBarMtd) filtersBarMtd.style.display = 'none';
     if (execBannerMtd) execBannerMtd.style.display = 'none';
   } else {
@@ -3992,6 +4015,7 @@ function switchTab(name) {
   if (name==='products')   { renderProductKPIs('product-kpi-grid2'); renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (name==='tariff')     { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (name==='rankings')   renderAllRankings();
+  if (name==='managers')   renderManagers();
   if (name==='heatmap')    renderHeatmap();
   if (name==='charts')     renderContribCharts();
   if (name==='packages')   renderPackages();
@@ -11261,7 +11285,244 @@ function mtdBAEmailDoc(items, pace, scope, date) {
   return '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="' + f + '">' +
     '<p style="' + f + '">Dear All,</p><p style="' + f + '">' + mtdInsEsc(mtdBAIntro(scope, date)) + '</p>' +
     mtdBAEmailTables(items, pace) +
-    '<p style="' + f + ';margin-top:14px">' + MTD_BA_SIGNATURE.map(mtdInsEsc).join('<br>') + '</p></body></html>';
+    '<p style="' + f + ';margin-top:14px">' + MTD_BA_SIGNATURE.map(mtdInsEsc).join('<br>') + '</p>
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// MANAGERS PERFORMANCE — Evaluation-based, per manager per month.
+// Source: the Evaluation_2026.xlsx the user uploads in this tab (SheetJS is
+// already loaded by the dashboard). No Supabase call, no employee-level data
+// is rendered or exported: only manager-month aggregates.
+// Join key: Store Code (upper-cased, trimmed) + Month (from sheet name).
+// Columns are found BY HEADER NAME, never by fixed position, so a reordered
+// sheet still works. Manager names are trimmed / space-normalised.
+// ════════════════════════════════════════════════════════════════════════════
+var MGR_EVAL = { rows: [], agg: [], loaded: false, fileName: '' };
+var MGR_LEVEL = 'regional';
+var MGR_FILTER_MGR = '';
+var MGR_FILTER_REGION = '';
+
+function mgrNorm(v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' '); }
+function mgrMonthFromSheet(sn, evalHeader) {
+  var map = { jan: '01-2026', feb: '02-2026', mar: '03-2026', apr: '04-2026', may: '05-2026', jun: '06-2026', jul: '07-2026', aug: '08-2026', sep: '09-2026', oct: '10-2026', nov: '11-2026', dec: '12-2026' };
+  var m = String(sn || '').toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);
+  if (m) return map[m[1]];
+  var full = { january: '01-2026', february: '02-2026', march: '03-2026', april: '04-2026', may: '05-2026', june: '06-2026', july: '07-2026', august: '08-2026', september: '09-2026', october: '10-2026', november: '11-2026', december: '12-2026' };
+  var h = String(evalHeader || '').toLowerCase();
+  var k; for (k in full) { if (h.indexOf(k) >= 0) return full[k]; }
+  return '';
+}
+function mgrColIdx(headers, test) {
+  for (var i = 0; i < headers.length; i++) { if (test(mgrNorm(headers[i]).toLowerCase())) return i; }
+  return -1;
+}
+function mgrLoadEvaluation(file) {
+  if (!file) return;
+  var status = document.getElementById('mgr-status');
+  if (status) status.textContent = 'جاري قراءة الملف…';
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      var rows = [];
+      wb.SheetNames.forEach(function (sn) {
+        var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+        var hdrIdx = -1, headers = null;
+        for (var i = 0; i < aoa.length; i++) {
+          var r = aoa[i] || [];
+          if (r.some(function (c) { return mgrNorm(c) === 'Store Code'; })) { hdrIdx = i; headers = r; break; }
+        }
+        if (hdrIdx < 0) return;
+        var idxStore = mgrColIdx(headers, function (h) { return h === 'store code'; });
+        var idxRegion = mgrColIdx(headers, function (h) { return h === 'region'; });
+        var idxRM = mgrColIdx(headers, function (h) { return h.indexOf('regional manager') >= 0; });
+        var idxAM = mgrColIdx(headers, function (h) { return h.indexOf('area manger') >= 0 || h.indexOf('area manager') >= 0; });
+        var idxEval = -1;
+        for (var k = 0; k < headers.length; k++) { if (mgrNorm(headers[k]).toLowerCase().indexOf('evaluation') >= 0) idxEval = k; }
+        var idxAch = mgrColIdx(headers, function (h) { return h.indexOf('ach.activation') >= 0; });
+        var idxMob = mgrColIdx(headers, function (h) { return h.indexOf('mobile sales target') >= 0; });
+        var idxMix = mgrColIdx(headers, function (h) { return h.indexOf('sales mix') >= 0; });
+        if (idxStore < 0 || idxEval < 0) return;
+        var month = mgrMonthFromSheet(sn, headers[idxEval]);
+        if (!month) return;
+        for (var j = hdrIdx + 1; j < aoa.length; j++) {
+          var row = aoa[j] || [];
+          var code = mgrNorm(row[idxStore]).toUpperCase();
+          var ev = Number(row[idxEval]);
+          if (!code || isNaN(ev)) continue;
+          rows.push({ storeCode: code, month: month, region: mgrNorm(row[idxRegion]), rm: mgrNorm(row[idxRM]), am: mgrNorm(row[idxAM]), eval: ev, ach: Number(row[idxAch]), mobile: Number(row[idxMob]), mix: Number(row[idxMix]) });
+        }
+      });
+      if (!rows.length) { if (status) status.textContent = 'لم أجد صفوف Evaluation صالحة — تأكد أن الشيتات فيها عمود Store Code وعمود Evaluation.'; return; }
+      MGR_EVAL.rows = rows; MGR_EVAL.loaded = true; MGR_EVAL.fileName = file.name;
+      mgrBuildAgg(); mgrPopulateFilters(); renderManagers();
+      var months = {}; rows.forEach(function (r) { months[r.month] = 1; });
+      if (status) status.textContent = 'تم تحميل ' + rows.length + ' صف Evaluation من ' + file.name + ' — ' + Object.keys(months).length + ' شهر.';
+    } catch (err) { if (status) status.textContent = 'خطأ في قراءة الملف: ' + (err && err.message ? err.message : err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function mgrBuildAgg() {
+  var map = {};
+  MGR_EVAL.rows.forEach(function (r) {
+    [['Regional', r.rm], ['Area', r.am]].forEach(function (pair) {
+      var level = pair[0], mgr = pair[1];
+      if (!mgr) return;
+      var key = level + '|' + mgr + '|' + r.month;
+      if (!map[key]) map[key] = { level: level, manager: mgr, month: r.month, n: 0, evalSum: 0, achSum: 0, achN: 0, mobSum: 0, mixSum: 0, regions: {}, stores: {} };
+      var d = map[key];
+      d.n++; d.evalSum += r.eval;
+      if (!isNaN(r.ach)) { d.achSum += r.ach; d.achN++; }
+      if (!isNaN(r.mobile)) d.mobSum += r.mobile;
+      if (!isNaN(r.mix)) d.mixSum += r.mix;
+      d.regions[r.region] = (d.regions[r.region] || 0) + 1;
+      d.stores[r.storeCode] = 1;
+    });
+  });
+  MGR_EVAL.agg = Object.keys(map).map(function (k) {
+    var d = map[k], region = '';
+    Object.keys(d.regions).forEach(function (rg) { if (!region || d.regions[rg] > d.regions[region]) region = rg; });
+    return { level: d.level, manager: d.manager, month: d.month, stores: Object.keys(d.stores).length, n: d.n, avgEval: d.evalSum / d.n, avgAch: d.achN ? d.achSum / d.achN : null, avgMob: d.mobSum / d.n, avgMix: d.mixSum / d.n, region: region };
+  });
+}
+function mgrPopulateFilters() {
+  var level = MGR_LEVEL === 'area' ? 'Area' : 'Regional';
+  var mgrSel = document.getElementById('mgr-manager');
+  var regSel = document.getElementById('mgr-region');
+  if (!mgrSel || !regSel) return;
+  var mgrs = {}, regs = {};
+  MGR_EVAL.agg.forEach(function (a) { if (a.level === level) { mgrs[a.manager] = 1; if (a.region) regs[a.region] = 1; } });
+  mgrSel.innerHTML = '<option value="">All Managers</option>' + Object.keys(mgrs).sort().map(function (m) { return '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>'; }).join('');
+  regSel.innerHTML = '<option value="">All Regions</option>' + Object.keys(regs).sort().map(function (r) { return '<option value="' + r + '">' + r + '</option>'; }).join('');
+  mgrSel.value = ''; regSel.value = ''; MGR_FILTER_MGR = ''; MGR_FILTER_REGION = '';
+}
+function mgrSetLevel(v) { MGR_LEVEL = v; mgrPopulateFilters(); renderManagers(); }
+function mgrSetManager(v) { MGR_FILTER_MGR = v; renderManagers(); }
+function mgrSetRegion(v) { MGR_FILTER_REGION = v; renderManagers(); }
+function mgrResetFilters() { MGR_FILTER_MGR = ''; MGR_FILTER_REGION = ''; var a = document.getElementById('mgr-manager'); var b = document.getElementById('mgr-region'); if (a) a.value = ''; if (b) b.value = ''; renderManagers(); }
+function mgrPctColor(p) { return p >= 90 ? '#22c55e' : (p >= 80 ? '#f59e0b' : '#ef4444'); }
+function mgrWeighted(rows) {
+  var tot = 0, ev = 0, ach = 0;
+  rows.forEach(function (x) { tot += x.stores; ev += x.avgEval * x.stores; if (x.avgAch != null) ach += x.avgAch * x.stores; });
+  return { stores: tot, avgEval: tot ? ev / tot * 100 : 0, avgAch: tot ? ach / tot * 100 : 0 };
+}
+function renderManagers() {
+  var el = document.getElementById('mgr-table');
+  var kpi = document.getElementById('mgr-kpis');
+  if (!el) return;
+  if (!MGR_EVAL.loaded) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">ارفع ملف Evaluation_2026.xlsx أولاً — الجدول سيظهر هنا بعد الرفع.</div>'; if (kpi) kpi.innerHTML = ''; return; }
+  var level = MGR_LEVEL === 'area' ? 'Area' : 'Regional';
+  var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
+  var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
+  var filtered = MGR_EVAL.agg.filter(function (a) { return a.level === level && (!MGR_FILTER_MGR || a.manager === MGR_FILTER_MGR) && (!MGR_FILTER_REGION || a.region === MGR_FILTER_REGION); });
+  if (!filtered.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للفلاتر الحالية.</div>'; if (kpi) kpi.innerHTML = ''; return; }
+  var byMgr = {};
+  filtered.forEach(function (a) { (byMgr[a.manager] = byMgr[a.manager] || []).push(a); });
+  var mgrNames = Object.keys(byMgr).sort(function (a, b) { return mgrWeighted(byMgr[b]).avgEval - mgrWeighted(byMgr[a]).avgEval; });
+  var totalStores = 0, totalEv = 0;
+  mgrNames.forEach(function (m) { var w = mgrWeighted(byMgr[m]); totalStores += w.stores; totalEv += w.avgEval * w.stores; });
+  if (kpi) {
+    kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + mgrNames.length + '</b> مدير · <b>' + totalStores + '</b> فرع-شهر · متوسط Evaluation <b style="color:' + mgrPctColor(totalEv / totalStores) + '">' + (totalEv / totalStores).toFixed(2) + '%</b></div>' +
+      '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px">الأفضل: <b>' + mgrNames[0] + '</b> (' + mgrWeighted(byMgr[mgrNames[0]]).avgEval.toFixed(2) + '%)</div>' +
+      '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px">الأقل: <b>' + mgrNames[mgrNames.length - 1] + '</b> (' + mgrWeighted(byMgr[mgrNames[mgrNames.length - 1]]).avgEval.toFixed(2) + '%)</div>';
+  }
+  var th = 'padding:9px 12px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
+  var html = '<table style="width:100%;border-collapse:collapse;min-width:720px"><thead><tr>' +
+    '<th style="' + th + ';background:#5E2D91;text-align:left">Manager / Month</th>' +
+    '<th style="' + th + ';background:#5E2D91">Region</th><th style="' + th + ';background:#5E2D91">Stores</th>' +
+    '<th style="' + th + ';background:#5E2D91">Avg Evaluation</th><th style="' + th + ';background:#5E2D91">Avg Ach. Activation</th>' +
+    '<th style="' + th + ';background:#5E2D91">Avg Mobile /35</th><th style="' + th + ';background:#5E2D91">Avg Sales Mix /30</th></tr></thead><tbody>';
+  mgrNames.forEach(function (m) {
+    var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
+    var w = mgrWeighted(rows);
+    html += '<tr style="background:#f3e8ff"><td colspan="7" style="padding:9px 12px;font-size:13px;font-weight:800;color:#5E2D91">' + m + ' <span style="font-size:11px;font-weight:600;color:#6b7280">— ' + rows.length + ' شهر · ' + w.stores + ' فرع-شهر</span></td></tr>';
+    rows.forEach(function (x, i) {
+      var evPct = x.avgEval * 100, c = mgrPctColor(evPct);
+      html += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6">' +
+        '<td style="padding:8px 12px;padding-left:28px;font-size:12px;font-weight:600;color:#374151">' + (labels[x.month] || x.month) + ' ' + x.month.split('-')[1] + '</td>' +
+        '<td style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280">' + x.region + '</td>' +
+        '<td style="padding:8px 12px;text-align:center;font-size:12px">' + x.stores + '</td>' +
+        '<td style="padding:8px 12px;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;background:' + c + '18;color:' + c + '">' + evPct.toFixed(2) + '%</span></td>' +
+        '<td style="padding:8px 12px;text-align:center;font-size:12px">' + (x.avgAch != null ? (x.avgAch * 100).toFixed(2) + '%' : '—') + '</td>' +
+        '<td style="padding:8px 12px;text-align:center;font-size:12px">' + x.avgMob.toFixed(2) + '</td>' +
+        '<td style="padding:8px 12px;text-align:center;font-size:12px">' + x.avgMix.toFixed(2) + '</td></tr>';
+    });
+    html += '<tr style="background:#ede9fe;border-top:2px solid #ddd6fe"><td style="padding:8px 12px;font-size:12px;font-weight:800;color:#5E2D91">Average — ' + m + '</td><td style="padding:8px 12px;text-align:center;font-size:12px">' + rows[0].region + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">' + w.stores + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:800">' + w.avgEval.toFixed(2) + '%</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">' + w.avgAch.toFixed(2) + '%</td><td colspan="2" style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280">متوسط موزون بعدد الفروع</td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+function mgrLoadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = function () { window.ExcelJS ? res() : rej(new Error('ExcelJS not available')); };
+    s.onerror = function () { rej(new Error('تعذر تحميل مكتبة التصدير (تأكد من الإنترنت)')); };
+    document.head.appendChild(s);
+  });
+}
+function mgrStyleHeader(row) {
+  row.eachCell(function (cell) {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5E2D91' } };
+    cell.font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } }, top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+  });
+}
+async function mgrExportExcel(btn) {
+  if (!MGR_EVAL.loaded) { alert('⚠️ ارفع ملف Evaluation أولاً'); return; }
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
+  try {
+    await mgrLoadExcelJS();
+    var level = MGR_LEVEL === 'area' ? 'Area' : 'Regional';
+    var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
+    var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
+    var filtered = MGR_EVAL.agg.filter(function (a) { return a.level === level && (!MGR_FILTER_MGR || a.manager === MGR_FILTER_MGR) && (!MGR_FILTER_REGION || a.region === MGR_FILTER_REGION); });
+    var byMgr = {};
+    filtered.forEach(function (a) { (byMgr[a.manager] = byMgr[a.manager] || []).push(a); });
+    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
+    var ws = wb.addWorksheet('Managers by Month');
+    ws.columns = [{ width: 11 }, { width: 32 }, { width: 16 }, { width: 12 }, { width: 9 }, { width: 16 }, { width: 19 }, { width: 16 }, { width: 18 }];
+    ws.mergeCells('A1:I1'); var t = ws.getCell('A1'); t.value = 'FAKHARANY360 — Managers Performance by Month — ' + level + ' — Source: ' + MGR_EVAL.fileName; t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr = ws.addRow(['Level', 'Manager', 'Region', 'Month', 'Stores', 'Avg Evaluation', 'Avg Ach. Activation', 'Avg Mobile ( /35)', 'Avg Sales Mix ( /30)']);
+    mgrStyleHeader(hr); ws.autoFilter = 'A2:I2'; ws.views = [{ state: 'frozen', ySplit: 2 }];
+    var mgrNames = Object.keys(byMgr).sort(function (a, b) { return mgrWeighted(byMgr[b]).avgEval - mgrWeighted(byMgr[a]).avgEval; });
+    mgrNames.forEach(function (m) {
+      var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
+      rows.forEach(function (x, i) {
+        var r = ws.addRow([x.level, x.manager, x.region, (labels[x.month] || x.month) + ' ' + x.month.split('-')[1], x.stores, x.avgEval, x.avgAch, Math.round(x.avgMob * 100) / 100, Math.round(x.avgMix * 100) / 100]);
+        r.getCell(6).numFmt = '0.00%'; r.getCell(7).numFmt = '0.00%';
+        r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
+      });
+      var w = mgrWeighted(rows);
+      var sr = ws.addRow([level, 'Average — ' + m, rows[0].region, rows.length + ' months', w.stores, w.avgEval / 100, w.avgAch / 100, null, null]);
+      sr.getCell(6).numFmt = '0.00%'; sr.getCell(7).numFmt = '0.00%';
+      sr.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } }; cell.font = { name: 'Calibri', bold: true, size: 11 }; });
+    });
+    var ws2 = wb.addWorksheet('Summary by Manager');
+    ws2.columns = [{ width: 11 }, { width: 32 }, { width: 16 }, { width: 9 }, { width: 14 }, { width: 22 }, { width: 24 }, { width: 20 }, { width: 20 }];
+    ws2.mergeCells('A1:I1'); var t2 = ws2.getCell('A1'); t2.value = 'FAKHARANY360 — Managers Summary (weighted average)'; t2.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr2 = ws2.addRow(['Level', 'Manager', 'Region', 'Months', 'Store-months', 'Weighted Avg Evaluation', 'Weighted Avg Ach. Activation', 'Best Month', 'Worst Month']);
+    mgrStyleHeader(hr2); ws2.autoFilter = 'A2:I2'; ws2.views = [{ state: 'frozen', ySplit: 2 }];
+    mgrNames.forEach(function (m, i) {
+      var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
+      var w = mgrWeighted(rows);
+      var best = rows.slice().sort(function (a, b) { return b.avgEval - a.avgEval; })[0];
+      var worst = rows.slice().sort(function (a, b) { return a.avgEval - b.avgEval; })[0];
+      var r = ws2.addRow([level, m, rows[0].region, rows.length, w.stores, w.avgEval / 100, w.avgAch / 100, (labels[best.month] || best.month) + ' ' + best.month.split('-')[1] + ' (' + (best.avgEval * 100).toFixed(2) + '%)', (labels[worst.month] || worst.month) + ' ' + worst.month.split('-')[1] + ' (' + (worst.avgEval * 100).toFixed(2) + '%)']);
+      r.getCell(6).numFmt = '0.00%'; r.getCell(7).numFmt = '0.00%';
+      r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
+    });
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'Managers_Performance_' + stamp + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) { console.error('[Managers export]', e); alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e)); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
+}
+</script>
+
+</body></html>';
 }
 // plain text (fallback for phones that can't share files)
 function mtdBAEmailText(items, pace, scope, date, level) {
