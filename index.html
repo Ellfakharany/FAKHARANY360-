@@ -1388,8 +1388,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- MANAGERS TAB — Simple Jan-Sep report (v4, in same index.html) -->
     <div id="tab-managers" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers — يناير إلى سبتمبر 2026 (تقرير مبسط)</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">صف واحد لكل مدير، مجمّع من يناير لسبتمبر 2026، من بيانات الداشبورد المحمّلة بعد الدخول — من غير رفع شيت، ومن غير تفاصيل فروع أو شهور، عشان التاب يفضل خفيف ومش يهنّج. لكل مدير: % الإنجاز + الـ Gap (عدد ونسبة) في كل منتج أساسي، + التاريف Low / Mid / High.</div>
+      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers — يناير إلى سبتمبر 2026 (تقرير مبسط + اسم مدير الفرع)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">صف واحد لكل مدير، مجمّع من يناير لسبتمبر 2026، من بيانات الداشبورد المحمّلة بعد الدخول — ومن غير تفاصيل فروع أو شهور، عشان التاب يفضل خفيف ومش يهنّج. لكل مدير: % الإنجاز + الـ Gap (عدد ونسبة) في كل منتج أساسي، + التاريف Low / Mid / High، + <b>أسماء مديري الفروع</b> التابعين له (من شيت Evaluation، بربط كود الفرع — ارفعه مرة واحدة بس، وهيتحفظ في المتصفح بتاعك).</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
         <div class="filter-group"><label class="filter-label">مستوى المدير</label><select id="mgrs-level" onchange="mgrsSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
         <div class="filter-group"><label class="filter-label">بحث باسم المدير</label><input id="mgrs-search" oninput="mgrsSetSearch(this.value)" class="filter-select" placeholder="اكتب جزء من اسم المدير…" style="min-width:220px"></div>
@@ -1397,12 +1397,15 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
         <button onclick="mgrsExportExcel(this)" style="padding:8px 18px;background:linear-gradient(135deg,#217346,#1e8449);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-export mr-1"></i>تصدير Excel للإرسال للمديرين</button>
+        <button onclick="document.getElementById('mgrs-eval-input').click()" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>رفع Evaluation (لأسماء مديري الفروع)</button>
+        <input type="file" id="mgrs-eval-input" accept=".xlsx,.xls" style="display:none" onchange="mgrsLoadEvaluation(this.files[0])">
+        <span id="mgrs-eval-status" style="font-size:11px;color:#6b7280">لسه ما اترفعش Evaluation — عمود مدير الفرع هيظهر “—” لحد ما ترفعه مرة واحدة.</span>
         <span style="font-size:11px;color:#6b7280">التصدير فيه Target و Ach و % و Gap عدد ونسبة لكل منتج، + Low و Mid و High و 12PT، + شيت Read me.</span>
       </div>
       <div id="mgrs-months" style="margin-bottom:12px"></div>
       <div id="mgrs-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
       <div id="mgrs-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px">التعريفات: الفترة يناير–سبتمبر 2026 فقط (01-2026 إلى 09-2026). الأرقام على أساس Sales (الافتراضي في الداشبورد، مش Activation). الـ Gap = Target − Ach: موجب يعني عجز، سالب يعني زيادة عن التارجت. نسبة الـ Gap = Gap ÷ Target = 100% − Ach%. إجمالي % = مجموع Ach كل المنتجات ÷ مجموع Target كل المنتجات. التاريف: Low = شرائح 25،29،32،37 و Mid = 40،45،46،52 و High = 50+، والنسبة هي حصة كل شريحة من مجموع Low+Mid+High. ADSL هو نفسه FBB في الداشبورد.</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">التعريفات: الفترة يناير–سبتمبر 2026 فقط (01-2026 إلى 09-2026). الأرقام على أساس Sales (الافتراضي في الداشبورد، مش Activation). الـ Gap = Target − Ach: موجب يعني عجز، سالب يعني زيادة عن التارجت. نسبة الـ Gap = Gap ÷ Target = 100% − Ach%. إجمالي % = مجموع Ach كل المنتجات ÷ مجموع Target كل المنتجات. التاريف: Low = شرائح 25،29،32،37 و Mid = 40،45،46،52 و High = 50+، والنسبة هي حصة كل شريحة من مجموع Low+Mid+High. ADSL هو نفسه FBB في الداشبورد. عمود مدير الفرع = أسماء Name المميزة من شيت Evaluation لفروع المدير (بربط كود الفرع)، وبيظهر بعد رفع Evaluation مرة واحدة وبيتحفظ في المتصفح بتاعك.</div>
     </div>
 
     <!-- HEATMAP TAB -->
@@ -11830,7 +11833,9 @@ function mtdNwRenderExtras() {
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
-// MANAGERS — SIMPLE JAN-SEP REPORT v4 (in the same index.html).
+// MANAGERS — SIMPLE JAN-SEP REPORT v5 (in the same index.html).
+// v5 adds Branch Manager names (Evaluation Name, linked by Store Code) as ONE
+// column per manager row — no branch rows, so the tab stays light.
 // Replaces the v2/v3 Managers tab (aggregates by month, detail by branch,
 // Evaluation upload) which rendered thousands of rows and hung on mobile.
 // This version: ONE row per manager, Jan-Sep 2026 only, from RAW_DATA already
@@ -11845,6 +11850,9 @@ function mtdNwRenderExtras() {
 // ════════════════════════════════════════════════════════════════════════════
 var MGRS_LEVEL = 'area';
 var MGRS_SEARCH = '';
+var MGRS_EVAL_MAP = {}; // storeCode -> {names:{}, branches:{}} from Evaluation, Jan-Sep sheets only
+var MGRS_EVAL_LOADED = false;
+var MGRS_EVAL_FILE = '';
 var MGRS_MONTHS = ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026'];
 var MGRS_MONTH_NAMES = {'01-2026':'يناير','02-2026':'فبراير','03-2026':'مارس','04-2026':'أبريل','05-2026':'مايو','06-2026':'يونيو','07-2026':'يوليو','08-2026':'أغسطس','09-2026':'سبتمبر'};
 function mgrsNorm(v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' '); }
@@ -11878,11 +11886,88 @@ function mgrsAggregate() {
   arr.sort(function (a, b) { var pa = a.totalPct == null ? -1 : a.totalPct, pb = b.totalPct == null ? -1 : b.totalPct; return pb - pa; });
   return arr;
 }
+
+function mgrsSaveEvalMap() {
+  try { localStorage.setItem('mgrs_eval_map_v5', JSON.stringify({ file: MGRS_EVAL_FILE, map: MGRS_EVAL_MAP })); } catch (e) { /* storage full/blocked: session-only, still works */ }
+}
+function mgrsLoadEvalMapFromStorage() {
+  if (MGRS_EVAL_LOADED) return;
+  try {
+    var raw = localStorage.getItem('mgrs_eval_map_v5');
+    if (!raw) return;
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.map) { MGRS_EVAL_MAP = parsed.map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = parsed.file || ''; }
+  } catch (e) { /* ignore corrupt storage */ }
+}
+function mgrsEvalStatusText() {
+  if (!MGRS_EVAL_LOADED) return 'لسه ما اترفعش Evaluation — عمود مدير الفرع هيظهر “—” لحد ما ترفعه مرة واحدة.';
+  var codes = Object.keys(MGRS_EVAL_MAP).length;
+  return 'تم تحميل Evaluation' + (MGRS_EVAL_FILE ? ' (' + MGRS_EVAL_FILE + ')' : '') + ' — ' + codes + ' كود فرع ليهم اسم مدير فرع (محفوظ في المتصفح بتاعك، مش محتاج ترفعه تاني بعد الريلود).';
+}
+function mgrsMonthFromSheet(sn) {
+  var map = { jan: '01-2026', feb: '02-2026', mar: '03-2026', apr: '04-2026', may: '05-2026', jun: '06-2026', jul: '07-2026', aug: '08-2026', sep: '09-2026' };
+  var m = String(sn || '').toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep)/);
+  return m ? map[m[1]] : '';
+}
+function mgrsLoadEvaluation(file) {
+  if (!file) return;
+  var status = document.getElementById('mgrs-eval-status');
+  if (status) status.textContent = 'جاري قراءة ملف Evaluation…';
+  if (typeof XLSX === 'undefined') { if (status) status.textContent = 'مكتبة قراءة الإكسل (SheetJS) مش محمّلة — تأكد من الإنترنت وأعد تحميل الصفحة.'; return; }
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      var map = {};
+      wb.SheetNames.forEach(function (sn) {
+        var month = mgrsMonthFromSheet(sn);
+        if (MGRS_MONTHS.indexOf(month) < 0) return;
+        var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+        var hdrIdx = -1, headers = null;
+        for (var i = 0; i < aoa.length; i++) { var r = aoa[i] || []; if (r.some(function (c) { return mgrsNorm(c) === 'Store Code'; })) { hdrIdx = i; headers = r; break; } }
+        if (hdrIdx < 0) return;
+        function colIdx(test) { for (var k = 0; k < headers.length; k++) { if (test(mgrsNorm(headers[k]).toLowerCase())) return k; } return -1; }
+        var iStore = colIdx(function (h) { return h === 'store code'; });
+        var iName = colIdx(function (h) { return h === 'name'; });
+        var iBranch = colIdx(function (h) { return h.indexOf('branch name') >= 0; });
+        if (iStore < 0) return;
+        for (var j = hdrIdx + 1; j < aoa.length; j++) {
+          var row = aoa[j] || [];
+          var code = mgrsNorm(row[iStore]).toUpperCase();
+          if (!code) continue;
+          if (!map[code]) map[code] = { names: {}, branches: {} };
+          if (iName >= 0) { var nm = mgrsNorm(row[iName]); if (nm) map[code].names[nm] = 1; }
+          if (iBranch >= 0) { var br = mgrsNorm(row[iBranch]); if (br) map[code].branches[br] = 1; }
+        }
+      });
+      if (!Object.keys(map).length) { if (status) status.textContent = 'لم أجد أكواد فروع صالحة في الملف — تأكد أنه ملف Evaluation_2026.xlsx.'; return; }
+      MGRS_EVAL_MAP = map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = file.name;
+      mgrsSaveEvalMap();
+      if (status) status.textContent = mgrsEvalStatusText();
+      renderManagers();
+    } catch (err) { if (status) status.textContent = 'خطأ في قراءة الملف: ' + (err && err.message ? err.message : err); }
+  };
+  reader.onerror = function () { if (status) status.textContent = 'تعذر قراءة الملف من المتصفح.'; };
+  reader.readAsArrayBuffer(file);
+}
+function mgrsBranchInfoFor(d) {
+  var names = {}, branches = {};
+  Object.keys(d.stores).forEach(function (code) {
+    var e = MGRS_EVAL_MAP[code];
+    if (!e) return;
+    Object.keys(e.names || {}).forEach(function (n) { names[n] = 1; });
+    Object.keys(e.branches || {}).forEach(function (b) { branches[b] = 1; });
+  });
+  return { names: Object.keys(names).sort(), branches: Object.keys(branches).sort() };
+}
 function renderManagers() {
   var el = document.getElementById('mgrs-table');
   var kpi = document.getElementById('mgrs-kpis');
   var monthsEl = document.getElementById('mgrs-months');
   if (!el) return;
+  mgrsLoadEvalMapFromStorage();
+  var stEl = document.getElementById('mgrs-eval-status');
+  if (stEl) stEl.textContent = mgrsEvalStatusText();
   var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
   if (!data.length) {
     el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات فروع محمّلة لسه.<br>سجّل دخول في الداشبورد الأول، وبعدين افتح تاب Managers — التقرير بيتبني من نفس البيانات المحمّلة، من غير رفع شيت.</div>';
@@ -11917,13 +12002,15 @@ function renderManagers() {
     kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + arr.length + '</b> مدير (' + mgrsLevelLabel() + ') · الفترة يناير–سبتمبر 2026 · مرتّب من الأعلى % إجمالي للأقل · الأرقام على أساس Sales.</div>';
   }
   var th = 'padding:9px 8px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
-  var html2 = '<table style="width:100%;border-collapse:collapse;min-width:980px"><thead><tr>' +
-    '<th style="' + th + ';background:#5E2D91">#</th><th style="' + th + ';background:#5E2D91;text-align:right">المدير</th><th style="' + th + ';background:#5E2D91">فروع</th><th style="' + th + ';background:#5E2D91">شهور</th><th style="' + th + ';background:#5E2D91">إجمالي %</th><th style="' + th + ';background:#5E2D91">إجمالي Gap</th>' +
+  var html2 = '<table style="width:100%;border-collapse:collapse;min-width:1150px"><thead><tr>' +
+    '<th style="' + th + ';background:#5E2D91">#</th><th style="' + th + ';background:#5E2D91;text-align:right">المدير</th><th style="' + th + ';background:#5E2D91;text-align:right">مدير الفرع<div style="font-size:10px;font-weight:400">من Evaluation</div></th><th style="' + th + ';background:#5E2D91">فروع</th><th style="' + th + ';background:#5E2D91">شهور</th><th style="' + th + ';background:#5E2D91">إجمالي %</th><th style="' + th + ';background:#5E2D91">إجمالي Gap</th>' +
     PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + mgrsProductLabel(p) + ' %<div style="font-size:10px;font-weight:400">Gap عدد / نسبة</div></th>'; }).join('') +
     '<th style="' + th + ';background:#5E2D91">Low<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">Mid<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">High<div style="font-size:10px;font-weight:400">عدد / حصة</div></th></tr></thead><tbody>';
   arr.forEach(function (d, i) {
     var mixTot = d.low + d.mid + d.high;
-    html2 += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px;text-align:center;font-size:12px">' + (i + 1) + '</td><td style="padding:8px;font-size:12px;font-weight:700">' + d.manager + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.branchCount + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.monthCount + '</td>' +
+    var bi = mgrsBranchInfoFor(d);
+    var bmCell = !MGRS_EVAL_LOADED ? '<span style="color:#9ca3af">—</span>' : (bi.names.length ? bi.names.join(' • ') + '<div style="font-size:10px;color:#6b7280">' + bi.names.length + ' اسم</div>' : '<span style="color:#9ca3af">— (مش في Evaluation)</span>');
+    html2 += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px;text-align:center;font-size:12px">' + (i + 1) + '</td><td style="padding:8px;font-size:12px;font-weight:700">' + d.manager + '</td><td style="padding:8px;font-size:11px;max-width:260px">' + bmCell + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.branchCount + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.monthCount + '</td>' +
       '<td style="padding:8px;text-align:center"><span style="font-size:12px;font-weight:800;color:' + mgrsPctColor(d.totalPct) + '">' + (d.totalPct == null ? '—' : d.totalPct.toFixed(1) + '%') + '</span></td>' +
       '<td style="padding:8px;text-align:center;font-size:12px">' + (d.totalT ? (d.totalT - d.totalA).toLocaleString('en-US') + '<div style="font-size:10px;color:#6b7280">' + (100 - d.totalPct).toFixed(1) + '%</div>' : '—') + '</td>' +
       PRODUCTS.map(function (p) {
@@ -11967,7 +12054,7 @@ async function mgrsExportExcel(btn) {
     await mgrsLoadExcelJS();
     var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
     var ws = wb.addWorksheet('Managers Jan-Sep 2026');
-    var headers = ['#', 'Manager', 'Level', 'Branches', 'Store-months', 'Months present', 'Total Target', 'Total Ach', 'Total Ach%', 'Total Gap (count)', 'Total Gap %'];
+    var headers = ['#', 'Manager', 'Branch Managers', 'Branches (names)', 'Level', 'Branches', 'Store-months', 'Months present', 'Total Target', 'Total Ach', 'Total Ach%', 'Total Gap (count)', 'Total Gap %'];
     PRODUCTS.forEach(function (p) { headers.push(mgrsProductLabel(p) + ' Target', mgrsProductLabel(p) + ' Ach', mgrsProductLabel(p) + ' Ach%', mgrsProductLabel(p) + ' Gap (count)', mgrsProductLabel(p) + ' Gap %'); });
     headers.push('Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
     ws.columns = headers.map(function (h, i) { return { width: i === 1 ? 32 : 14 }; });
@@ -11980,12 +12067,13 @@ async function mgrsExportExcel(btn) {
     ws.views = [{ state: 'frozen', ySplit: 2 }];
     arr.forEach(function (d, i) {
       var mixTot = d.low + d.mid + d.high;
-      var row = [i + 1, d.manager, mgrsLevelLabel(), d.branchCount, d.rows, d.monthCount, d.totalT, d.totalA, d.totalT ? d.totalA / d.totalT : null, d.totalT - d.totalA, d.totalT ? (d.totalT - d.totalA) / d.totalT : null];
+      var bi2 = mgrsBranchInfoFor(d);
+      var row = [i + 1, d.manager, bi2.names.join('; ') || null, bi2.branches.join('; ') || null, mgrsLevelLabel(), d.branchCount, d.rows, d.monthCount, d.totalT, d.totalA, d.totalT ? d.totalA / d.totalT : null, d.totalT - d.totalA, d.totalT ? (d.totalT - d.totalA) / d.totalT : null];
       PRODUCTS.forEach(function (p) { var tt = d[p.key + 'T'], aa = d[p.key + 'A']; row.push(tt, aa, tt ? aa / tt : null, tt - aa, tt ? (tt - aa) / tt : null); });
       row.push(d.low, d.mid, d.high, d.pt12, mixTot ? d.low / mixTot : null, mixTot ? d.mid / mixTot : null, mixTot ? d.high / mixTot : null);
       var r = ws.addRow(row);
-      [9, 11].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
-      PRODUCTS.forEach(function (p, pi) { var c = r.getCell(14 + pi * 5); if (c.value != null) c.numFmt = '0.00%'; var c2 = r.getCell(16 + pi * 5); if (c2.value != null) c2.numFmt = '0.00%'; });
+      [11, 13].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
+      PRODUCTS.forEach(function (p, pi) { var c = r.getCell(16 + pi * 5); if (c.value != null) c.numFmt = '0.00%'; var c2 = r.getCell(18 + pi * 5); if (c2.value != null) c2.numFmt = '0.00%'; });
       [headers.length - 2, headers.length - 1, headers.length].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
       r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
     });
@@ -12001,6 +12089,7 @@ async function mgrsExportExcel(btn) {
       ['Gap %', 'Gap (count) / Target. Equals 100% - Ach%.'],
       ['Tariffs', 'Low = tariffs 25,29,32,37; Mid = 40,45,46,52; High = 50+. % = share of Low+Mid+High. 12PT is a volume column only.'],
       ['Products', 'Mobile, WE Gold, ADSL (FBB), Fixed, Wallet, WE Air.'],
+      ['Branch Managers', 'Distinct Evaluation Name values per store code (Jan-Sep sheets), linked to the dashboard manager by store code. Upload Evaluation once in the Managers tab; it is saved in this browser\'s localStorage only, not sent anywhere.'],
       ['Rows loaded', (typeof RAW_DATA !== 'undefined' ? RAW_DATA.length : 0) + ' store-month rows in total (all months in source).']
     ];
     MGRS_MONTHS.forEach(function (m) { info.push(['Month ' + MGRS_MONTH_NAMES[m] + ' 2026', c[m] + ' store rows']); });
