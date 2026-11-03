@@ -1389,19 +1389,21 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- MANAGERS TAB — Branch performance + Evaluation (v2, fixed) -->
     <div id="tab-managers" class="tab-content hidden">
       <div class="section-title"><i class="fas fa-users mr-2"></i>Managers Performance — by Month</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">مصدرين، اختار واحد منهم: <b>Branch Performance</b> بيجمع أداء الفروع نفسها من بيانات الداشبورد المحمّلة (monthly_closure) لكل مدير وكل شهر، في كل المنتجات الأساسية والسيلز/تاريف ميكس — من غير ما ترفع شيت. و <b>Evaluation</b> بيجمع متوسط تقييمات الفروع من ملف Evaluation_2026.xlsx اللي ترفعه هنا. الجدول في الحالتين: كل مدير، وتحته شهوره تحت بعض بالترتيب، وبعدين صف المتوسط بتاعه.</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">الوضع الافتراضي <b>Detail by Branch</b>: جدول واحد فيه الشهر، اسم المدير، اسم مدير الفرع، اسم الفرع، وبعدين الأداء في كل الباقات الأساسية %، و Total Evaluation %، وتفاصيل السيلز/تاريف ميكس — كل صف = مدير × فرع × شهر، والربط بين Evaluation والداشبورد بيكون بكود الفرع + الشهر. بعد كل مدير فيه صف Overall لكل فروعه وشهورة. لو عايز الملخص القديم (مدير × شهر بس)، اختار <b>Summary by Manager</b>.</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
-        <div class="filter-group"><label class="filter-label">Data Source</label><select id="mgr-source" onchange="mgrSetSource(this.value)" class="filter-select"><option value="branch">Branch Performance (dashboard data)</option><option value="evaluation">Evaluation (upload file)</option></select></div>
-        <div class="filter-group"><label class="filter-label">Manager Level</label><select id="mgr-level" onchange="mgrSetLevel(this.value)" class="filter-select"><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option><option value="area">Area Manager</option></select></div>
+        <div class="filter-group"><label class="filter-label">View</label><select id="mgr-viewmode" onchange="mgrSetViewMode(this.value)" class="filter-select"><option value="detail">Detail by Branch — Month × Manager × Branch</option><option value="summary">Summary by Manager</option></select></div>
+        <div class="filter-group"><label class="filter-label">Manager Level</label><select id="mgr-level" onchange="mgrSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
         <div class="filter-group"><label class="filter-label">Manager</label><select id="mgr-manager" onchange="mgrSetManager(this.value)" class="filter-select"><option value="">All Managers</option></select></div>
         <div class="filter-group"><label class="filter-label">Region</label><select id="mgr-region" onchange="mgrSetRegion(this.value)" class="filter-select"><option value="">All Regions</option></select></div>
-        <div class="filter-group" id="mgr-view-wrap"><label class="filter-label">View (Branch only)</label><select id="mgr-view" onchange="mgrSetView(this.value)" class="filter-select"><option value="summary">Summary — Ach% only</option><option value="details">Details — Target / Ach / Ach%</option></select></div>
+        <div class="filter-group"><label class="filter-label">Search Branch / Branch Manager / Code</label><input id="mgr-branch-search" oninput="mgrSetBranchSearch(this.value)" class="filter-select" placeholder="مثال: شبرا، أو اسم مدير الفرع، أو كود الفرع" style="min-width:220px"></div>
+        <div class="filter-group" id="mgr-source-wrap" style="display:none"><label class="filter-label">Data Source (Summary only)</label><select id="mgr-source" onchange="mgrSetSource(this.value)" class="filter-select"><option value="branch">Branch Performance (dashboard data)</option><option value="evaluation">Evaluation (upload file)</option></select></div>
+        <div class="filter-group" id="mgr-view-wrap" style="display:none"><label class="filter-label">View (Summary / Branch only)</label><select id="mgr-view" onchange="mgrSetView(this.value)" class="filter-select"><option value="summary">Summary — Ach% only</option><option value="details">Details — Target / Ach / Ach%</option></select></div>
         <button onclick="mgrResetFilters()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
       </div>
       <div id="mgr-branch-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
-        <span style="font-size:11px;color:#6b7280">Branch mode uses the dashboard data already loaded after login (Supabase monthly_closure). Mobile / Fixed / FBB follow the Sales / Activation toggle you last selected.</span>
+        <span style="font-size:11px;color:#6b7280">Detail mode joins by Store Code + Month: Evaluation (if uploaded) gives Manager / Branch Manager / Branch / Total Evaluation %, and Dashboard data (if logged in) gives product %s and Tariff Mix. If one side is missing, its columns show “—”. اسحب يمين عشان تشوف باقي الأعمدة، واضغط على اسم المدير عشان تفتح/تقفل فروعه.</span>
       </div>
-      <div id="mgr-eval-actions" style="display:none;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+      <div id="mgr-eval-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
         <button onclick="document.getElementById('mgr-eval-input').click()" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>Upload Evaluation (.xlsx)</button>
         <input type="file" id="mgr-eval-input" accept=".xlsx,.xls" style="display:none" onchange="mgrLoadEvaluation(this.files[0])">
         <span id="mgr-status" style="font-size:11px;color:#6b7280">لم يتم رفع ملف Evaluation بعد.</span>
@@ -1412,7 +1414,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div id="mgr-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
       <div id="mgr-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px">Branch: Target/Ach من monthly_closure لكل فرع-شهر، مجمعة بالمدير والشهر. Sales Mix هنا = Tariff Mix من الداشبورد: Low (25,29,32,37) و Mid (40,45,46,52) و High (50+) و 12PT، ونسبة كل شريحة من مجموع Low+Mid+High. Evaluation: متوسط Evaluation = متوسط مجموع نقاط كل فرع (TNPS 10 + Mobile 35 + Sales Mix 30 + 5×5)، موزوناً بعدد الفروع، وأسماء المديرين وأكواد الفروع يتم تطبيعها قبل التجميع.</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">Detail: كل صف = مدير × فرع × شهر. ربط Evaluation والداشبورد بكود الفرع (بحروف كبيرة) + الشهر (MM-YYYY). اسم المدير هنا هو Area/Regional/Supervisor حسب الاختيار، واسم مدير الفرع هو عمود Name من شيت Evaluation (الموظف المقيّم على الفرع في ذلك الشهر). Branch: Target/Ach من monthly_closure. Sales Mix = Tariff Mix من الداشبورد: Low (25,29,32,37) و Mid (40,45,46,52) و High (50+) و 12PT، ونسبة كل شريحة من مجموع Low+Mid+High؛ وعمود Eval Sales Mix /30 هو نقاط السيلز ميكس من شيت Evaluation نفسه. Evaluation % = مجموع نقاط الفرع (TNPS 10 + Mobile 35 + Sales Mix 30 + 5×5).</div>
     </div>
 
     <!-- HEATMAP TAB -->
@@ -11840,6 +11842,7 @@ function mtdNwRenderExtras() {
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
+// MANAGERS PERFORMANCE v3 — Detail by Branch (Month x Manager x Branch) joined by Store Code + Month, plus v2 Summary by Manager.
 // MANAGERS PERFORMANCE v2 — two sources, one tab.
 //  (1) Branch: aggregates RAW_DATA (monthly_closure, already loaded by the
 //      dashboard after login) by manager level x month, for every main
@@ -11854,7 +11857,10 @@ function mtdNwRenderExtras() {
 // ════════════════════════════════════════════════════════════════════════════
 var MGR_EVAL = { rows: [], agg: [], loaded: false, fileName: '' };
 var MGR_SOURCE = 'branch';
-var MGR_LEVEL = 'regional';
+var MGR_LEVEL = 'area';
+var MGR_VIEWMODE = 'detail';
+var MGR_BRANCH_SEARCH = '';
+var MGR_DETAIL_EXPANDED = {};
 var MGR_VIEW = 'summary';
 var MGR_FILTER_MGR = '';
 var MGR_FILTER_REGION = '';
@@ -11871,17 +11877,22 @@ function mgrLevelField() { return MGR_LEVEL === 'supervisor' ? 'supervisor' : (M
 function mgrLevelLabel() { return MGR_LEVEL === 'supervisor' ? 'Supervisor' : (MGR_LEVEL === 'area' ? 'Area' : 'Regional'); }
 function mgrPctColor(p) { return p >= 100 ? '#22c55e' : (p >= 90 ? '#22c55e' : (p >= 70 ? '#f59e0b' : '#ef4444')); }
 function mgrNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
-function mgrSetSource(v) { MGR_SOURCE = v; var ea = document.getElementById('mgr-eval-actions'); var ba = document.getElementById('mgr-branch-actions'); var vw = document.getElementById('mgr-view-wrap'); if (ea) ea.style.display = (v === 'evaluation' ? 'flex' : 'none'); if (ba) ba.style.display = (v === 'branch' ? 'flex' : 'none'); if (vw) vw.style.display = (v === 'branch' ? '' : 'none'); mgrPopulateFilters(); renderManagers(); }
-function mgrSetLevel(v) { MGR_LEVEL = v; mgrPopulateFilters(); renderManagers(); }
+function mgrApplyViewVisibility() { var sw = document.getElementById('mgr-source-wrap'); var vw = document.getElementById('mgr-view-wrap'); var ea = document.getElementById('mgr-eval-actions'); var ba = document.getElementById('mgr-branch-actions'); if (sw) sw.style.display = (MGR_VIEWMODE === 'summary' ? '' : 'none'); if (vw) vw.style.display = (MGR_VIEWMODE === 'summary' && MGR_SOURCE === 'branch' ? '' : 'none'); if (ea) ea.style.display = 'flex'; if (ba) ba.style.display = 'flex'; }
+function mgrSetViewMode(v) { MGR_VIEWMODE = v; MGR_DETAIL_EXPANDED = {}; mgrApplyViewVisibility(); mgrPopulateFilters(); renderManagers(); }
+function mgrSetSource(v) { MGR_SOURCE = v; mgrApplyViewVisibility(); mgrPopulateFilters(); renderManagers(); }
+function mgrSetLevel(v) { MGR_LEVEL = v; MGR_DETAIL_EXPANDED = {}; mgrPopulateFilters(); renderManagers(); }
 function mgrSetView(v) { MGR_VIEW = v; renderManagers(); }
 function mgrSetManager(v) { MGR_FILTER_MGR = v; renderManagers(); }
 function mgrSetRegion(v) { MGR_FILTER_REGION = v; renderManagers(); }
-function mgrResetFilters() { MGR_FILTER_MGR = ''; MGR_FILTER_REGION = ''; var a = document.getElementById('mgr-manager'); var b = document.getElementById('mgr-region'); if (a) a.value = ''; if (b) b.value = ''; renderManagers(); }
+function mgrSetBranchSearch(v) { MGR_BRANCH_SEARCH = v || ''; renderManagers(); }
+function mgrResetFilters() { MGR_FILTER_MGR = ''; MGR_FILTER_REGION = ''; MGR_BRANCH_SEARCH = ''; MGR_DETAIL_EXPANDED = {}; var a = document.getElementById('mgr-manager'); var b = document.getElementById('mgr-region'); var c = document.getElementById('mgr-branch-search'); if (a) a.value = ''; if (b) b.value = ''; if (c) c.value = ''; renderManagers(); }
 function mgrPopulateFilters() {
   var mgrSel = document.getElementById('mgr-manager'); var regSel = document.getElementById('mgr-region');
   if (!mgrSel || !regSel) return;
   var mgrs = {}, regs = {};
-  if (MGR_SOURCE === 'branch') {
+  if (MGR_VIEWMODE === 'detail') {
+    mgrBuildJoinedRows().forEach(function (r) { var m = mgrDetailMgr(r); if (m) mgrs[m] = 1; if (r.region) regs[r.region] = 1; });
+  } else if (MGR_SOURCE === 'branch') {
     var f = mgrLevelField();
     (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) { var m = mgrNorm(r[f]); if (m) mgrs[m] = 1; var rg = mgrNorm(r.region); if (rg) regs[rg] = 1; });
   } else {
@@ -11917,6 +11928,8 @@ function mgrLoadEvaluation(file) {
         var hdrIdx = -1, headers = null;
         for (var i = 0; i < aoa.length; i++) { var r = aoa[i] || []; if (r.some(function (c) { return mgrNorm(c) === 'Store Code'; })) { hdrIdx = i; headers = r; break; } }
         if (hdrIdx < 0) return;
+        var idxName = mgrColIdx(headers, function (h) { return h === 'name'; });
+        var idxBranch = mgrColIdx(headers, function (h) { return h.indexOf('branch name') >= 0; });
         var idxStore = mgrColIdx(headers, function (h) { return h === 'store code'; });
         var idxRegion = mgrColIdx(headers, function (h) { return h === 'region'; });
         var idxRM = mgrColIdx(headers, function (h) { return h.indexOf('regional manager') >= 0; });
@@ -11931,7 +11944,7 @@ function mgrLoadEvaluation(file) {
         for (var j = hdrIdx + 1; j < aoa.length; j++) {
           var row = aoa[j] || []; var code = mgrNorm(row[idxStore]).toUpperCase(); var ev = Number(row[idxEval]);
           if (!code || isNaN(ev)) continue;
-          rows.push({ storeCode: code, month: month, region: mgrNorm(row[idxRegion]), rm: mgrNorm(row[idxRM]), am: mgrNorm(row[idxAM]), eval: ev, ach: Number(row[idxAch]), mobile: Number(row[idxMob]), mix: Number(row[idxMix]) });
+          rows.push({ storeCode: code, month: month, region: mgrNorm(row[idxRegion]), rm: mgrNorm(row[idxRM]), am: mgrNorm(row[idxAM]), name: idxName >= 0 ? mgrNorm(row[idxName]) : '', branch: idxBranch >= 0 ? mgrNorm(row[idxBranch]) : '', eval: ev, ach: Number(row[idxAch]), mobile: Number(row[idxMob]), mix: Number(row[idxMix]) });
         }
       });
       if (!rows.length) { if (status) status.textContent = 'لم أجد صفوف Evaluation صالحة — تأكد أن الشيتات فيها عمود Store Code وعمود Evaluation.'; return; }
@@ -11983,12 +11996,72 @@ function mgrBranchWeighted(rows) {
   return o;
 }
 function mgrEvalWeighted(rows) { var tot = 0, ev = 0, ach = 0; rows.forEach(function (x) { tot += x.stores; ev += x.avgEval * x.stores; if (x.avgAch != null) ach += x.avgAch * x.stores; }); return { stores: tot, avgEval: tot ? ev / tot * 100 : 0, avgAch: tot ? ach / tot * 100 : 0 }; }
+// ── Detail by Branch (v3): joined by Store Code + Month ──
+function mgrDetailMgr(r) { if (MGR_LEVEL === 'supervisor') return mgrNorm(r.supervisor); if (MGR_LEVEL === 'area') return mgrNorm(r.am) || mgrNorm(r.areaManager); return mgrNorm(r.rm) || mgrNorm(r.regionalManager); }
+function mgrBuildJoinedRows() {
+  var map = {};
+  function getRow(code, month) { var k = code + '|' + month; if (!map[k]) { var o = { storeCode: code, month: month, branch: '', branchMgr: '', am: '', rm: '', supervisor: '', areaManager: '', regionalManager: '', region: '', eval: null, evalAch: null, evalMob: null, evalMix: null, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0, hasDash: false, hasEval: false }; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[k] = o; } return map[k]; }
+  MGR_EVAL.rows.forEach(function (r) { var row = getRow(r.storeCode, r.month); row.hasEval = true; row.branch = r.branch || row.branch; row.branchMgr = r.name || row.branchMgr; row.am = r.am; row.rm = r.rm; row.region = r.region || row.region; row.eval = r.eval; row.evalAch = r.ach; row.evalMob = r.mobile; row.evalMix = r.mix; });
+  (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) { var code = mgrNorm(r.storeCode || r.store).toUpperCase(); var month = r.month; if (!code || !month) return; var row = getRow(code, month); row.hasDash = true; row.branch = row.branch || mgrNorm(r.store); row.supervisor = mgrNorm(r.supervisor); row.areaManager = mgrNorm(r.areaManager); row.regionalManager = mgrNorm(r.regionalManager); row.region = row.region || mgrNorm(r.region); MGR_PRODUCTS.forEach(function (p) { var t = mgrNum(r[p.t]), a = mgrNum(r[p.a]); row[p.key + 'T'] += t; row[p.key + 'A'] += a; row.totalT += t; row.totalA += a; }); row.low += mgrNum(r.lowT); row.mid += mgrNum(r.midT); row.high += mgrNum(r.highT); row.pt12 += mgrNum(r.pt12); });
+  return Object.keys(map).map(function (k) { return map[k]; });
+}
+function mgrDetailFiltered(rows) {
+  var q = mgrNorm(MGR_BRANCH_SEARCH).toLowerCase();
+  return rows.filter(function (r) { if (MGR_FILTER_MGR && mgrDetailMgr(r) !== MGR_FILTER_MGR) return false; if (MGR_FILTER_REGION && r.region !== MGR_FILTER_REGION) return false; if (q) { var hay = (mgrDetailMgr(r) + ' ' + r.branchMgr + ' ' + r.branch + ' ' + r.storeCode + ' ' + r.region).toLowerCase(); if (hay.indexOf(q) < 0) return false; } return true; });
+}
+function mgrDetailWeighted(rows) {
+  var o = { n: 0, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0, evalSum: 0, evalN: 0, branches: {} };
+  MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; });
+  rows.forEach(function (x) { o.n++; o.branches[x.storeCode] = 1; o.totalT += x.totalT; o.totalA += x.totalA; o.low += x.low; o.mid += x.mid; o.high += x.high; o.pt12 += x.pt12; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] += x[p.key + 'T']; o[p.key + 'A'] += x[p.key + 'A']; }); if (x.eval != null && !isNaN(x.eval)) { o.evalSum += x.eval * 100; o.evalN++; } });
+  o.branchCount = Object.keys(o.branches).length; o.avgEval = o.evalN ? o.evalSum / o.evalN : null; return o;
+}
+function mgrToggleDetail(idx) {
+  MGR_DETAIL_EXPANDED[idx] = !MGR_DETAIL_EXPANDED[idx];
+  var exp = MGR_DETAIL_EXPANDED[idx];
+  var rows = document.querySelectorAll('[data-mgr-idx="' + idx + '"]');
+  for (var i = 0; i < rows.length; i++) rows[i].style.display = exp ? '' : 'none';
+  var ar = document.getElementById('mgr-arrow-' + idx); if (ar) ar.textContent = exp ? '▾' : '▸';
+}
+function renderManagersDetail(el, kpi, order, labels) {
+  if (MGR_LEVEL === 'supervisor' && !(typeof RAW_DATA !== 'undefined' && RAW_DATA.length)) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">Supervisor موجود في بيانات الداشبورد بس، مش في شيت Evaluation.<br>سجّل دخول وحمّل بيانات الفروع أولاً، أو اختار Area / Regional.</div>'; if (kpi) kpi.innerHTML = ''; return; }
+  var joined = mgrBuildJoinedRows();
+  if (!joined.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات لسه.<br>ارفع ملف Evaluation، أو سجّل دخول وحمّل بيانات الفروع (monthly_closure) — الجدول التفصيلي بيجمع اللي موجود من الاتنين بكود الفرع + الشهر.</div>'; if (kpi) kpi.innerHTML = ''; return; }
+  var filtered = mgrDetailFiltered(joined);
+  if (!filtered.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للفلاتر الحالية — جرّب تمسح البحث أو تختار All Managers.</div>'; if (kpi) kpi.innerHTML = ''; return; }
+  var byMgr = {}; filtered.forEach(function (r) { var m = mgrDetailMgr(r) || '— (no manager)'; (byMgr[m] = byMgr[m] || []).push(r); });
+  var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrDetailWeighted(byMgr[a]), wb = mgrDetailWeighted(byMgr[b]); var pa = wa.totalT ? wa.totalA / wa.totalT : -1, pb = wb.totalT ? wb.totalA / wb.totalT : -1; if (pa !== pb) return pb - pa; var ea = wa.avgEval == null ? -1 : wa.avgEval, eb = wb.avgEval == null ? -1 : wb.avgEval; return eb - ea; });
+  var allW = mgrDetailWeighted(filtered);
+  var dashN = 0, evalN = 0; filtered.forEach(function (r) { if (r.hasDash) dashN++; if (r.hasEval) evalN++; });
+  var allBranches = {}; filtered.forEach(function (r) { allBranches[r.storeCode] = 1; });
+  if (kpi) { kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + mgrNames.length + '</b> مدير · <b>' + Object.keys(allBranches).length + '</b> فرع · <b>' + filtered.length + '</b> فرع-شهر · منها <b>' + dashN + '</b> ببيانات داشبورد و <b>' + evalN + '</b> ببيانات Evaluation · إجمالي منتجات <b style="color:' + mgrPctColor(allW.totalT ? allW.totalA / allW.totalT * 100 : 0) + '">' + (allW.totalT ? (allW.totalA / allW.totalT * 100).toFixed(1) + '%' : '—') + '</b>' + (allW.avgEval != null ? ' · متوسط Evaluation <b>' + allW.avgEval.toFixed(2) + '%</b>' : '') + '</div>'; }
+  var th = 'padding:9px 10px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
+  var html = '<table style="width:100%;border-collapse:collapse;min-width:1250px"><thead><tr>' +
+    '<th style="' + th + ';background:#5E2D91;text-align:left">Month</th><th style="' + th + ';background:#5E2D91;text-align:left">Manager</th><th style="' + th + ';background:#5E2D91;text-align:left">Branch Manager</th><th style="' + th + ';background:#5E2D91;text-align:left">Branch</th>' +
+    MGR_PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + p.label + ' %</th>'; }).join('') +
+    '<th style="' + th + ';background:#5E2D91">Total Eval %</th><th style="' + th + ';background:#5E2D91">Sales Mix Low %</th><th style="' + th + ';background:#5E2D91">Mid %</th><th style="' + th + ';background:#5E2D91">High %</th></tr></thead><tbody>';
+  function prodCellDetail(x, p) { var t = x[p.key + 'T'], a = x[p.key + 'A']; if (!t) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; var pc = a / t * 100, c = mgrPctColor(pc); return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:800;color:' + c + '">' + pc.toFixed(1) + '%</div><div style="font-size:10px;color:#9ca3af">' + a.toLocaleString('en-US') + ' / ' + t.toLocaleString('en-US') + '</div></td>'; }
+  function mixCellDetail(x, key, total) { if (!total) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:700">' + (x[key] / total * 100).toFixed(1) + '%</div><div style="font-size:10px;color:#9ca3af">' + x[key].toLocaleString('en-US') + '</div></td>'; }
+  function evalCellDetail(x) { if (x.eval == null || isNaN(x.eval)) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; var pc = x.eval * 100, c = mgrPctColor(pc); var sub = ''; if (x.evalMob != null && !isNaN(x.evalMob)) sub += 'Mob ' + Number(x.evalMob).toFixed(1) + '/35 '; if (x.evalMix != null && !isNaN(x.evalMix)) sub += 'Mix ' + Number(x.evalMix).toFixed(1) + '/30'; return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:800;color:' + c + '">' + pc.toFixed(2) + '%</div><div style="font-size:10px;color:#9ca3af">' + sub + '</div></td>'; }
+  function overallCells(w) { var mixTot = w.low + w.mid + w.high; var s = MGR_PRODUCTS.map(function (p) { var t = w[p.key + 'T'], a = w[p.key + 'A']; return '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (t ? (a / t * 100).toFixed(1) + '%' : '—') + '</td>'; }).join(''); s += '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (w.avgEval != null ? w.avgEval.toFixed(2) + '%' : '—') + '</td>'; s += '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.low / mixTot * 100).toFixed(1) + '%' : '—') + '</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.mid / mixTot * 100).toFixed(1) + '%' : '—') + '</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.high / mixTot * 100).toFixed(1) + '%' : '—') + '</td>'; return s; }
+  mgrNames.forEach(function (m, mi) {
+    var rows = byMgr[m].slice().sort(function (a, b) { var d = order.indexOf(a.month) - order.indexOf(b.month); return d !== 0 ? d : (a.branch < b.branch ? -1 : (a.branch > b.branch ? 1 : 0)); });
+    var w = mgrDetailWeighted(rows);
+    var monthsSet = {}; rows.forEach(function (r) { monthsSet[r.month] = 1; });
+    var expanded = !!(MGR_DETAIL_EXPANDED[mi] || MGR_FILTER_MGR || MGR_BRANCH_SEARCH);
+    html += '<tr style="background:#f3e8ff;cursor:pointer" onclick="mgrToggleDetail(' + mi + ')"><td colspan="14" style="padding:9px 12px;font-size:13px;font-weight:800;color:#5E2D91"><span id="mgr-arrow-' + mi + '">' + (expanded ? '▾' : '▸') + '</span> ' + m + ' <span style="font-size:11px;font-weight:600;color:#6b7280">— ' + Object.keys(monthsSet).length + ' شهر · ' + w.branchCount + ' فرع · ' + w.n + ' فرع-شهر · منتجات ' + (w.totalT ? (w.totalA / w.totalT * 100).toFixed(1) + '%' : '—') + (w.avgEval != null ? ' · Eval ' + w.avgEval.toFixed(2) + '%' : '') + ' — اضغط عشان تفتح/تقفل الفروع</span></td></tr>';
+    html += '<tr style="background:#ede9fe;border-top:2px solid #ddd6fe"><td style="padding:8px 12px;font-size:12px;font-weight:800;color:#5E2D91">Overall</td><td style="padding:8px 12px;font-size:12px;font-weight:700">' + m + '</td><td style="padding:8px 12px;font-size:12px;color:#6b7280">—</td><td style="padding:8px 12px;font-size:12px;font-weight:700">كل الفروع (' + w.branchCount + ')</td>' + overallCells(w) + '</tr>';
+    rows.forEach(function (x, i) { var mixTot = x.low + x.mid + x.high; html += '<tr data-mgr-idx="' + mi + '" style="display:' + (expanded ? '' : 'none') + ';background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px 12px;font-size:12px;font-weight:600;color:#374151;white-space:nowrap">' + (labels[x.month] || x.month) + ' ' + x.month.split('-')[1] + '</td><td style="padding:8px 12px;font-size:12px">' + m + '</td><td style="padding:8px 12px;font-size:12px">' + (x.branchMgr || '—') + '</td><td style="padding:8px 12px;font-size:12px"><div style="font-weight:600">' + (x.branch || '—') + '</div><div style="font-size:10px;color:#9ca3af">' + x.storeCode + '</div></td>' + MGR_PRODUCTS.map(function (p) { return prodCellDetail(x, p); }).join('') + evalCellDetail(x) + mixCellDetail(x, 'low', mixTot) + mixCellDetail(x, 'mid', mixTot) + mixCellDetail(x, 'high', mixTot) + '</tr>'; });
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
 function renderManagers() {
   var el = document.getElementById('mgr-table'); var kpi = document.getElementById('mgr-kpis');
   if (!el) return;
   var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
   var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
-  if (MGR_SOURCE === 'branch') { renderManagersBranch(el, kpi, order, labels); } else { renderManagersEval(el, kpi, order, labels); }
+  if (MGR_VIEWMODE === 'detail') { renderManagersDetail(el, kpi, order, labels); } else if (MGR_SOURCE === 'branch') { renderManagersBranch(el, kpi, order, labels); } else { renderManagersEval(el, kpi, order, labels); }
 }
 function renderManagersBranch(el, kpi, order, labels) {
   var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
@@ -12058,7 +12131,61 @@ function mgrLoadExcelJS() {
   return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = function () { window.ExcelJS ? res() : rej(new Error('ExcelJS not available')); }; s.onerror = function () { rej(new Error('تعذر تحميل مكتبة التصدير (تأكد من الإنترنت)')); }; document.head.appendChild(s); });
 }
 function mgrStyleHeader(row) { row.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5E2D91' } }; cell.font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } }, top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } }; }); }
+async function mgrExportDetail(btn) {
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
+  try {
+    var joined = mgrBuildJoinedRows();
+    if (!joined.length) { alert('⚠️ مفيش بيانات لسه — ارفع Evaluation أو سجّل دخول وحمّل بيانات الفروع أولاً'); return; }
+    var filtered = mgrDetailFiltered(joined);
+    if (!filtered.length) { alert('⚠️ لا توجد بيانات مطابقة للفلاتر الحالية'); return; }
+    await mgrLoadExcelJS();
+    var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
+    var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
+    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
+    var byMgr = {}; filtered.forEach(function (r) { var m = mgrDetailMgr(r) || '— (no manager)'; (byMgr[m] = byMgr[m] || []).push(r); });
+    var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrDetailWeighted(byMgr[a]), wb2 = mgrDetailWeighted(byMgr[b]); var pa = wa.totalT ? wa.totalA / wa.totalT : -1, pb = wb2.totalT ? wb2.totalA / wb2.totalT : -1; return pb - pa; });
+    var ws = wb.addWorksheet('Detail by Branch');
+    var headers = ['Level', 'Manager', 'Branch Manager', 'Branch', 'Store Code', 'Region', 'Month'];
+    MGR_PRODUCTS.forEach(function (p) { headers.push(p.label + ' Target', p.label + ' Ach', p.label + ' Ach%'); });
+    headers.push('Total Evaluation %', 'Eval Ach. Activation %', 'Eval Mobile /35', 'Eval Sales Mix /30', 'Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
+    ws.columns = headers.map(function (h, i) { return { width: i === 1 || i === 2 || i === 3 ? 28 : 14 }; }); ws.columns[6].width = 16;
+    ws.mergeCells('A1:' + ws.getColumn(headers.length).letter + '1'); var t = ws.getCell('A1'); t.value = 'FAKHARANY360 — Managers Detail by Branch (Month x Manager x Branch) — joined by Store Code + Month — ' + mgrLevelLabel(); t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr = ws.addRow(headers); mgrStyleHeader(hr); ws.autoFilter = 'A2:' + ws.getColumn(headers.length).letter + '2'; ws.views = [{ state: 'frozen', ySplit: 2 }];
+    mgrNames.forEach(function (m) {
+      var rows = byMgr[m].slice().sort(function (a, b) { var d = order.indexOf(a.month) - order.indexOf(b.month); return d !== 0 ? d : (a.branch < b.branch ? -1 : (a.branch > b.branch ? 1 : 0)); });
+      rows.forEach(function (x, i) {
+        var row = [mgrLevelLabel(), m, x.branchMgr || null, x.branch || null, x.storeCode, x.region || null, (labels[x.month] || x.month) + ' ' + x.month.split('-')[1]];
+        MGR_PRODUCTS.forEach(function (p) { row.push(x.hasDash ? x[p.key + 'T'] : null, x.hasDash ? x[p.key + 'A'] : null, (x.hasDash && x[p.key + 'T']) ? x[p.key + 'A'] / x[p.key + 'T'] : null); });
+        var mixTot = x.low + x.mid + x.high;
+        row.push(x.eval != null ? x.eval : null, (x.evalAch != null && !isNaN(x.evalAch)) ? x.evalAch : null, (x.evalMob != null && !isNaN(x.evalMob)) ? x.evalMob : null, (x.evalMix != null && !isNaN(x.evalMix)) ? x.evalMix : null, x.hasDash ? x.low : null, x.hasDash ? x.mid : null, x.hasDash ? x.high : null, x.hasDash ? x.pt12 : null, mixTot ? x.low / mixTot : null, mixTot ? x.mid / mixTot : null, mixTot ? x.high / mixTot : null);
+        var r = ws.addRow(row);
+        MGR_PRODUCTS.forEach(function (p, pi) { var c = r.getCell(10 + pi * 3); if (c.value != null) c.numFmt = '0.00%'; });
+        [26, 27, 34, 35, 36].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
+        r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
+      });
+    });
+    var ws2 = wb.addWorksheet('Summary by Manager');
+    var h2 = ['Level', 'Manager', 'Months', 'Branches', 'Store-months', 'Total Target', 'Total Ach', 'Total Ach%']; MGR_PRODUCTS.forEach(function (p) { h2.push(p.label + ' Ach%'); }); h2.push('Avg Evaluation %', 'Low%', 'Mid%', 'High%');
+    ws2.columns = h2.map(function () { return { width: 15 }; }); ws2.columns[1].width = 28;
+    ws2.mergeCells('A1:' + ws2.getColumn(h2.length).letter + '1'); var t2 = ws2.getCell('A1'); t2.value = 'FAKHARANY360 — Managers Summary (Overall)'; t2.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr2 = ws2.addRow(h2); mgrStyleHeader(hr2); ws2.autoFilter = 'A2:' + ws2.getColumn(h2.length).letter + '2'; ws2.views = [{ state: 'frozen', ySplit: 2 }];
+    mgrNames.forEach(function (m, i) { var rows = byMgr[m]; var w = mgrDetailWeighted(rows); var monthsSet = {}; rows.forEach(function (r) { monthsSet[r.month] = 1; }); var mixTot = w.low + w.mid + w.high; var row = [mgrLevelLabel(), m, Object.keys(monthsSet).length, w.branchCount, w.n, w.totalT, w.totalA, w.totalT ? w.totalA / w.totalT : null]; MGR_PRODUCTS.forEach(function (p) { row.push(w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : null); }); row.push(w.avgEval != null ? w.avgEval / 100 : null, mixTot ? w.low / mixTot : null, mixTot ? w.mid / mixTot : null, mixTot ? w.high / mixTot : null); var r = ws2.addRow(row); r.getCell(8).numFmt = '0.00%'; for (var ci = 9; ci < 9 + MGR_PRODUCTS.length + 4; ci++) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; } r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; }); });
+    var ws3 = wb.addWorksheet('Summary by Branch');
+    var h3 = ['Level', 'Manager', 'Branch Manager', 'Branch', 'Store Code', 'Region', 'Months', 'Store-months', 'Total Target', 'Total Ach', 'Total Ach%']; MGR_PRODUCTS.forEach(function (p) { h3.push(p.label + ' Ach%'); }); h3.push('Avg Evaluation %');
+    ws3.columns = h3.map(function () { return { width: 15 }; }); ws3.columns[1].width = 28; ws3.columns[2].width = 28; ws3.columns[3].width = 28;
+    ws3.mergeCells('A1:' + ws3.getColumn(h3.length).letter + '1'); var t3 = ws3.getCell('A1'); t3.value = 'FAKHARANY360 — Branches Summary (Overall by Manager x Branch)'; t3.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr3 = ws3.addRow(h3); mgrStyleHeader(hr3); ws3.autoFilter = 'A2:' + ws3.getColumn(h3.length).letter + '2'; ws3.views = [{ state: 'frozen', ySplit: 2 }];
+    var byBranch = {}; filtered.forEach(function (r) { var k = (mgrDetailMgr(r) || '—') + '|' + r.storeCode; (byBranch[k] = byBranch[k] || []).push(r); });
+    Object.keys(byBranch).sort().forEach(function (k, i) { var rows = byBranch[k]; var w = mgrDetailWeighted(rows); var monthsSet = {}; var bm = '', br = '', rg = ''; rows.forEach(function (r) { monthsSet[r.month] = 1; if (r.branchMgr) bm = r.branchMgr; if (r.branch) br = r.branch; if (r.region) rg = r.region; }); var row = [mgrLevelLabel(), mgrDetailMgr(rows[0]) || '—', bm || null, br || null, rows[0].storeCode, rg || null, Object.keys(monthsSet).length, w.n, w.totalT, w.totalA, w.totalT ? w.totalA / w.totalT : null]; MGR_PRODUCTS.forEach(function (p) { row.push(w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : null); }); row.push(w.avgEval != null ? w.avgEval / 100 : null); var r = ws3.addRow(row); r.getCell(11).numFmt = '0.00%'; for (var cj = 12; cj < 12 + MGR_PRODUCTS.length + 1; cj++) { var c = r.getCell(cj); if (c.value != null) c.numFmt = '0.00%'; } r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; }); });
+    var buf = await wb.xlsx.writeBuffer(); var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'Managers_Detail_by_Branch_' + stamp + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) { console.error('[Managers detail export]', e); alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e)); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
+}
+
 async function mgrExportExcel(btn) {
+  if (MGR_VIEWMODE === 'detail') { return mgrExportDetail(btn); }
   var old = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
   try {
