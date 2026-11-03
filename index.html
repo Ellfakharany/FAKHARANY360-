@@ -1386,35 +1386,23 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
-    <!-- MANAGERS TAB — Branch performance + Evaluation (v2, fixed) -->
+    <!-- MANAGERS TAB — Simple Jan-Sep report (v4, in same index.html) -->
     <div id="tab-managers" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers Performance — by Month</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">الوضع الافتراضي <b>Detail by Branch</b>: جدول واحد فيه الشهر، اسم المدير، اسم مدير الفرع، اسم الفرع، وبعدين الأداء في كل الباقات الأساسية %، و Total Evaluation %، وتفاصيل السيلز/تاريف ميكس — كل صف = مدير × فرع × شهر، والربط بين Evaluation والداشبورد بيكون بكود الفرع + الشهر. بعد كل مدير فيه صف Overall لكل فروعه وشهورة. لو عايز الملخص القديم (مدير × شهر بس)، اختار <b>Summary by Manager</b>.</div>
+      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers — يناير إلى سبتمبر 2026 (تقرير مبسط)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">صف واحد لكل مدير، مجمّع من يناير لسبتمبر 2026، من بيانات الداشبورد المحمّلة بعد الدخول — من غير رفع شيت، ومن غير تفاصيل فروع أو شهور، عشان التاب يفضل خفيف ومش يهنّج. لكل مدير: % الإنجاز + الـ Gap (عدد ونسبة) في كل منتج أساسي، + التاريف Low / Mid / High.</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
-        <div class="filter-group"><label class="filter-label">View</label><select id="mgr-viewmode" onchange="mgrSetViewMode(this.value)" class="filter-select"><option value="detail">Detail by Branch — Month × Manager × Branch</option><option value="summary">Summary by Manager</option></select></div>
-        <div class="filter-group"><label class="filter-label">Manager Level</label><select id="mgr-level" onchange="mgrSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
-        <div class="filter-group"><label class="filter-label">Manager</label><select id="mgr-manager" onchange="mgrSetManager(this.value)" class="filter-select"><option value="">All Managers</option></select></div>
-        <div class="filter-group"><label class="filter-label">Region</label><select id="mgr-region" onchange="mgrSetRegion(this.value)" class="filter-select"><option value="">All Regions</option></select></div>
-        <div class="filter-group"><label class="filter-label">Search Branch / Branch Manager / Code</label><input id="mgr-branch-search" oninput="mgrSetBranchSearch(this.value)" class="filter-select" placeholder="مثال: شبرا، أو اسم مدير الفرع، أو كود الفرع" style="min-width:220px"></div>
-        <div class="filter-group" id="mgr-source-wrap" style="display:none"><label class="filter-label">Data Source (Summary only)</label><select id="mgr-source" onchange="mgrSetSource(this.value)" class="filter-select"><option value="branch">Branch Performance (dashboard data)</option><option value="evaluation">Evaluation (upload file)</option></select></div>
-        <div class="filter-group" id="mgr-view-wrap" style="display:none"><label class="filter-label">View (Summary / Branch only)</label><select id="mgr-view" onchange="mgrSetView(this.value)" class="filter-select"><option value="summary">Summary — Ach% only</option><option value="details">Details — Target / Ach / Ach%</option></select></div>
-        <button onclick="mgrResetFilters()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
-      </div>
-      <div id="mgr-branch-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
-        <span style="font-size:11px;color:#6b7280">Detail mode joins by Store Code + Month: Evaluation (if uploaded) gives Manager / Branch Manager / Branch / Total Evaluation %, and Dashboard data (if logged in) gives product %s and Tariff Mix. If one side is missing, its columns show “—”. اسحب يمين عشان تشوف باقي الأعمدة، واضغط على اسم المدير عشان تفتح/تقفل فروعه.</span>
-      </div>
-      <div id="mgr-eval-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
-        <button onclick="document.getElementById('mgr-eval-input').click()" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>Upload Evaluation (.xlsx)</button>
-        <input type="file" id="mgr-eval-input" accept=".xlsx,.xls" style="display:none" onchange="mgrLoadEvaluation(this.files[0])">
-        <span id="mgr-status" style="font-size:11px;color:#6b7280">لم يتم رفع ملف Evaluation بعد.</span>
+        <div class="filter-group"><label class="filter-label">مستوى المدير</label><select id="mgrs-level" onchange="mgrsSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
+        <div class="filter-group"><label class="filter-label">بحث باسم المدير</label><input id="mgrs-search" oninput="mgrsSetSearch(this.value)" class="filter-select" placeholder="اكتب جزء من اسم المدير…" style="min-width:220px"></div>
+        <button onclick="mgrsReset()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
-        <button onclick="mgrExportExcel(this)" style="padding:8px 18px;background:linear-gradient(135deg,#217346,#1e8449);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-export mr-1"></i>Export Excel (formatted)</button>
-        <span id="mgr-export-note" style="font-size:11px;color:#6b7280"></span>
+        <button onclick="mgrsExportExcel(this)" style="padding:8px 18px;background:linear-gradient(135deg,#217346,#1e8449);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-export mr-1"></i>تصدير Excel للإرسال للمديرين</button>
+        <span style="font-size:11px;color:#6b7280">التصدير فيه Target و Ach و % و Gap عدد ونسبة لكل منتج، + Low و Mid و High و 12PT، + شيت Read me.</span>
       </div>
-      <div id="mgr-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
-      <div id="mgr-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px">Detail: كل صف = مدير × فرع × شهر. ربط Evaluation والداشبورد بكود الفرع (بحروف كبيرة) + الشهر (MM-YYYY). اسم المدير هنا هو Area/Regional/Supervisor حسب الاختيار، واسم مدير الفرع هو عمود Name من شيت Evaluation (الموظف المقيّم على الفرع في ذلك الشهر). Branch: Target/Ach من monthly_closure. Sales Mix = Tariff Mix من الداشبورد: Low (25,29,32,37) و Mid (40,45,46,52) و High (50+) و 12PT، ونسبة كل شريحة من مجموع Low+Mid+High؛ وعمود Eval Sales Mix /30 هو نقاط السيلز ميكس من شيت Evaluation نفسه. Evaluation % = مجموع نقاط الفرع (TNPS 10 + Mobile 35 + Sales Mix 30 + 5×5).</div>
+      <div id="mgrs-months" style="margin-bottom:12px"></div>
+      <div id="mgrs-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
+      <div id="mgrs-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">التعريفات: الفترة يناير–سبتمبر 2026 فقط (01-2026 إلى 09-2026). الأرقام على أساس Sales (الافتراضي في الداشبورد، مش Activation). الـ Gap = Target − Ach: موجب يعني عجز، سالب يعني زيادة عن التارجت. نسبة الـ Gap = Gap ÷ Target = 100% − Ach%. إجمالي % = مجموع Ach كل المنتجات ÷ مجموع Target كل المنتجات. التاريف: Low = شرائح 25،29،32،37 و Mid = 40،45،46،52 و High = 50+، والنسبة هي حصة كل شريحة من مجموع Low+Mid+High. ADSL هو نفسه FBB في الداشبورد.</div>
     </div>
 
     <!-- HEATMAP TAB -->
@@ -11842,413 +11830,199 @@ function mtdNwRenderExtras() {
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
-// MANAGERS PERFORMANCE v3 — Detail by Branch (Month x Manager x Branch) joined by Store Code + Month, plus v2 Summary by Manager.
-// MANAGERS PERFORMANCE v2 — two sources, one tab.
-//  (1) Branch: aggregates RAW_DATA (monthly_closure, already loaded by the
-//      dashboard after login) by manager level x month, for every main
-//      product (Mobile, WE Gold, FBB, Fixed, Wallet, WE Air) plus Tariff Mix
-//      (Low / Mid / High / 12PT). No upload, no Evaluation sheet needed.
-//  (2) Evaluation: parses an uploaded Evaluation_2026.xlsx in the browser
-//      (SheetJS, already loaded), columns found BY HEADER NAME, and
-//      aggregates by manager level x month. No employee-level data is
-//      rendered or exported, only manager-month aggregates.
-// Join keys: Branch — storeCode/store + month + manager field from RAW_DATA.
-//            Evaluation — Store Code (upper, trimmed) + month (sheet name).
+// MANAGERS — SIMPLE JAN-SEP REPORT v4 (in the same index.html).
+// Replaces the v2/v3 Managers tab (aggregates by month, detail by branch,
+// Evaluation upload) which rendered thousands of rows and hung on mobile.
+// This version: ONE row per manager, Jan-Sep 2026 only, from RAW_DATA already
+// loaded by the dashboard after login. No upload, no branch rows, no charts,
+// no Evaluation — that is why it stays light.
+// Columns on screen: Manager | Branches | Months | Total % | Total Gap |
+// per product: Ach% + Gap count / Gap% | Tariff Low / Mid / High count + share.
+// Export adds full Target / Ach / % / Gap count / Gap% per product + 12PT.
+// Uses the dashboard's own PRODUCTS (tKey/aKey), MONTH_ORDER, MONTH_LABELS.
+// Gap = Target - Ach. Gap% = Gap / Target. Total% = sum Ach / sum Target.
+// Tariff % = share of Low+Mid+High. ADSL in the UI = FBB in the data.
 // ════════════════════════════════════════════════════════════════════════════
-var MGR_EVAL = { rows: [], agg: [], loaded: false, fileName: '' };
-var MGR_SOURCE = 'branch';
-var MGR_LEVEL = 'area';
-var MGR_VIEWMODE = 'detail';
-var MGR_BRANCH_SEARCH = '';
-var MGR_DETAIL_EXPANDED = {};
-var MGR_VIEW = 'summary';
-var MGR_FILTER_MGR = '';
-var MGR_FILTER_REGION = '';
-var MGR_PRODUCTS = [
-  { key: 'mobile', label: 'Mobile', t: 'mobileTarget', a: 'mobileSubs' },
-  { key: 'gold', label: 'WE Gold', t: 'goldTarget', a: 'goldSubs' },
-  { key: 'fbb', label: 'FBB', t: 'fbbTarget', a: 'fbbSubs' },
-  { key: 'fixed', label: 'Fixed', t: 'fixedTarget', a: 'fixedSubs' },
-  { key: 'wallet', label: 'Wallet', t: 'walletTarget', a: 'walletSales' },
-  { key: 'fwa', label: 'WE Air', t: 'fwaTarget', a: 'fwaSubs' }
-];
-function mgrNorm(v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' '); }
-function mgrLevelField() { return MGR_LEVEL === 'supervisor' ? 'supervisor' : (MGR_LEVEL === 'area' ? 'areaManager' : 'regionalManager'); }
-function mgrLevelLabel() { return MGR_LEVEL === 'supervisor' ? 'Supervisor' : (MGR_LEVEL === 'area' ? 'Area' : 'Regional'); }
-function mgrPctColor(p) { return p >= 100 ? '#22c55e' : (p >= 90 ? '#22c55e' : (p >= 70 ? '#f59e0b' : '#ef4444')); }
-function mgrNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
-function mgrApplyViewVisibility() { var sw = document.getElementById('mgr-source-wrap'); var vw = document.getElementById('mgr-view-wrap'); var ea = document.getElementById('mgr-eval-actions'); var ba = document.getElementById('mgr-branch-actions'); if (sw) sw.style.display = (MGR_VIEWMODE === 'summary' ? '' : 'none'); if (vw) vw.style.display = (MGR_VIEWMODE === 'summary' && MGR_SOURCE === 'branch' ? '' : 'none'); if (ea) ea.style.display = 'flex'; if (ba) ba.style.display = 'flex'; }
-function mgrSetViewMode(v) { MGR_VIEWMODE = v; MGR_DETAIL_EXPANDED = {}; mgrApplyViewVisibility(); mgrPopulateFilters(); renderManagers(); }
-function mgrSetSource(v) { MGR_SOURCE = v; mgrApplyViewVisibility(); mgrPopulateFilters(); renderManagers(); }
-function mgrSetLevel(v) { MGR_LEVEL = v; MGR_DETAIL_EXPANDED = {}; mgrPopulateFilters(); renderManagers(); }
-function mgrSetView(v) { MGR_VIEW = v; renderManagers(); }
-function mgrSetManager(v) { MGR_FILTER_MGR = v; renderManagers(); }
-function mgrSetRegion(v) { MGR_FILTER_REGION = v; renderManagers(); }
-function mgrSetBranchSearch(v) { MGR_BRANCH_SEARCH = v || ''; renderManagers(); }
-function mgrResetFilters() { MGR_FILTER_MGR = ''; MGR_FILTER_REGION = ''; MGR_BRANCH_SEARCH = ''; MGR_DETAIL_EXPANDED = {}; var a = document.getElementById('mgr-manager'); var b = document.getElementById('mgr-region'); var c = document.getElementById('mgr-branch-search'); if (a) a.value = ''; if (b) b.value = ''; if (c) c.value = ''; renderManagers(); }
-function mgrPopulateFilters() {
-  var mgrSel = document.getElementById('mgr-manager'); var regSel = document.getElementById('mgr-region');
-  if (!mgrSel || !regSel) return;
-  var mgrs = {}, regs = {};
-  if (MGR_VIEWMODE === 'detail') {
-    mgrBuildJoinedRows().forEach(function (r) { var m = mgrDetailMgr(r); if (m) mgrs[m] = 1; if (r.region) regs[r.region] = 1; });
-  } else if (MGR_SOURCE === 'branch') {
-    var f = mgrLevelField();
-    (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) { var m = mgrNorm(r[f]); if (m) mgrs[m] = 1; var rg = mgrNorm(r.region); if (rg) regs[rg] = 1; });
-  } else {
-    var level = mgrLevelLabel();
-    MGR_EVAL.agg.forEach(function (a) { if (a.level === level) { mgrs[a.manager] = 1; if (a.region) regs[a.region] = 1; } });
-  }
-  mgrSel.innerHTML = '<option value="">All Managers</option>' + Object.keys(mgrs).sort().map(function (m) { return '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>'; }).join('');
-  regSel.innerHTML = '<option value="">All Regions</option>' + Object.keys(regs).sort().map(function (r) { return '<option value="' + r + '">' + r + '</option>'; }).join('');
-  mgrSel.value = ''; regSel.value = ''; MGR_FILTER_MGR = ''; MGR_FILTER_REGION = '';
+var MGRS_LEVEL = 'area';
+var MGRS_SEARCH = '';
+var MGRS_MONTHS = ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026'];
+var MGRS_MONTH_NAMES = {'01-2026':'يناير','02-2026':'فبراير','03-2026':'مارس','04-2026':'أبريل','05-2026':'مايو','06-2026':'يونيو','07-2026':'يوليو','08-2026':'أغسطس','09-2026':'سبتمبر'};
+function mgrsNorm(v) { return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim().replace(/\s+/g, ' '); }
+function mgrsNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
+function mgrsLevelField() { return MGRS_LEVEL === 'supervisor' ? 'supervisor' : (MGRS_LEVEL === 'area' ? 'areaManager' : 'regionalManager'); }
+function mgrsLevelLabel() { return MGRS_LEVEL === 'supervisor' ? 'Supervisor' : (MGRS_LEVEL === 'area' ? 'Area Manager' : 'Regional Manager'); }
+function mgrsProductLabel(p) { return p.key === 'fbb' ? 'ADSL (FBB)' : p.label; }
+function mgrsPctColor(p) { return p == null ? '#9ca3af' : (p >= 100 ? '#16a34a' : (p >= 90 ? '#16a34a' : (p >= 70 ? '#d97706' : '#dc2626'))); }
+function mgrsSetLevel(v) { MGRS_LEVEL = v; renderManagers(); }
+function mgrsSetSearch(v) { MGRS_SEARCH = v || ''; renderManagers(); }
+function mgrsReset() { MGRS_SEARCH = ''; var c = document.getElementById('mgrs-search'); if (c) c.value = ''; renderManagers(); }
+function mgrsMonthsCount() {
+  var c = {};
+  MGRS_MONTHS.forEach(function (m) { c[m] = 0; });
+  (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) { if (c.hasOwnProperty(r.month)) c[r.month]++; });
+  return c;
 }
-// ── Evaluation parsing (header-name mapping, same as v1) ──
-function mgrMonthFromSheet(sn, evalHeader) {
-  var map = { jan: '01-2026', feb: '02-2026', mar: '03-2026', apr: '04-2026', may: '05-2026', jun: '06-2026', jul: '07-2026', aug: '08-2026', sep: '09-2026', oct: '10-2026', nov: '11-2026', dec: '12-2026' };
-  var m = String(sn || '').toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);
-  if (m) return map[m[1]];
-  var full = { january: '01-2026', february: '02-2026', march: '03-2026', april: '04-2026', may: '05-2026', june: '06-2026', july: '07-2026', august: '08-2026', september: '09-2026', october: '10-2026', november: '11-2026', december: '12-2026' };
-  var h = String(evalHeader || '').toLowerCase(); var k; for (k in full) { if (h.indexOf(k) >= 0) return full[k]; }
-  return '';
-}
-function mgrColIdx(headers, test) { for (var i = 0; i < headers.length; i++) { if (test(mgrNorm(headers[i]).toLowerCase())) return i; } return -1; }
-function mgrLoadEvaluation(file) {
-  if (!file) return;
-  var status = document.getElementById('mgr-status');
-  if (status) status.textContent = 'جاري قراءة الملف…';
-  if (typeof XLSX === 'undefined') { if (status) status.textContent = 'مكتبة قراءة الإكسل (SheetJS) مش محمّلة — تأكد من الإنترنت وأعد تحميل الصفحة.'; return; }
-  var reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      var rows = [];
-      wb.SheetNames.forEach(function (sn) {
-        var aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
-        var hdrIdx = -1, headers = null;
-        for (var i = 0; i < aoa.length; i++) { var r = aoa[i] || []; if (r.some(function (c) { return mgrNorm(c) === 'Store Code'; })) { hdrIdx = i; headers = r; break; } }
-        if (hdrIdx < 0) return;
-        var idxName = mgrColIdx(headers, function (h) { return h === 'name'; });
-        var idxBranch = mgrColIdx(headers, function (h) { return h.indexOf('branch name') >= 0; });
-        var idxStore = mgrColIdx(headers, function (h) { return h === 'store code'; });
-        var idxRegion = mgrColIdx(headers, function (h) { return h === 'region'; });
-        var idxRM = mgrColIdx(headers, function (h) { return h.indexOf('regional manager') >= 0; });
-        var idxAM = mgrColIdx(headers, function (h) { return h.indexOf('area manger') >= 0 || h.indexOf('area manager') >= 0; });
-        var idxEval = -1; for (var k = 0; k < headers.length; k++) { if (mgrNorm(headers[k]).toLowerCase().indexOf('evaluation') >= 0) idxEval = k; }
-        var idxAch = mgrColIdx(headers, function (h) { return h.indexOf('ach.activation') >= 0; });
-        var idxMob = mgrColIdx(headers, function (h) { return h.indexOf('mobile sales target') >= 0; });
-        var idxMix = mgrColIdx(headers, function (h) { return h.indexOf('sales mix') >= 0; });
-        if (idxStore < 0 || idxEval < 0) return;
-        var month = mgrMonthFromSheet(sn, headers[idxEval]);
-        if (!month) return;
-        for (var j = hdrIdx + 1; j < aoa.length; j++) {
-          var row = aoa[j] || []; var code = mgrNorm(row[idxStore]).toUpperCase(); var ev = Number(row[idxEval]);
-          if (!code || isNaN(ev)) continue;
-          rows.push({ storeCode: code, month: month, region: mgrNorm(row[idxRegion]), rm: mgrNorm(row[idxRM]), am: mgrNorm(row[idxAM]), name: idxName >= 0 ? mgrNorm(row[idxName]) : '', branch: idxBranch >= 0 ? mgrNorm(row[idxBranch]) : '', eval: ev, ach: Number(row[idxAch]), mobile: Number(row[idxMob]), mix: Number(row[idxMix]) });
-        }
-      });
-      if (!rows.length) { if (status) status.textContent = 'لم أجد صفوف Evaluation صالحة — تأكد أن الشيتات فيها عمود Store Code وعمود Evaluation.'; return; }
-      MGR_EVAL.rows = rows; MGR_EVAL.loaded = true; MGR_EVAL.fileName = file.name;
-      mgrBuildEvalAgg(); mgrPopulateFilters(); renderManagers();
-      var months = {}; rows.forEach(function (r) { months[r.month] = 1; });
-      if (status) status.textContent = 'تم تحميل ' + rows.length + ' صف Evaluation من ' + file.name + ' — ' + Object.keys(months).length + ' شهر.';
-    } catch (err) { if (status) status.textContent = 'خطأ في قراءة الملف: ' + (err && err.message ? err.message : err); console.error('[Managers Evaluation]', err); }
-  };
-  reader.onerror = function () { if (status) status.textContent = 'تعذر قراءة الملف من المتصفح.'; };
-  reader.readAsArrayBuffer(file);
-}
-function mgrBuildEvalAgg() {
+function mgrsAggregate() {
+  var f = mgrsLevelField();
   var map = {};
-  MGR_EVAL.rows.forEach(function (r) {
-    [['Regional', r.rm], ['Area', r.am]].forEach(function (pair) {
-      var level = pair[0], mgr = pair[1]; if (!mgr) return;
-      var key = level + '|' + mgr + '|' + r.month;
-      if (!map[key]) map[key] = { level: level, manager: mgr, month: r.month, n: 0, evalSum: 0, achSum: 0, achN: 0, mobSum: 0, mixSum: 0, regions: {}, stores: {} };
-      var d = map[key]; d.n++; d.evalSum += r.eval; if (!isNaN(r.ach)) { d.achSum += r.ach; d.achN++; } if (!isNaN(r.mobile)) d.mobSum += r.mobile; if (!isNaN(r.mix)) d.mixSum += r.mix; d.regions[r.region] = (d.regions[r.region] || 0) + 1; d.stores[r.storeCode] = 1;
-    });
+  (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) {
+    if (MGRS_MONTHS.indexOf(r.month) < 0) return;
+    var mgr = mgrsNorm(r[f]); if (!mgr) return;
+    if (!map[mgr]) { var o = { manager: mgr, stores: {}, months: {}, rows: 0, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0 }; PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[mgr] = o; }
+    var d = map[mgr];
+    d.rows++; d.stores[r.storeCode || r.store] = 1; d.months[r.month] = 1;
+    PRODUCTS.forEach(function (p) { var t = mgrsNum(r[p.tKey]), a = mgrsNum(r[p.aKey]); d[p.key + 'T'] += t; d[p.key + 'A'] += a; d.totalT += t; d.totalA += a; });
+    d.low += mgrsNum(r.lowT); d.mid += mgrsNum(r.midT); d.high += mgrsNum(r.highT); d.pt12 += mgrsNum(r.pt12);
   });
-  MGR_EVAL.agg = Object.keys(map).map(function (k) { var d = map[k], region = ''; Object.keys(d.regions).forEach(function (rg) { if (!region || d.regions[rg] > d.regions[region]) region = rg; }); return { level: d.level, manager: d.manager, month: d.month, stores: Object.keys(d.stores).length, n: d.n, avgEval: d.evalSum / d.n, avgAch: d.achN ? d.achSum / d.achN : null, avgMob: d.mobSum / d.n, avgMix: d.mixSum / d.n, region: region }; });
+  var arr = Object.keys(map).map(function (k) { var d = map[k]; d.branchCount = Object.keys(d.stores).length; d.monthCount = Object.keys(d.months).length; d.totalPct = d.totalT ? d.totalA / d.totalT * 100 : null; return d; });
+  arr.sort(function (a, b) { var pa = a.totalPct == null ? -1 : a.totalPct, pb = b.totalPct == null ? -1 : b.totalPct; return pb - pa; });
+  return arr;
 }
-// ── Branch aggregation ──
-function mgrBranchAgg() {
-  var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
-  var f = mgrLevelField();
-  var filtered = data.filter(function (r) { return (!MGR_FILTER_MGR || mgrNorm(r[f]) === MGR_FILTER_MGR) && (!MGR_FILTER_REGION || mgrNorm(r.region) === MGR_FILTER_REGION); });
-  var map = {};
-  filtered.forEach(function (r) {
-    var mgr = mgrNorm(r[f]); if (!mgr) return;
-    var key = mgr + '|' + r.month;
-    if (!map[key]) { var o = { manager: mgr, month: r.month, stores: {}, region: mgrNorm(r.region), totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0 }; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[key] = o; }
-    var d = map[key]; d.stores[r.storeCode || r.store] = 1; d.totalT += 0; d.low += mgrNum(r.lowT); d.mid += mgrNum(r.midT); d.high += mgrNum(r.highT); d.pt12 += mgrNum(r.pt12);
-    MGR_PRODUCTS.forEach(function (p) { var t = mgrNum(r[p.t]); var a = mgrNum(r[p.a]); d[p.key + 'T'] += t; d[p.key + 'A'] += a; d.totalT += t; d.totalA += a; });
-  });
-  return Object.keys(map).map(function (k) { var d = map[k]; d.storeCount = Object.keys(d.stores).length; return d; });
-}
-function mgrEvalAggFiltered() {
-  var level = mgrLevelLabel();
-  return MGR_EVAL.agg.filter(function (a) { return a.level === level && (!MGR_FILTER_MGR || a.manager === MGR_FILTER_MGR) && (!MGR_FILTER_REGION || a.region === MGR_FILTER_REGION); });
-}
-function mgrBranchWeighted(rows) {
-  var o = { stores: 0, totalT: 0, totalA: 0 };
-  MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; });
-  o.low = 0; o.mid = 0; o.high = 0; o.pt12 = 0;
-  rows.forEach(function (x) { o.stores += x.storeCount; o.totalT += x.totalT; o.totalA += x.totalA; o.low += x.low; o.mid += x.mid; o.high += x.high; o.pt12 += x.pt12; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] += x[p.key + 'T']; o[p.key + 'A'] += x[p.key + 'A']; }); });
-  return o;
-}
-function mgrEvalWeighted(rows) { var tot = 0, ev = 0, ach = 0; rows.forEach(function (x) { tot += x.stores; ev += x.avgEval * x.stores; if (x.avgAch != null) ach += x.avgAch * x.stores; }); return { stores: tot, avgEval: tot ? ev / tot * 100 : 0, avgAch: tot ? ach / tot * 100 : 0 }; }
-// ── Detail by Branch (v3): joined by Store Code + Month ──
-function mgrDetailMgr(r) { if (MGR_LEVEL === 'supervisor') return mgrNorm(r.supervisor); if (MGR_LEVEL === 'area') return mgrNorm(r.am) || mgrNorm(r.areaManager); return mgrNorm(r.rm) || mgrNorm(r.regionalManager); }
-function mgrBuildJoinedRows() {
-  var map = {};
-  function getRow(code, month) { var k = code + '|' + month; if (!map[k]) { var o = { storeCode: code, month: month, branch: '', branchMgr: '', am: '', rm: '', supervisor: '', areaManager: '', regionalManager: '', region: '', eval: null, evalAch: null, evalMob: null, evalMix: null, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0, hasDash: false, hasEval: false }; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[k] = o; } return map[k]; }
-  MGR_EVAL.rows.forEach(function (r) { var row = getRow(r.storeCode, r.month); row.hasEval = true; row.branch = r.branch || row.branch; row.branchMgr = r.name || row.branchMgr; row.am = r.am; row.rm = r.rm; row.region = r.region || row.region; row.eval = r.eval; row.evalAch = r.ach; row.evalMob = r.mobile; row.evalMix = r.mix; });
-  (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) { var code = mgrNorm(r.storeCode || r.store).toUpperCase(); var month = r.month; if (!code || !month) return; var row = getRow(code, month); row.hasDash = true; row.branch = row.branch || mgrNorm(r.store); row.supervisor = mgrNorm(r.supervisor); row.areaManager = mgrNorm(r.areaManager); row.regionalManager = mgrNorm(r.regionalManager); row.region = row.region || mgrNorm(r.region); MGR_PRODUCTS.forEach(function (p) { var t = mgrNum(r[p.t]), a = mgrNum(r[p.a]); row[p.key + 'T'] += t; row[p.key + 'A'] += a; row.totalT += t; row.totalA += a; }); row.low += mgrNum(r.lowT); row.mid += mgrNum(r.midT); row.high += mgrNum(r.highT); row.pt12 += mgrNum(r.pt12); });
-  return Object.keys(map).map(function (k) { return map[k]; });
-}
-function mgrDetailFiltered(rows) {
-  var q = mgrNorm(MGR_BRANCH_SEARCH).toLowerCase();
-  return rows.filter(function (r) { if (MGR_FILTER_MGR && mgrDetailMgr(r) !== MGR_FILTER_MGR) return false; if (MGR_FILTER_REGION && r.region !== MGR_FILTER_REGION) return false; if (q) { var hay = (mgrDetailMgr(r) + ' ' + r.branchMgr + ' ' + r.branch + ' ' + r.storeCode + ' ' + r.region).toLowerCase(); if (hay.indexOf(q) < 0) return false; } return true; });
-}
-function mgrDetailWeighted(rows) {
-  var o = { n: 0, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0, evalSum: 0, evalN: 0, branches: {} };
-  MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; });
-  rows.forEach(function (x) { o.n++; o.branches[x.storeCode] = 1; o.totalT += x.totalT; o.totalA += x.totalA; o.low += x.low; o.mid += x.mid; o.high += x.high; o.pt12 += x.pt12; MGR_PRODUCTS.forEach(function (p) { o[p.key + 'T'] += x[p.key + 'T']; o[p.key + 'A'] += x[p.key + 'A']; }); if (x.eval != null && !isNaN(x.eval)) { o.evalSum += x.eval * 100; o.evalN++; } });
-  o.branchCount = Object.keys(o.branches).length; o.avgEval = o.evalN ? o.evalSum / o.evalN : null; return o;
-}
-function mgrToggleDetail(idx) {
-  MGR_DETAIL_EXPANDED[idx] = !MGR_DETAIL_EXPANDED[idx];
-  var exp = MGR_DETAIL_EXPANDED[idx];
-  var rows = document.querySelectorAll('[data-mgr-idx="' + idx + '"]');
-  for (var i = 0; i < rows.length; i++) rows[i].style.display = exp ? '' : 'none';
-  var ar = document.getElementById('mgr-arrow-' + idx); if (ar) ar.textContent = exp ? '▾' : '▸';
-}
-function renderManagersDetail(el, kpi, order, labels) {
-  if (MGR_LEVEL === 'supervisor' && !(typeof RAW_DATA !== 'undefined' && RAW_DATA.length)) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">Supervisor موجود في بيانات الداشبورد بس، مش في شيت Evaluation.<br>سجّل دخول وحمّل بيانات الفروع أولاً، أو اختار Area / Regional.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var joined = mgrBuildJoinedRows();
-  if (!joined.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات لسه.<br>ارفع ملف Evaluation، أو سجّل دخول وحمّل بيانات الفروع (monthly_closure) — الجدول التفصيلي بيجمع اللي موجود من الاتنين بكود الفرع + الشهر.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var filtered = mgrDetailFiltered(joined);
-  if (!filtered.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للفلاتر الحالية — جرّب تمسح البحث أو تختار All Managers.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var byMgr = {}; filtered.forEach(function (r) { var m = mgrDetailMgr(r) || '— (no manager)'; (byMgr[m] = byMgr[m] || []).push(r); });
-  var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrDetailWeighted(byMgr[a]), wb = mgrDetailWeighted(byMgr[b]); var pa = wa.totalT ? wa.totalA / wa.totalT : -1, pb = wb.totalT ? wb.totalA / wb.totalT : -1; if (pa !== pb) return pb - pa; var ea = wa.avgEval == null ? -1 : wa.avgEval, eb = wb.avgEval == null ? -1 : wb.avgEval; return eb - ea; });
-  var allW = mgrDetailWeighted(filtered);
-  var dashN = 0, evalN = 0; filtered.forEach(function (r) { if (r.hasDash) dashN++; if (r.hasEval) evalN++; });
-  var allBranches = {}; filtered.forEach(function (r) { allBranches[r.storeCode] = 1; });
-  if (kpi) { kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + mgrNames.length + '</b> مدير · <b>' + Object.keys(allBranches).length + '</b> فرع · <b>' + filtered.length + '</b> فرع-شهر · منها <b>' + dashN + '</b> ببيانات داشبورد و <b>' + evalN + '</b> ببيانات Evaluation · إجمالي منتجات <b style="color:' + mgrPctColor(allW.totalT ? allW.totalA / allW.totalT * 100 : 0) + '">' + (allW.totalT ? (allW.totalA / allW.totalT * 100).toFixed(1) + '%' : '—') + '</b>' + (allW.avgEval != null ? ' · متوسط Evaluation <b>' + allW.avgEval.toFixed(2) + '%</b>' : '') + '</div>'; }
-  var th = 'padding:9px 10px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
-  var html = '<table style="width:100%;border-collapse:collapse;min-width:1250px"><thead><tr>' +
-    '<th style="' + th + ';background:#5E2D91;text-align:left">Month</th><th style="' + th + ';background:#5E2D91;text-align:left">Manager</th><th style="' + th + ';background:#5E2D91;text-align:left">Branch Manager</th><th style="' + th + ';background:#5E2D91;text-align:left">Branch</th>' +
-    MGR_PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + p.label + ' %</th>'; }).join('') +
-    '<th style="' + th + ';background:#5E2D91">Total Eval %</th><th style="' + th + ';background:#5E2D91">Sales Mix Low %</th><th style="' + th + ';background:#5E2D91">Mid %</th><th style="' + th + ';background:#5E2D91">High %</th></tr></thead><tbody>';
-  function prodCellDetail(x, p) { var t = x[p.key + 'T'], a = x[p.key + 'A']; if (!t) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; var pc = a / t * 100, c = mgrPctColor(pc); return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:800;color:' + c + '">' + pc.toFixed(1) + '%</div><div style="font-size:10px;color:#9ca3af">' + a.toLocaleString('en-US') + ' / ' + t.toLocaleString('en-US') + '</div></td>'; }
-  function mixCellDetail(x, key, total) { if (!total) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:700">' + (x[key] / total * 100).toFixed(1) + '%</div><div style="font-size:10px;color:#9ca3af">' + x[key].toLocaleString('en-US') + '</div></td>'; }
-  function evalCellDetail(x) { if (x.eval == null || isNaN(x.eval)) return '<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9ca3af">—</td>'; var pc = x.eval * 100, c = mgrPctColor(pc); var sub = ''; if (x.evalMob != null && !isNaN(x.evalMob)) sub += 'Mob ' + Number(x.evalMob).toFixed(1) + '/35 '; if (x.evalMix != null && !isNaN(x.evalMix)) sub += 'Mix ' + Number(x.evalMix).toFixed(1) + '/30'; return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:800;color:' + c + '">' + pc.toFixed(2) + '%</div><div style="font-size:10px;color:#9ca3af">' + sub + '</div></td>'; }
-  function overallCells(w) { var mixTot = w.low + w.mid + w.high; var s = MGR_PRODUCTS.map(function (p) { var t = w[p.key + 'T'], a = w[p.key + 'A']; return '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (t ? (a / t * 100).toFixed(1) + '%' : '—') + '</td>'; }).join(''); s += '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (w.avgEval != null ? w.avgEval.toFixed(2) + '%' : '—') + '</td>'; s += '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.low / mixTot * 100).toFixed(1) + '%' : '—') + '</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.mid / mixTot * 100).toFixed(1) + '%' : '—') + '</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (mixTot ? (w.high / mixTot * 100).toFixed(1) + '%' : '—') + '</td>'; return s; }
-  mgrNames.forEach(function (m, mi) {
-    var rows = byMgr[m].slice().sort(function (a, b) { var d = order.indexOf(a.month) - order.indexOf(b.month); return d !== 0 ? d : (a.branch < b.branch ? -1 : (a.branch > b.branch ? 1 : 0)); });
-    var w = mgrDetailWeighted(rows);
-    var monthsSet = {}; rows.forEach(function (r) { monthsSet[r.month] = 1; });
-    var expanded = !!(MGR_DETAIL_EXPANDED[mi] || MGR_FILTER_MGR || MGR_BRANCH_SEARCH);
-    html += '<tr style="background:#f3e8ff;cursor:pointer" onclick="mgrToggleDetail(' + mi + ')"><td colspan="14" style="padding:9px 12px;font-size:13px;font-weight:800;color:#5E2D91"><span id="mgr-arrow-' + mi + '">' + (expanded ? '▾' : '▸') + '</span> ' + m + ' <span style="font-size:11px;font-weight:600;color:#6b7280">— ' + Object.keys(monthsSet).length + ' شهر · ' + w.branchCount + ' فرع · ' + w.n + ' فرع-شهر · منتجات ' + (w.totalT ? (w.totalA / w.totalT * 100).toFixed(1) + '%' : '—') + (w.avgEval != null ? ' · Eval ' + w.avgEval.toFixed(2) + '%' : '') + ' — اضغط عشان تفتح/تقفل الفروع</span></td></tr>';
-    html += '<tr style="background:#ede9fe;border-top:2px solid #ddd6fe"><td style="padding:8px 12px;font-size:12px;font-weight:800;color:#5E2D91">Overall</td><td style="padding:8px 12px;font-size:12px;font-weight:700">' + m + '</td><td style="padding:8px 12px;font-size:12px;color:#6b7280">—</td><td style="padding:8px 12px;font-size:12px;font-weight:700">كل الفروع (' + w.branchCount + ')</td>' + overallCells(w) + '</tr>';
-    rows.forEach(function (x, i) { var mixTot = x.low + x.mid + x.high; html += '<tr data-mgr-idx="' + mi + '" style="display:' + (expanded ? '' : 'none') + ';background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px 12px;font-size:12px;font-weight:600;color:#374151;white-space:nowrap">' + (labels[x.month] || x.month) + ' ' + x.month.split('-')[1] + '</td><td style="padding:8px 12px;font-size:12px">' + m + '</td><td style="padding:8px 12px;font-size:12px">' + (x.branchMgr || '—') + '</td><td style="padding:8px 12px;font-size:12px"><div style="font-weight:600">' + (x.branch || '—') + '</div><div style="font-size:10px;color:#9ca3af">' + x.storeCode + '</div></td>' + MGR_PRODUCTS.map(function (p) { return prodCellDetail(x, p); }).join('') + evalCellDetail(x) + mixCellDetail(x, 'low', mixTot) + mixCellDetail(x, 'mid', mixTot) + mixCellDetail(x, 'high', mixTot) + '</tr>'; });
-  });
-  html += '</tbody></table>';
-  el.innerHTML = html;
-}
-
 function renderManagers() {
-  var el = document.getElementById('mgr-table'); var kpi = document.getElementById('mgr-kpis');
+  var el = document.getElementById('mgrs-table');
+  var kpi = document.getElementById('mgrs-kpis');
+  var monthsEl = document.getElementById('mgrs-months');
   if (!el) return;
-  var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
-  var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
-  if (MGR_VIEWMODE === 'detail') { renderManagersDetail(el, kpi, order, labels); } else if (MGR_SOURCE === 'branch') { renderManagersBranch(el, kpi, order, labels); } else { renderManagersEval(el, kpi, order, labels); }
-}
-function renderManagersBranch(el, kpi, order, labels) {
   var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
-  if (!data.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات فروع محمّلة في الداشبورد لسه.<br>سجّل دخول وحمّل بيانات الشهور (Supabase أو DB2026.json) وبعدين ارجع للتاب ده — الجدول بيتبني من RAW_DATA مباشرة، من غير رفع شيت.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var agg = mgrBranchAgg();
-  if (!agg.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للفلاتر الحالية.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var byMgr = {}; agg.forEach(function (a) { (byMgr[a.manager] = byMgr[a.manager] || []).push(a); });
-  var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrBranchWeighted(byMgr[a]); var wb = mgrBranchWeighted(byMgr[b]); return (wb.totalA / (wb.totalT || 1)) - (wa.totalA / (wa.totalT || 1)); });
-  var allW = mgrBranchWeighted(agg);
-  if (kpi) { kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + mgrNames.length + '</b> مدير · إجمالي Target <b>' + allW.totalT.toLocaleString('en-US') + '</b> · Ach <b>' + allW.totalA.toLocaleString('en-US') + '</b> · <b style="color:' + mgrPctColor(allW.totalA / (allW.totalT || 1) * 100) + '">' + (allW.totalA / (allW.totalT || 1) * 100).toFixed(1) + '%</b></div>'; }
-  var th = 'padding:9px 10px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
-  var html = '<table style="width:100%;border-collapse:collapse;min-width:900px"><thead><tr>' +
-    '<th style="' + th + ';background:#5E2D91;text-align:left">Manager / Month</th><th style="' + th + ';background:#5E2D91">Stores</th>' +
-    '<th style="' + th + ';background:#5E2D91">Total T / A / %</th>' +
-    MGR_PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + p.label + '</th>'; }).join('') +
-    '<th style="' + th + ';background:#5E2D91">Sales Mix Low %</th><th style="' + th + ';background:#5E2D91">Mid %</th><th style="' + th + ';background:#5E2D91">High %</th></tr></thead><tbody>';
-  function prodCell(x, p) {
-    var t = x[p.key + 'T'], a = x[p.key + 'A'], pc = t ? a / t * 100 : 0, c = mgrPctColor(pc);
-    if (MGR_VIEW === 'summary') return '<td style="padding:8px 10px;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;background:' + c + '18;color:' + c + '">' + pc.toFixed(1) + '%</span></td>';
-    return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:700">' + a.toLocaleString('en-US') + '</div><div style="font-size:10px;color:#9ca3af">T ' + t.toLocaleString('en-US') + '</div><div style="font-size:11px;font-weight:800;color:' + c + '">' + pc.toFixed(1) + '%</div></td>';
+  if (!data.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات فروع محمّلة لسه.<br>سجّل دخول في الداشبورد الأول، وبعدين افتح تاب Managers — التقرير بيتبني من نفس البيانات المحمّلة، من غير رفع شيت.</div>';
+    if (kpi) kpi.innerHTML = '';
+    if (monthsEl) monthsEl.innerHTML = '';
+    return;
   }
-  function mixCell(x, key, total) { var v = x[key]; var pc = total ? v / total * 100 : 0; if (MGR_VIEW === 'summary') return '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:700">' + pc.toFixed(1) + '%</td>'; return '<td style="padding:8px 10px;text-align:center"><div style="font-size:12px;font-weight:700">' + v.toLocaleString('en-US') + '</div><div style="font-size:11px;color:#6b7280">' + pc.toFixed(1) + '%</div></td>'; }
-  mgrNames.forEach(function (m) {
-    var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
-    var w = mgrBranchWeighted(rows);
-    html += '<tr style="background:#f3e8ff"><td colspan="' + (3 + MGR_PRODUCTS.length + 3) + '" style="padding:9px 12px;font-size:13px;font-weight:800;color:#5E2D91">' + m + ' <span style="font-size:11px;font-weight:600;color:#6b7280">— ' + rows.length + ' شهر</span></td></tr>';
-    rows.forEach(function (x, i) {
-      var totPc = x.totalT ? x.totalA / x.totalT * 100 : 0, c = mgrPctColor(totPc), mixTot = x.low + x.mid + x.high;
-      html += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6">' +
-        '<td style="padding:8px 12px;padding-left:28px;font-size:12px;font-weight:600;color:#374151">' + (labels[x.month] || x.month) + ' ' + x.month.split('-')[1] + '</td>' +
-        '<td style="padding:8px 12px;text-align:center;font-size:12px">' + x.storeCount + '</td>' +
-        '<td style="padding:8px 12px;text-align:center"><div style="font-size:12px;font-weight:700">' + x.totalA.toLocaleString('en-US') + '</div><div style="font-size:10px;color:#9ca3af">T ' + x.totalT.toLocaleString('en-US') + '</div><div style="font-size:11px;font-weight:800;color:' + c + '">' + totPc.toFixed(1) + '%</div></td>' +
-        MGR_PRODUCTS.map(function (p) { return prodCell(x, p); }).join('') +
-        mixCell(x, 'low', mixTot) + mixCell(x, 'mid', mixTot) + mixCell(x, 'high', mixTot) + '</tr>';
+  var c = mgrsMonthsCount();
+  if (monthsEl) {
+    var html = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    MGRS_MONTHS.forEach(function (m) {
+      var n = c[m];
+      var style = n === 0 ? 'border:1px solid #fca5a5;background:#fef2f2' : 'border:1px solid #e5e7eb;background:#faf9fb';
+      html += '<div style="' + style + ';border-radius:10px;padding:8px 10px;font-size:12px"><span>' + MGRS_MONTH_NAMES[m] + ' 2026</span><div style="font-weight:800;font-size:14px">' + n.toLocaleString('en-US') + ' صف فرع</div></div>';
     });
-    var wPc = w.totalT ? w.totalA / w.totalT * 100 : 0, wMix = w.low + w.mid + w.high;
-    html += '<tr style="background:#ede9fe;border-top:2px solid #ddd6fe"><td style="padding:8px 12px;font-size:12px;font-weight:800;color:#5E2D91">Average — ' + m + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">' + w.stores + ' فرع-شهر</td>' +
-      '<td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:800">' + w.totalA.toLocaleString('en-US') + ' / ' + w.totalT.toLocaleString('en-US') + ' (' + wPc.toFixed(1) + '%)</td>' +
-      MGR_PRODUCTS.map(function (p) { var t = w[p.key + 'T'], a = w[p.key + 'A']; return '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (t ? a / t * 100 : 0).toFixed(1) + '%</td>'; }).join('') +
-      '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (wMix ? w.low / wMix * 100 : 0).toFixed(1) + '%</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (wMix ? w.mid / wMix * 100 : 0).toFixed(1) + '%</td><td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:800">' + (wMix ? w.high / wMix * 100 : 0).toFixed(1) + '%</td></tr>';
-  });
-  html += '</tbody></table>';
-  el.innerHTML = html;
-}
-function renderManagersEval(el, kpi, order, labels) {
-  if (MGR_LEVEL === 'supervisor') { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">شيت Evaluation مفيهوش عمود Supervisor — فيه Regional Manager و Area Manager بس. اختار واحد منهم، أو بدّل المصدر لـ Branch Performance عشان تشوف الـ Supervisors.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  if (!MGR_EVAL.loaded) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">ارفع ملف Evaluation_2026.xlsx أولاً — الجدول سيظهر هنا بعد الرفع.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var filtered = mgrEvalAggFiltered();
-  if (!filtered.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للفلاتر الحالية.</div>'; if (kpi) kpi.innerHTML = ''; return; }
-  var byMgr = {}; filtered.forEach(function (a) { (byMgr[a.manager] = byMgr[a.manager] || []).push(a); });
-  var mgrNames = Object.keys(byMgr).sort(function (a, b) { return mgrEvalWeighted(byMgr[b]).avgEval - mgrEvalWeighted(byMgr[a]).avgEval; });
-  var totalStores = 0, totalEv = 0; mgrNames.forEach(function (m) { var w = mgrEvalWeighted(byMgr[m]); totalStores += w.stores; totalEv += w.avgEval * w.stores; });
-  if (kpi) { kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + mgrNames.length + '</b> مدير · <b>' + totalStores + '</b> فرع-شهر · متوسط Evaluation <b style="color:' + mgrPctColor(totalEv / totalStores) + '">' + (totalEv / totalStores).toFixed(2) + '%</b></div>'; }
-  var th = 'padding:9px 12px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
-  var html = '<table style="width:100%;border-collapse:collapse;min-width:720px"><thead><tr><th style="' + th + ';background:#5E2D91;text-align:left">Manager / Month</th><th style="' + th + ';background:#5E2D91">Region</th><th style="' + th + ';background:#5E2D91">Stores</th><th style="' + th + ';background:#5E2D91">Avg Evaluation</th><th style="' + th + ';background:#5E2D91">Avg Ach. Activation</th><th style="' + th + ';background:#5E2D91">Avg Mobile /35</th><th style="' + th + ';background:#5E2D91">Avg Sales Mix /30</th></tr></thead><tbody>';
-  mgrNames.forEach(function (m) {
-    var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
-    var w = mgrEvalWeighted(rows);
-    html += '<tr style="background:#f3e8ff"><td colspan="7" style="padding:9px 12px;font-size:13px;font-weight:800;color:#5E2D91">' + m + ' <span style="font-size:11px;font-weight:600;color:#6b7280">— ' + rows.length + ' شهر · ' + w.stores + ' فرع-شهر</span></td></tr>';
-    rows.forEach(function (x, i) { var evPct = x.avgEval * 100, c = mgrPctColor(evPct); html += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px 12px;padding-left:28px;font-size:12px;font-weight:600;color:#374151">' + (labels[x.month] || x.month) + ' ' + x.month.split('-')[1] + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;color:#6b7280">' + x.region + '</td><td style="padding:8px 12px;text-align:center;font-size:12px">' + x.stores + '</td><td style="padding:8px 12px;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;background:' + c + '18;color:' + c + '">' + evPct.toFixed(2) + '%</span></td><td style="padding:8px 12px;text-align:center;font-size:12px">' + (x.avgAch != null ? (x.avgAch * 100).toFixed(2) + '%' : '—') + '</td><td style="padding:8px 12px;text-align:center;font-size:12px">' + x.avgMob.toFixed(2) + '</td><td style="padding:8px 12px;text-align:center;font-size:12px">' + x.avgMix.toFixed(2) + '</td></tr>'; });
-    html += '<tr style="background:#ede9fe;border-top:2px solid #ddd6fe"><td style="padding:8px 12px;font-size:12px;font-weight:800;color:#5E2D91">Average — ' + m + '</td><td style="padding:8px 12px;text-align:center;font-size:12px">' + rows[0].region + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">' + w.stores + '</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:800">' + w.avgEval.toFixed(2) + '%</td><td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700">' + w.avgAch.toFixed(2) + '%</td><td colspan="2" style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280">متوسط موزون بعدد الفروع</td></tr>';
-  });
-  html += '</tbody></table>'; el.innerHTML = html;
-}
-function mgrLoadExcelJS() {
-  if (window.ExcelJS) return Promise.resolve();
-  return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = function () { window.ExcelJS ? res() : rej(new Error('ExcelJS not available')); }; s.onerror = function () { rej(new Error('تعذر تحميل مكتبة التصدير (تأكد من الإنترنت)')); }; document.head.appendChild(s); });
-}
-function mgrStyleHeader(row) { row.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5E2D91' } }; cell.font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cell.border = { left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } }, top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } }; }); }
-async function mgrExportDetail(btn) {
-  var old = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
-  try {
-    var joined = mgrBuildJoinedRows();
-    if (!joined.length) { alert('⚠️ مفيش بيانات لسه — ارفع Evaluation أو سجّل دخول وحمّل بيانات الفروع أولاً'); return; }
-    var filtered = mgrDetailFiltered(joined);
-    if (!filtered.length) { alert('⚠️ لا توجد بيانات مطابقة للفلاتر الحالية'); return; }
-    await mgrLoadExcelJS();
-    var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
-    var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
-    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
-    var byMgr = {}; filtered.forEach(function (r) { var m = mgrDetailMgr(r) || '— (no manager)'; (byMgr[m] = byMgr[m] || []).push(r); });
-    var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrDetailWeighted(byMgr[a]), wb2 = mgrDetailWeighted(byMgr[b]); var pa = wa.totalT ? wa.totalA / wa.totalT : -1, pb = wb2.totalT ? wb2.totalA / wb2.totalT : -1; return pb - pa; });
-    var ws = wb.addWorksheet('Detail by Branch');
-    var headers = ['Level', 'Manager', 'Branch Manager', 'Branch', 'Store Code', 'Region', 'Month'];
-    MGR_PRODUCTS.forEach(function (p) { headers.push(p.label + ' Target', p.label + ' Ach', p.label + ' Ach%'); });
-    headers.push('Total Evaluation %', 'Eval Ach. Activation %', 'Eval Mobile /35', 'Eval Sales Mix /30', 'Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
-    ws.columns = headers.map(function (h, i) { return { width: i === 1 || i === 2 || i === 3 ? 28 : 14 }; }); ws.columns[6].width = 16;
-    ws.mergeCells('A1:' + ws.getColumn(headers.length).letter + '1'); var t = ws.getCell('A1'); t.value = 'FAKHARANY360 — Managers Detail by Branch (Month x Manager x Branch) — joined by Store Code + Month — ' + mgrLevelLabel(); t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-    var hr = ws.addRow(headers); mgrStyleHeader(hr); ws.autoFilter = 'A2:' + ws.getColumn(headers.length).letter + '2'; ws.views = [{ state: 'frozen', ySplit: 2 }];
-    mgrNames.forEach(function (m) {
-      var rows = byMgr[m].slice().sort(function (a, b) { var d = order.indexOf(a.month) - order.indexOf(b.month); return d !== 0 ? d : (a.branch < b.branch ? -1 : (a.branch > b.branch ? 1 : 0)); });
-      rows.forEach(function (x, i) {
-        var row = [mgrLevelLabel(), m, x.branchMgr || null, x.branch || null, x.storeCode, x.region || null, (labels[x.month] || x.month) + ' ' + x.month.split('-')[1]];
-        MGR_PRODUCTS.forEach(function (p) { row.push(x.hasDash ? x[p.key + 'T'] : null, x.hasDash ? x[p.key + 'A'] : null, (x.hasDash && x[p.key + 'T']) ? x[p.key + 'A'] / x[p.key + 'T'] : null); });
-        var mixTot = x.low + x.mid + x.high;
-        row.push(x.eval != null ? x.eval : null, (x.evalAch != null && !isNaN(x.evalAch)) ? x.evalAch : null, (x.evalMob != null && !isNaN(x.evalMob)) ? x.evalMob : null, (x.evalMix != null && !isNaN(x.evalMix)) ? x.evalMix : null, x.hasDash ? x.low : null, x.hasDash ? x.mid : null, x.hasDash ? x.high : null, x.hasDash ? x.pt12 : null, mixTot ? x.low / mixTot : null, mixTot ? x.mid / mixTot : null, mixTot ? x.high / mixTot : null);
-        var r = ws.addRow(row);
-        MGR_PRODUCTS.forEach(function (p, pi) { var c = r.getCell(10 + pi * 3); if (c.value != null) c.numFmt = '0.00%'; });
-        [26, 27, 34, 35, 36].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
-        r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
-      });
-    });
-    var ws2 = wb.addWorksheet('Summary by Manager');
-    var h2 = ['Level', 'Manager', 'Months', 'Branches', 'Store-months', 'Total Target', 'Total Ach', 'Total Ach%']; MGR_PRODUCTS.forEach(function (p) { h2.push(p.label + ' Ach%'); }); h2.push('Avg Evaluation %', 'Low%', 'Mid%', 'High%');
-    ws2.columns = h2.map(function () { return { width: 15 }; }); ws2.columns[1].width = 28;
-    ws2.mergeCells('A1:' + ws2.getColumn(h2.length).letter + '1'); var t2 = ws2.getCell('A1'); t2.value = 'FAKHARANY360 — Managers Summary (Overall)'; t2.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-    var hr2 = ws2.addRow(h2); mgrStyleHeader(hr2); ws2.autoFilter = 'A2:' + ws2.getColumn(h2.length).letter + '2'; ws2.views = [{ state: 'frozen', ySplit: 2 }];
-    mgrNames.forEach(function (m, i) { var rows = byMgr[m]; var w = mgrDetailWeighted(rows); var monthsSet = {}; rows.forEach(function (r) { monthsSet[r.month] = 1; }); var mixTot = w.low + w.mid + w.high; var row = [mgrLevelLabel(), m, Object.keys(monthsSet).length, w.branchCount, w.n, w.totalT, w.totalA, w.totalT ? w.totalA / w.totalT : null]; MGR_PRODUCTS.forEach(function (p) { row.push(w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : null); }); row.push(w.avgEval != null ? w.avgEval / 100 : null, mixTot ? w.low / mixTot : null, mixTot ? w.mid / mixTot : null, mixTot ? w.high / mixTot : null); var r = ws2.addRow(row); r.getCell(8).numFmt = '0.00%'; for (var ci = 9; ci < 9 + MGR_PRODUCTS.length + 4; ci++) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; } r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; }); });
-    var ws3 = wb.addWorksheet('Summary by Branch');
-    var h3 = ['Level', 'Manager', 'Branch Manager', 'Branch', 'Store Code', 'Region', 'Months', 'Store-months', 'Total Target', 'Total Ach', 'Total Ach%']; MGR_PRODUCTS.forEach(function (p) { h3.push(p.label + ' Ach%'); }); h3.push('Avg Evaluation %');
-    ws3.columns = h3.map(function () { return { width: 15 }; }); ws3.columns[1].width = 28; ws3.columns[2].width = 28; ws3.columns[3].width = 28;
-    ws3.mergeCells('A1:' + ws3.getColumn(h3.length).letter + '1'); var t3 = ws3.getCell('A1'); t3.value = 'FAKHARANY360 — Branches Summary (Overall by Manager x Branch)'; t3.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-    var hr3 = ws3.addRow(h3); mgrStyleHeader(hr3); ws3.autoFilter = 'A2:' + ws3.getColumn(h3.length).letter + '2'; ws3.views = [{ state: 'frozen', ySplit: 2 }];
-    var byBranch = {}; filtered.forEach(function (r) { var k = (mgrDetailMgr(r) || '—') + '|' + r.storeCode; (byBranch[k] = byBranch[k] || []).push(r); });
-    Object.keys(byBranch).sort().forEach(function (k, i) { var rows = byBranch[k]; var w = mgrDetailWeighted(rows); var monthsSet = {}; var bm = '', br = '', rg = ''; rows.forEach(function (r) { monthsSet[r.month] = 1; if (r.branchMgr) bm = r.branchMgr; if (r.branch) br = r.branch; if (r.region) rg = r.region; }); var row = [mgrLevelLabel(), mgrDetailMgr(rows[0]) || '—', bm || null, br || null, rows[0].storeCode, rg || null, Object.keys(monthsSet).length, w.n, w.totalT, w.totalA, w.totalT ? w.totalA / w.totalT : null]; MGR_PRODUCTS.forEach(function (p) { row.push(w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : null); }); row.push(w.avgEval != null ? w.avgEval / 100 : null); var r = ws3.addRow(row); r.getCell(11).numFmt = '0.00%'; for (var cj = 12; cj < 12 + MGR_PRODUCTS.length + 1; cj++) { var c = r.getCell(cj); if (c.value != null) c.numFmt = '0.00%'; } r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; }); });
-    var buf = await wb.xlsx.writeBuffer(); var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'Managers_Detail_by_Branch_' + stamp + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  } catch (e) { console.error('[Managers detail export]', e); alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e)); }
-  finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
-}
-
-async function mgrExportExcel(btn) {
-  if (MGR_VIEWMODE === 'detail') { return mgrExportDetail(btn); }
-  var old = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
-  try {
-    if (MGR_SOURCE === 'evaluation' && !MGR_EVAL.loaded) { alert('⚠️ ارفع ملف Evaluation أولاً'); return; }
-    if (MGR_SOURCE === 'branch' && !(typeof RAW_DATA !== 'undefined' && RAW_DATA.length)) { alert('⚠️ مفيش بيانات فروع محمّلة — سجّل دخول وحمّل البيانات أولاً'); return; }
-    await mgrLoadExcelJS();
-    var order = (typeof MONTH_ORDER !== 'undefined') ? MONTH_ORDER : ['01-2026','02-2026','03-2026','04-2026','05-2026','06-2026','07-2026','08-2026','09-2026','10-2026','11-2026','12-2026'];
-    var labels = (typeof MONTH_LABELS !== 'undefined') ? MONTH_LABELS : {};
-    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
-    if (MGR_SOURCE === 'branch') {
-      var agg = mgrBranchAgg(); var byMgr = {}; agg.forEach(function (a) { (byMgr[a.manager] = byMgr[a.manager] || []).push(a); });
-      var mgrNames = Object.keys(byMgr).sort(function (a, b) { var wa = mgrBranchWeighted(byMgr[a]); var wb2 = mgrBranchWeighted(byMgr[b]); return (wb2.totalA / (wb2.totalT || 1)) - (wa.totalA / (wa.totalT || 1)); });
-      var ws = wb.addWorksheet('Managers by Month');
-      var headers = ['Level', 'Manager', 'Month', 'Stores', 'Total Target', 'Total Ach', 'Total Ach%'];
-      MGR_PRODUCTS.forEach(function (p) { headers.push(p.label + ' Target', p.label + ' Ach', p.label + ' Ach%'); });
-      headers.push('Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
-      ws.columns = headers.map(function (h, i) { return { width: i < 3 ? 18 : 13 }; }); ws.columns[1].width = 28;
-      ws.mergeCells('A1:' + String.fromCharCode(64 + Math.min(headers.length, 26)) + '1'); var t = ws.getCell('A1'); t.value = 'FAKHARANY360 — Managers Branch Performance by Month — ' + mgrLevelLabel(); t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-      var hr = ws.addRow(headers); mgrStyleHeader(hr); ws.autoFilter = 'A2:' + ws.getColumn(headers.length).letter + '2'; ws.views = [{ state: 'frozen', ySplit: 2 }];
-      mgrNames.forEach(function (m, mi) {
-        var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); });
-        rows.forEach(function (x, i) {
-          var row = [mgrLevelLabel(), m, (labels[x.month] || x.month) + ' ' + x.month.split('-')[1], x.storeCount, x.totalT, x.totalA, x.totalT ? x.totalA / x.totalT : 0];
-          MGR_PRODUCTS.forEach(function (p) { row.push(x[p.key + 'T'], x[p.key + 'A'], x[p.key + 'T'] ? x[p.key + 'A'] / x[p.key + 'T'] : 0); });
-          var mixTot = x.low + x.mid + x.high; row.push(x.low, x.mid, x.high, x.pt12, mixTot ? x.low / mixTot : 0, mixTot ? x.mid / mixTot : 0, mixTot ? x.high / mixTot : 0);
-          var r = ws.addRow(row); r.getCell(7).numFmt = '0.00%'; var ci = 10; MGR_PRODUCTS.forEach(function () { r.getCell(ci).numFmt = '0.00%'; ci += 3; }); r.getCell(headers.length - 2).numFmt = '0.00%'; r.getCell(headers.length - 1).numFmt = '0.00%'; r.getCell(headers.length).numFmt = '0.00%';
-          r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
-        });
-        var w = mgrBranchWeighted(rows); var wPc = w.totalT ? w.totalA / w.totalT : 0; var wMix = w.low + w.mid + w.high;
-        var srow = [mgrLevelLabel(), 'Average — ' + m, rows.length + ' months', w.stores, w.totalT, w.totalA, wPc];
-        MGR_PRODUCTS.forEach(function (p) { srow.push(w[p.key + 'T'], w[p.key + 'A'], w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : 0); });
-        srow.push(w.low, w.mid, w.high, w.pt12, wMix ? w.low / wMix : 0, wMix ? w.mid / wMix : 0, wMix ? w.high / wMix : 0);
-        var sr = ws.addRow(srow); sr.getCell(7).numFmt = '0.00%'; var cj = 10; MGR_PRODUCTS.forEach(function () { sr.getCell(cj).numFmt = '0.00%'; cj += 3; }); sr.getCell(headers.length - 2).numFmt = '0.00%'; sr.getCell(headers.length - 1).numFmt = '0.00%'; sr.getCell(headers.length).numFmt = '0.00%';
-        sr.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } }; cell.font = { name: 'Calibri', bold: true, size: 11 }; });
-      });
-      var ws2 = wb.addWorksheet('Summary by Manager');
-      var h2 = ['Level', 'Manager', 'Months', 'Store-months', 'Total Target', 'Total Ach', 'Total Ach%']; MGR_PRODUCTS.forEach(function (p) { h2.push(p.label + ' Ach%'); }); h2.push('Best Month', 'Worst Month');
-      ws2.columns = h2.map(function () { return { width: 16 }; }); ws2.columns[1].width = 28;
-      ws2.mergeCells('A1:I1'); var t2 = ws2.getCell('A1'); t2.value = 'FAKHARANY360 — Managers Branch Summary'; t2.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-      var hr2 = ws2.addRow(h2); mgrStyleHeader(hr2); ws2.autoFilter = 'A2:I2'; ws2.views = [{ state: 'frozen', ySplit: 2 }];
-      mgrNames.forEach(function (m, i) {
-        var rows = byMgr[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); }); var w = mgrBranchWeighted(rows);
-        var best = rows.slice().sort(function (a, b) { return (b.totalA / (b.totalT || 1)) - (a.totalA / (a.totalT || 1)); })[0]; var worst = rows.slice().sort(function (a, b) { return (a.totalA / (a.totalT || 1)) - (b.totalA / (b.totalT || 1)); })[0];
-        var row = [mgrLevelLabel(), m, rows.length, w.stores, w.totalT, w.totalA, w.totalT ? w.totalA / w.totalT : 0];
-        MGR_PRODUCTS.forEach(function (p) { row.push(w[p.key + 'T'] ? w[p.key + 'A'] / w[p.key + 'T'] : 0); });
-        row.push((labels[best.month] || best.month) + ' ' + best.month.split('-')[1], (labels[worst.month] || worst.month) + ' ' + worst.month.split('-')[1]);
-        var r = ws2.addRow(row); r.getCell(7).numFmt = '0.00%'; for (var ci2 = 8; ci2 < 8 + MGR_PRODUCTS.length; ci2++) r.getCell(ci2).numFmt = '0.00%';
-        r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
-      });
+    html += '</div>';
+    if (c['08-2026'] === 0) {
+      html += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:10px"><b>شهر 8 مش موجود في البيانات المحمّلة نفسها (0 صف).</b> يعني المشكلة مش في عرض التاب ولا في الداشبورد — ملف إغلاق أغسطس (Mobile أو WE Pay) على الأغلب لسه ما اترفعش/ما اتزامنش على Supabase، لأن سكربت الإغلاق بيتخطى الشهر لو ناقصه واحد من الملفين. لو رفعت ملف أغسطس وعملت Refresh للبيانات، الشهر هيظهر هنا تلقائيا من غير أي تعديل في الملف.</div>';
     } else {
-      var filtered = mgrEvalAggFiltered(); var byMgrE = {}; filtered.forEach(function (a) { (byMgrE[a.manager] = byMgrE[a.manager] || []).push(a); });
-      var mgrNamesE = Object.keys(byMgrE).sort(function (a, b) { return mgrEvalWeighted(byMgrE[b]).avgEval - mgrEvalWeighted(byMgrE[a]).avgEval; });
-      var wsE = wb.addWorksheet('Managers by Month'); wsE.columns = [{ width: 11 }, { width: 32 }, { width: 16 }, { width: 12 }, { width: 9 }, { width: 16 }, { width: 19 }, { width: 16 }, { width: 18 }];
-      wsE.mergeCells('A1:I1'); var tE = wsE.getCell('A1'); tE.value = 'FAKHARANY360 — Managers Evaluation by Month — Source: ' + MGR_EVAL.fileName; tE.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
-      var hrE = wsE.addRow(['Level', 'Manager', 'Region', 'Month', 'Stores', 'Avg Evaluation', 'Avg Ach. Activation', 'Avg Mobile ( /35)', 'Avg Sales Mix ( /30)']); mgrStyleHeader(hrE); wsE.autoFilter = 'A2:I2'; wsE.views = [{ state: 'frozen', ySplit: 2 }];
-      mgrNamesE.forEach(function (m) { var rows = byMgrE[m].slice().sort(function (a, b) { return order.indexOf(a.month) - order.indexOf(b.month); }); rows.forEach(function (x, i) { var r = wsE.addRow([x.level, x.manager, x.region, (labels[x.month] || x.month) + ' ' + x.month.split('-')[1], x.stores, x.avgEval, x.avgAch, Math.round(x.avgMob * 100) / 100, Math.round(x.avgMix * 100) / 100]); r.getCell(6).numFmt = '0.00%'; r.getCell(7).numFmt = '0.00%'; r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; }); }); var wE = mgrEvalWeighted(rows); var srE = wsE.addRow([mgrLevelLabel(), 'Average — ' + m, rows[0].region, rows.length + ' months', wE.stores, wE.avgEval / 100, wE.avgAch / 100, null, null]); srE.getCell(6).numFmt = '0.00%'; srE.getCell(7).numFmt = '0.00%'; srE.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3E8FF' } }; cell.font = { name: 'Calibri', bold: true, size: 11 }; }); });
+      html += '<div style="background:#ecfdf5;border:1px solid #22c55e;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:10px">شهر 8 موجود في البيانات المحمّلة (' + c['08-2026'].toLocaleString('en-US') + ' صف). لو كان بيظهر ويختفي في النسخ القديمة، فده كان تهنيج/تحميل جزئي — التاب الجديد خفيف ومش بيرسم غير صف واحد لكل مدير.</div>';
     }
-    var buf = await wb.xlsx.writeBuffer(); var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'Managers_Performance_' + MGR_SOURCE + '_' + stamp + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  } catch (e) { console.error('[Managers export]', e); alert('❌ فشل التصدير: ' + (e && e.message ? e.message : e)); }
-  finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
+    monthsEl.innerHTML = html;
+  }
+  var q = mgrsNorm(MGRS_SEARCH).toLowerCase();
+  var arr = mgrsAggregate().filter(function (d) { return !q || d.manager.toLowerCase().indexOf(q) >= 0; });
+  if (!arr.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للبحث الحالي.</div>';
+    if (kpi) kpi.innerHTML = '';
+    return;
+  }
+  if (kpi) {
+    kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + arr.length + '</b> مدير (' + mgrsLevelLabel() + ') · الفترة يناير–سبتمبر 2026 · مرتّب من الأعلى % إجمالي للأقل · الأرقام على أساس Sales.</div>';
+  }
+  var th = 'padding:9px 8px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
+  var html2 = '<table style="width:100%;border-collapse:collapse;min-width:980px"><thead><tr>' +
+    '<th style="' + th + ';background:#5E2D91">#</th><th style="' + th + ';background:#5E2D91;text-align:right">المدير</th><th style="' + th + ';background:#5E2D91">فروع</th><th style="' + th + ';background:#5E2D91">شهور</th><th style="' + th + ';background:#5E2D91">إجمالي %</th><th style="' + th + ';background:#5E2D91">إجمالي Gap</th>' +
+    PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + mgrsProductLabel(p) + ' %<div style="font-size:10px;font-weight:400">Gap عدد / نسبة</div></th>'; }).join('') +
+    '<th style="' + th + ';background:#5E2D91">Low<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">Mid<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">High<div style="font-size:10px;font-weight:400">عدد / حصة</div></th></tr></thead><tbody>';
+  arr.forEach(function (d, i) {
+    var mixTot = d.low + d.mid + d.high;
+    html2 += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px;text-align:center;font-size:12px">' + (i + 1) + '</td><td style="padding:8px;font-size:12px;font-weight:700">' + d.manager + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.branchCount + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.monthCount + '</td>' +
+      '<td style="padding:8px;text-align:center"><span style="font-size:12px;font-weight:800;color:' + mgrsPctColor(d.totalPct) + '">' + (d.totalPct == null ? '—' : d.totalPct.toFixed(1) + '%') + '</span></td>' +
+      '<td style="padding:8px;text-align:center;font-size:12px">' + (d.totalT ? (d.totalT - d.totalA).toLocaleString('en-US') + '<div style="font-size:10px;color:#6b7280">' + (100 - d.totalPct).toFixed(1) + '%</div>' : '—') + '</td>' +
+      PRODUCTS.map(function (p) {
+        var t = d[p.key + 'T'], a = d[p.key + 'A'];
+        if (!t) return '<td style="padding:8px;text-align:center;font-size:12px;color:#9ca3af">—</td>';
+        var pc = a / t * 100, gap = t - a, gp = gap / t * 100;
+        return '<td style="padding:8px;text-align:center"><span style="font-size:12px;font-weight:800;color:' + mgrsPctColor(pc) + '">' + pc.toFixed(1) + '%</span><div style="font-size:10px;color:#6b7280">' + gap.toLocaleString('en-US') + ' / ' + gp.toFixed(1) + '%</div></td>';
+      }).join('') +
+      [['low', d.low], ['mid', d.mid], ['high', d.high]].map(function (pair) {
+        return '<td style="padding:8px;text-align:center;font-size:12px">' + pair[1].toLocaleString('en-US') + '<div style="font-size:10px;color:#6b7280">' + (mixTot ? (pair[1] / mixTot * 100).toFixed(1) + '%' : '—') + '</div></td>';
+      }).join('') + '</tr>';
+  });
+  html2 += '</tbody></table>';
+  el.innerHTML = html2;
+}
+function mgrsLoadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise(function (res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = function () { window.ExcelJS ? res() : rej(new Error('ExcelJS not available')); };
+    s.onerror = function () { rej(new Error('تعذر تحميل مكتبة التصدير — تأكد من الإنترنت')); };
+    document.head.appendChild(s);
+  });
+}
+function mgrsStyleHeader(row) {
+  row.eachCell(function (cell) {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5E2D91' } };
+    cell.font = { name: 'Calibri', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } }, top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+  });
+}
+async function mgrsExportExcel(btn) {
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Exporting…'; }
+  try {
+    var q = mgrsNorm(MGRS_SEARCH).toLowerCase();
+    var arr = mgrsAggregate().filter(function (d) { return !q || d.manager.toLowerCase().indexOf(q) >= 0; });
+    if (!arr.length) { alert('مفيش بيانات للتصدير — سجّل دخول وحمّل البيانات أولاً'); return; }
+    await mgrsLoadExcelJS();
+    var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
+    var ws = wb.addWorksheet('Managers Jan-Sep 2026');
+    var headers = ['#', 'Manager', 'Level', 'Branches', 'Store-months', 'Months present', 'Total Target', 'Total Ach', 'Total Ach%', 'Total Gap (count)', 'Total Gap %'];
+    PRODUCTS.forEach(function (p) { headers.push(mgrsProductLabel(p) + ' Target', mgrsProductLabel(p) + ' Ach', mgrsProductLabel(p) + ' Ach%', mgrsProductLabel(p) + ' Gap (count)', mgrsProductLabel(p) + ' Gap %'); });
+    headers.push('Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
+    ws.columns = headers.map(function (h, i) { return { width: i === 1 ? 32 : 14 }; });
+    ws.mergeCells('A1:' + ws.getColumn(headers.length).letter + '1');
+    var t = ws.getCell('A1');
+    t.value = 'FAKHARANY360 — Managers Jan-Sep 2026 — ' + mgrsLevelLabel() + ' — Sales basis — Gap = Target - Ach';
+    t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
+    var hr = ws.addRow(headers); mgrsStyleHeader(hr);
+    ws.autoFilter = 'A2:' + ws.getColumn(headers.length).letter + '2';
+    ws.views = [{ state: 'frozen', ySplit: 2 }];
+    arr.forEach(function (d, i) {
+      var mixTot = d.low + d.mid + d.high;
+      var row = [i + 1, d.manager, mgrsLevelLabel(), d.branchCount, d.rows, d.monthCount, d.totalT, d.totalA, d.totalT ? d.totalA / d.totalT : null, d.totalT - d.totalA, d.totalT ? (d.totalT - d.totalA) / d.totalT : null];
+      PRODUCTS.forEach(function (p) { var tt = d[p.key + 'T'], aa = d[p.key + 'A']; row.push(tt, aa, tt ? aa / tt : null, tt - aa, tt ? (tt - aa) / tt : null); });
+      row.push(d.low, d.mid, d.high, d.pt12, mixTot ? d.low / mixTot : null, mixTot ? d.mid / mixTot : null, mixTot ? d.high / mixTot : null);
+      var r = ws.addRow(row);
+      [9, 11].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
+      PRODUCTS.forEach(function (p, pi) { var c = r.getCell(14 + pi * 5); if (c.value != null) c.numFmt = '0.00%'; var c2 = r.getCell(16 + pi * 5); if (c2.value != null) c2.numFmt = '0.00%'; });
+      [headers.length - 2, headers.length - 1, headers.length].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
+      r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
+    });
+    var ws2 = wb.addWorksheet('Read me');
+    ws2.columns = [{ width: 22 }, { width: 90 }];
+    var c = mgrsMonthsCount();
+    var info = [
+      ['Period', 'January - September 2026 (01-2026 to 09-2026)'],
+      ['Manager level', mgrsLevelLabel()],
+      ['Basis', 'Sales (dashboard default). Mobile / FBB / Fixed use Sales numbers, not Activation.'],
+      ['Total %', 'Sum of Ach across all 6 products / Sum of Target across all 6 products.'],
+      ['Gap (count)', 'Target - Ach. Positive = shortfall, negative = over target.'],
+      ['Gap %', 'Gap (count) / Target. Equals 100% - Ach%.'],
+      ['Tariffs', 'Low = tariffs 25,29,32,37; Mid = 40,45,46,52; High = 50+. % = share of Low+Mid+High. 12PT is a volume column only.'],
+      ['Products', 'Mobile, WE Gold, ADSL (FBB), Fixed, Wallet, WE Air.'],
+      ['Rows loaded', (typeof RAW_DATA !== 'undefined' ? RAW_DATA.length : 0) + ' store-month rows in total (all months in source).']
+    ];
+    MGRS_MONTHS.forEach(function (m) { info.push(['Month ' + MGRS_MONTH_NAMES[m] + ' 2026', c[m] + ' store rows']); });
+    info.push(['August note', c['08-2026'] === 0 ? 'August has 0 rows in the loaded data — see the warning on the Managers tab.' : 'August has ' + c['08-2026'] + ' rows in the loaded data.']);
+    ws2.addRow(['FAKHARANY360 — Managers Jan-Sep 2026 — Read me']);
+    info.forEach(function (pair) { ws2.addRow(pair); });
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'Managers_Jan-Sep_2026_' + MGRS_LEVEL + '_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    console.error('[Managers simple export]', e);
+    alert('فشل التصدير: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
 }
 </script>
+
 
 </body>
 </html>
