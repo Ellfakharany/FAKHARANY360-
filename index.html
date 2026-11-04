@@ -1388,24 +1388,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- MANAGERS TAB — Simple Jan-Sep report (v4, in same index.html) -->
     <div id="tab-managers" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers — يناير إلى سبتمبر 2026 (تقرير مبسط + اسم مدير الفرع)</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">صف واحد لكل مدير، مجمّع من يناير لسبتمبر 2026، من بيانات الداشبورد المحمّلة بعد الدخول — ومن غير تفاصيل فروع أو شهور، عشان التاب يفضل خفيف ومش يهنّج. لكل مدير: % الإنجاز + الـ Gap (عدد ونسبة) في كل منتج أساسي، + التاريف Low / Mid / High، + <b>أسماء مديري الفروع</b> التابعين له (من شيت Evaluation، بربط كود الفرع — ارفعه مرة واحدة بس، وهيتحفظ في المتصفح بتاعك).</div>
+      <div class="section-title"><i class="fas fa-users mr-2"></i>Managers — يناير إلى سبتمبر 2026</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">جدول عادي (مش Pivot): صف واحد لكل مدير، وأداءه ظاهر على طول — % + Gap لكل منتج + التاريف. الفلاتر فوق بتختار الشهر والتسلسل، والجدول تحت بيتغير معاهم. أسماء مديري الفروع مش مكتوبة كتلة نص في الجدول تاني — هتلاقي عددهم بس، ودوس "عرض" عشان تشوفهم في لوحة تحت الجدول. البحث بيطابق اسم المدير، أو اسم مدير الفرع، أو اسم الفرع، أو رقم Oracle (من Evaluation).</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
-        <div class="filter-group"><label class="filter-label">مستوى المدير</label><select id="mgrs-level" onchange="mgrsSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
-        <div class="filter-group"><label class="filter-label">بحث باسم المدير</label><input id="mgrs-search" oninput="mgrsSetSearch(this.value)" class="filter-select" placeholder="اكتب جزء من اسم المدير…" style="min-width:220px"></div>
+        <div class="filter-group"><label class="filter-label">الشهر</label><select id="mgrs-month" onchange="mgrsSetMonth(this.value)" class="filter-select"><option value="all">كل الشهور (يناير–سبتمبر)</option><option value="01-2026">يناير 2026</option><option value="02-2026">فبراير 2026</option><option value="03-2026">مارس 2026</option><option value="04-2026">أبريل 2026</option><option value="05-2026">مايو 2026</option><option value="06-2026">يونيو 2026</option><option value="07-2026">يوليو 2026</option><option value="08-2026">أغسطس 2026</option><option value="09-2026">سبتمبر 2026</option></select></div>
+        <div class="filter-group"><label class="filter-label">مستوى العرض</label><select id="mgrs-level" onchange="mgrsSetLevel(this.value)" class="filter-select"><option value="area">Area Manager</option><option value="regional">Regional Manager</option><option value="supervisor">Supervisor</option></select></div>
+        <div class="filter-group"><label class="filter-label">Regional Manager</label><select id="mgrs-region" onchange="mgrsSetRegion(this.value)" class="filter-select"><option value="">كل الـ Regional</option></select></div>
+        <div class="filter-group"><label class="filter-label">Supervisor</label><select id="mgrs-supervisor" onchange="mgrsSetSupervisor(this.value)" class="filter-select"><option value="">كل الـ Supervisors</option></select></div>
+        <div class="filter-group"><label class="filter-label">Area Manager</label><select id="mgrs-area" onchange="mgrsSetArea(this.value)" class="filter-select"><option value="">كل الـ Area Managers</option></select></div>
+        <div class="filter-group"><label class="filter-label">بحث</label><input id="mgrs-search" oninput="mgrsSetSearch(this.value)" class="filter-select" placeholder="اسم مدير، مدير فرع، اسم فرع، أو رقم Oracle…" style="min-width:260px"></div>
         <button onclick="mgrsReset()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
         <button onclick="mgrsExportExcel(this)" style="padding:8px 18px;background:linear-gradient(135deg,#217346,#1e8449);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-export mr-1"></i>تصدير Excel للإرسال للمديرين</button>
         <button onclick="document.getElementById('mgrs-eval-input').click()" style="padding:8px 18px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>رفع Evaluation (لأسماء مديري الفروع)</button>
         <input type="file" id="mgrs-eval-input" accept=".xlsx,.xls" style="display:none" onchange="mgrsLoadEvaluation(this.files[0])">
-        <span id="mgrs-eval-status" style="font-size:11px;color:#6b7280">لسه ما اترفعش Evaluation — عمود مدير الفرع هيظهر “—” لحد ما ترفعه مرة واحدة.</span>
+        <span id="mgrs-eval-status" style="font-size:11px;color:#6b7280">لسه ما اترفعش Evaluation — عدد مديري الفروع هيظهر 0، والبحث برقم Oracle واسم مدير الفرع مش هيشتغل لحد ما ترفعه مرة واحدة.</span>
         <span style="font-size:11px;color:#6b7280">التصدير فيه Target و Ach و % و Gap عدد ونسبة لكل منتج، + Low و Mid و High و 12PT، + شيت Read me.</span>
       </div>
       <div id="mgrs-months" style="margin-bottom:12px"></div>
       <div id="mgrs-kpis" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px"></div>
       <div id="mgrs-table" style="overflow:auto;border-radius:12px;border:1px solid #e5e7eb;background:white"></div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px">التعريفات: الفترة يناير–سبتمبر 2026 فقط (01-2026 إلى 09-2026). الأرقام على أساس Sales (الافتراضي في الداشبورد، مش Activation). الـ Gap = Target − Ach: موجب يعني عجز، سالب يعني زيادة عن التارجت. نسبة الـ Gap = Gap ÷ Target = 100% − Ach%. إجمالي % = مجموع Ach كل المنتجات ÷ مجموع Target كل المنتجات. التاريف: Low = شرائح 25،29،32،37 و Mid = 40،45،46،52 و High = 50+، والنسبة هي حصة كل شريحة من مجموع Low+Mid+High. ADSL هو نفسه FBB في الداشبورد. عمود مدير الفرع = أسماء Name المميزة من شيت Evaluation لفروع المدير (بربط كود الفرع)، وبيظهر بعد رفع Evaluation مرة واحدة وبيتحفظ في المتصفح بتاعك.</div>
+      <div id="mgrs-detail" style="margin-top:12px"></div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px">التعريفات: الفترة يناير–سبتمبر 2026 فقط (01-2026 إلى 09-2026). الأرقام على أساس Sales (الافتراضي في الداشبورد، مش Activation). الـ Gap = Target − Ach: موجب يعني عجز، سالب يعني زيادة عن التارجت. نسبة الـ Gap = Gap ÷ Target = 100% − Ach%. إجمالي % = مجموع Ach كل المنتجات ÷ مجموع Target كل المنتجات. التاريف: Low = شرائح 25،29،32،37 و Mid = 40،45،46،52 و High = 50+، والنسبة هي حصة كل شريحة من مجموع Low+Mid+High. ADSL هو نفسه FBB في الداشبورد. مديرو الفروع = أسماء Name المميزة من شيت Evaluation لفروع المدير (بربط كود الفرع)، وبيظهر عددهم في الجدول وتفاصيلهم في لوحة تحت الجدول بعد دوسة "عرض" — وبيتحفظوا في المتصفح بتاعك بعد رفع Evaluation مرة واحدة. البحث برقم Oracle واسم مدير الفرع بيحتاج Evaluation مرفوع؛ البحث باسم الفرع بيشتغل من اسم الفرع في الداشبورد نفسه حتى من غير Evaluation.</div>
     </div>
 
     <!-- HEATMAP TAB -->
@@ -11833,7 +11838,13 @@ function mtdNwRenderExtras() {
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════════════
-// MANAGERS — SIMPLE JAN-SEP REPORT v5 (in the same index.html).
+// MANAGERS — SIMPLE JAN-SEP REPORT v6 (in the same index.html).
+// v6 redesign after user feedback on v5: the Branch Managers column was a
+// giant text block that hid performance. Now the main table is FLAT (not a
+// pivot): one row per manager, performance columns visible. Filters above:
+// Month (All or one month), Level, Regional > Supervisor > Area (cascading),
+// Search by manager / branch manager / branch / Oracle ID. Branch managers
+// are shown only on demand in a detail panel below the table.
 // v5 adds Branch Manager names (Evaluation Name, linked by Store Code) as ONE
 // column per manager row — no branch rows, so the tab stays light.
 // Replaces the v2/v3 Managers tab (aggregates by month, detail by branch,
@@ -11850,6 +11861,13 @@ function mtdNwRenderExtras() {
 // ════════════════════════════════════════════════════════════════════════════
 var MGRS_LEVEL = 'area';
 var MGRS_SEARCH = '';
+var MGRS_MONTH_FILTER = 'all';
+var MGRS_REGION = '';
+var MGRS_SUPERVISOR = '';
+var MGRS_AREA = '';
+var MGRS_LAST_ROWS = [];
+var MGRS_DETAIL_INDEX = -1;
+var MGRS_EVAL_ORACLE_OK = false;
 var MGRS_EVAL_MAP = {}; // storeCode -> {names:{}, branches:{}} from Evaluation, Jan-Sep sheets only
 var MGRS_EVAL_LOADED = false;
 var MGRS_EVAL_FILE = '';
@@ -11861,9 +11879,36 @@ function mgrsLevelField() { return MGRS_LEVEL === 'supervisor' ? 'supervisor' : 
 function mgrsLevelLabel() { return MGRS_LEVEL === 'supervisor' ? 'Supervisor' : (MGRS_LEVEL === 'area' ? 'Area Manager' : 'Regional Manager'); }
 function mgrsProductLabel(p) { return p.key === 'fbb' ? 'ADSL (FBB)' : p.label; }
 function mgrsPctColor(p) { return p == null ? '#9ca3af' : (p >= 100 ? '#16a34a' : (p >= 90 ? '#16a34a' : (p >= 70 ? '#d97706' : '#dc2626'))); }
-function mgrsSetLevel(v) { MGRS_LEVEL = v; renderManagers(); }
+function mgrsSetLevel(v) { MGRS_LEVEL = v; MGRS_DETAIL_INDEX = -1; renderManagers(); }
+function mgrsSetMonth(v) { MGRS_MONTH_FILTER = v || 'all'; MGRS_DETAIL_INDEX = -1; renderManagers(); }
+function mgrsSetRegion(v) { MGRS_REGION = v || ''; MGRS_SUPERVISOR = ''; MGRS_AREA = ''; MGRS_DETAIL_INDEX = -1; renderManagers(); }
+function mgrsSetSupervisor(v) { MGRS_SUPERVISOR = v || ''; MGRS_AREA = ''; MGRS_DETAIL_INDEX = -1; renderManagers(); }
+function mgrsSetArea(v) { MGRS_AREA = v || ''; MGRS_DETAIL_INDEX = -1; renderManagers(); }
 function mgrsSetSearch(v) { MGRS_SEARCH = v || ''; renderManagers(); }
-function mgrsReset() { MGRS_SEARCH = ''; var c = document.getElementById('mgrs-search'); if (c) c.value = ''; renderManagers(); }
+function mgrsReset() {
+  MGRS_SEARCH = ''; MGRS_MONTH_FILTER = 'all'; MGRS_REGION = ''; MGRS_SUPERVISOR = ''; MGRS_AREA = ''; MGRS_DETAIL_INDEX = -1;
+  var ids = { 'mgrs-search': '', 'mgrs-month': 'all', 'mgrs-region': '', 'mgrs-supervisor': '', 'mgrs-area': '' };
+  Object.keys(ids).forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ids[id]; });
+  renderManagers();
+}
+function mgrsFillSelect(id, values, current, allLabel) {
+  var el = document.getElementById(id); if (!el) return '';
+  var keep = values.indexOf(current) >= 0 ? current : '';
+  el.innerHTML = '<option value="">' + allLabel + '</option>' + values.map(function (v) { return '<option value="' + v.replace(/"/g, '&quot;') + '"' + (v === keep ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+  return keep;
+}
+function mgrsPopulateHierarchy() {
+  var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
+  var regions = {}, sups = {}, areas = {};
+  data.forEach(function (r) {
+    var rg = mgrsNorm(r.regionalManager); if (rg) regions[rg] = 1;
+    if (!MGRS_REGION || rg === MGRS_REGION) { var sv = mgrsNorm(r.supervisor); if (sv) sups[sv] = 1; }
+    if ((!MGRS_REGION || rg === MGRS_REGION) && (!MGRS_SUPERVISOR || mgrsNorm(r.supervisor) === MGRS_SUPERVISOR)) { var am = mgrsNorm(r.areaManager); if (am) areas[am] = 1; }
+  });
+  MGRS_REGION = mgrsFillSelect('mgrs-region', Object.keys(regions).sort(), MGRS_REGION, 'كل الـ Regional');
+  MGRS_SUPERVISOR = mgrsFillSelect('mgrs-supervisor', Object.keys(sups).sort(), MGRS_SUPERVISOR, 'كل الـ Supervisors');
+  MGRS_AREA = mgrsFillSelect('mgrs-area', Object.keys(areas).sort(), MGRS_AREA, 'كل الـ Area Managers');
+}
 function mgrsMonthsCount() {
   var c = {};
   MGRS_MONTHS.forEach(function (m) { c[m] = 0; });
@@ -11875,34 +11920,47 @@ function mgrsAggregate() {
   var map = {};
   (typeof RAW_DATA !== 'undefined' ? RAW_DATA : []).forEach(function (r) {
     if (MGRS_MONTHS.indexOf(r.month) < 0) return;
+    if (MGRS_MONTH_FILTER !== 'all' && r.month !== MGRS_MONTH_FILTER) return;
+    if (MGRS_REGION && mgrsNorm(r.regionalManager) !== MGRS_REGION) return;
+    if (MGRS_SUPERVISOR && mgrsNorm(r.supervisor) !== MGRS_SUPERVISOR) return;
+    if (MGRS_AREA && mgrsNorm(r.areaManager) !== MGRS_AREA) return;
     var mgr = mgrsNorm(r[f]); if (!mgr) return;
-    if (!map[mgr]) { var o = { manager: mgr, stores: {}, months: {}, rows: 0, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0 }; PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[mgr] = o; }
+    if (!map[mgr]) { var o = { manager: mgr, stores: {}, storeNames: {}, months: {}, regions: {}, supervisors: {}, areas: {}, rows: 0, totalT: 0, totalA: 0, low: 0, mid: 0, high: 0, pt12: 0 }; PRODUCTS.forEach(function (p) { o[p.key + 'T'] = 0; o[p.key + 'A'] = 0; }); map[mgr] = o; }
     var d = map[mgr];
-    d.rows++; d.stores[r.storeCode || r.store] = 1; d.months[r.month] = 1;
+    var code = r.storeCode || r.store;
+    d.rows++; d.stores[code] = 1; if (r.store && !d.storeNames[code]) d.storeNames[code] = r.store; d.months[r.month] = 1;
+    if (mgrsNorm(r.regionalManager)) d.regions[mgrsNorm(r.regionalManager)] = 1;
+    if (mgrsNorm(r.supervisor)) d.supervisors[mgrsNorm(r.supervisor)] = 1;
+    if (mgrsNorm(r.areaManager)) d.areas[mgrsNorm(r.areaManager)] = 1;
     PRODUCTS.forEach(function (p) { var t = mgrsNum(r[p.tKey]), a = mgrsNum(r[p.aKey]); d[p.key + 'T'] += t; d[p.key + 'A'] += a; d.totalT += t; d.totalA += a; });
     d.low += mgrsNum(r.lowT); d.mid += mgrsNum(r.midT); d.high += mgrsNum(r.highT); d.pt12 += mgrsNum(r.pt12);
   });
-  var arr = Object.keys(map).map(function (k) { var d = map[k]; d.branchCount = Object.keys(d.stores).length; d.monthCount = Object.keys(d.months).length; d.totalPct = d.totalT ? d.totalA / d.totalT * 100 : null; return d; });
+  var arr = Object.keys(map).map(function (k) { var d = map[k]; d.branchCount = Object.keys(d.stores).length; d.monthCount = Object.keys(d.months).length; d.totalPct = d.totalT ? d.totalA / d.totalT * 100 : null; d.regions = Object.keys(d.regions).sort(); d.supervisors = Object.keys(d.supervisors).sort(); d.areas = Object.keys(d.areas).sort(); return d; });
   arr.sort(function (a, b) { var pa = a.totalPct == null ? -1 : a.totalPct, pb = b.totalPct == null ? -1 : b.totalPct; return pb - pa; });
   return arr;
 }
 
 function mgrsSaveEvalMap() {
-  try { localStorage.setItem('mgrs_eval_map_v5', JSON.stringify({ file: MGRS_EVAL_FILE, map: MGRS_EVAL_MAP })); } catch (e) { /* storage full/blocked: session-only, still works */ }
+  try { localStorage.setItem('mgrs_eval_map_v6', JSON.stringify({ file: MGRS_EVAL_FILE, map: MGRS_EVAL_MAP })); } catch (e) { /* storage full/blocked: session-only, still works */ }
 }
 function mgrsLoadEvalMapFromStorage() {
   if (MGRS_EVAL_LOADED) return;
   try {
-    var raw = localStorage.getItem('mgrs_eval_map_v5');
+    var raw = localStorage.getItem('mgrs_eval_map_v6') || localStorage.getItem('mgrs_eval_map_v5');
     if (!raw) return;
     var parsed = JSON.parse(raw);
-    if (parsed && parsed.map) { MGRS_EVAL_MAP = parsed.map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = parsed.file || ''; }
+    if (parsed && parsed.map) {
+      MGRS_EVAL_MAP = parsed.map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = parsed.file || '';
+      MGRS_EVAL_ORACLE_OK = Object.keys(MGRS_EVAL_MAP).some(function (k) { var e = MGRS_EVAL_MAP[k]; return e && e.oracles && Object.keys(e.oracles).length; });
+    }
   } catch (e) { /* ignore corrupt storage */ }
 }
 function mgrsEvalStatusText() {
-  if (!MGRS_EVAL_LOADED) return 'لسه ما اترفعش Evaluation — عمود مدير الفرع هيظهر “—” لحد ما ترفعه مرة واحدة.';
+  if (!MGRS_EVAL_LOADED) return 'لسه ما اترفعش Evaluation — عدد مديري الفروع هيظهر 0، والبحث برقم Oracle واسم مدير الفرع مش هيشتغل لحد ما ترفعه مرة واحدة.';
   var codes = Object.keys(MGRS_EVAL_MAP).length;
-  return 'تم تحميل Evaluation' + (MGRS_EVAL_FILE ? ' (' + MGRS_EVAL_FILE + ')' : '') + ' — ' + codes + ' كود فرع ليهم اسم مدير فرع (محفوظ في المتصفح بتاعك، مش محتاج ترفعه تاني بعد الريلود).';
+  var base = 'تم تحميل Evaluation' + (MGRS_EVAL_FILE ? ' (' + MGRS_EVAL_FILE + ')' : '') + ' — ' + codes + ' كود فرع ليهم اسم مدير فرع (محفوظ في المتصفح بتاعك، مش محتاج ترفعه تاني بعد الريلود).';
+  if (!MGRS_EVAL_ORACLE_OK) base += ' للبحث برقم Oracle ارفع Evaluation تاني (النسخة المحفوظة القديمة مفيهاش Oracle).';
+  return base;
 }
 function mgrsMonthFromSheet(sn) {
   var map = { jan: '01-2026', feb: '02-2026', mar: '03-2026', apr: '04-2026', may: '05-2026', jun: '06-2026', jul: '07-2026', aug: '08-2026', sep: '09-2026' };
@@ -11930,18 +11988,20 @@ function mgrsLoadEvaluation(file) {
         var iStore = colIdx(function (h) { return h === 'store code'; });
         var iName = colIdx(function (h) { return h === 'name'; });
         var iBranch = colIdx(function (h) { return h.indexOf('branch name') >= 0; });
+        var iOracle = colIdx(function (h) { return h === 'oracle id'; });
         if (iStore < 0) return;
         for (var j = hdrIdx + 1; j < aoa.length; j++) {
           var row = aoa[j] || [];
           var code = mgrsNorm(row[iStore]).toUpperCase();
           if (!code) continue;
-          if (!map[code]) map[code] = { names: {}, branches: {} };
+          if (!map[code]) map[code] = { names: {}, branches: {}, oracles: {}, nameOracle: {} };
           if (iName >= 0) { var nm = mgrsNorm(row[iName]); if (nm) map[code].names[nm] = 1; }
           if (iBranch >= 0) { var br = mgrsNorm(row[iBranch]); if (br) map[code].branches[br] = 1; }
+          if (iOracle >= 0) { var oc = mgrsNorm(row[iOracle]); if (oc) { map[code].oracles[oc] = 1; if (iName >= 0) { var nm2 = mgrsNorm(row[iName]); if (nm2) map[code].nameOracle[nm2] = oc; } } }
         }
       });
       if (!Object.keys(map).length) { if (status) status.textContent = 'لم أجد أكواد فروع صالحة في الملف — تأكد أنه ملف Evaluation_2026.xlsx.'; return; }
-      MGRS_EVAL_MAP = map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = file.name;
+      MGRS_EVAL_MAP = map; MGRS_EVAL_LOADED = true; MGRS_EVAL_FILE = file.name; MGRS_EVAL_ORACLE_OK = Object.keys(map).some(function (k) { return map[k].oracles && Object.keys(map[k].oracles).length; });
       mgrsSaveEvalMap();
       if (status) status.textContent = mgrsEvalStatusText();
       renderManagers();
@@ -11951,15 +12011,50 @@ function mgrsLoadEvaluation(file) {
   reader.readAsArrayBuffer(file);
 }
 function mgrsBranchInfoFor(d) {
-  var names = {}, branches = {};
+  var names = {}, branches = {}, oracles = {};
   Object.keys(d.stores).forEach(function (code) {
     var e = MGRS_EVAL_MAP[code];
     if (!e) return;
     Object.keys(e.names || {}).forEach(function (n) { names[n] = 1; });
     Object.keys(e.branches || {}).forEach(function (b) { branches[b] = 1; });
+    Object.keys(e.oracles || {}).forEach(function (o) { oracles[o] = 1; });
   });
-  return { names: Object.keys(names).sort(), branches: Object.keys(branches).sort() };
+  return { names: Object.keys(names).sort(), branches: Object.keys(branches).sort(), oracles: Object.keys(oracles).sort() };
 }
+function mgrsHierarchyText(d) {
+  if (MGRS_LEVEL === 'area') return 'Regional: ' + (d.regions.join(' / ') || '—') + ' | Supervisor: ' + (d.supervisors.join(' / ') || '—');
+  if (MGRS_LEVEL === 'supervisor') return 'Regional: ' + (d.regions.join(' / ') || '—');
+  return 'Regional: ' + d.manager;
+}
+function mgrsBranchDetailsFor(d) {
+  var out = [];
+  Object.keys(d.stores).forEach(function (code) {
+    var e = MGRS_EVAL_MAP[code] || {};
+    var evalBranches = Object.keys(e.branches || {});
+    var branchName = evalBranches.length ? evalBranches.join(' / ') : (d.storeNames[code] || code);
+    out.push({ code: code, branch: branchName, managers: Object.keys(e.names || {}).sort(), oracles: Object.keys(e.oracles || {}).sort() });
+  });
+  out.sort(function (a, b) { return a.branch.localeCompare(b.branch); });
+  return out;
+}
+function mgrsShowDetail(i) {
+  var d = MGRS_LAST_ROWS[i];
+  var el = document.getElementById('mgrs-detail');
+  if (!d || !el) return;
+  MGRS_DETAIL_INDEX = i;
+  var details = mgrsBranchDetailsFor(d);
+  var html = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b style="font-size:14px">مديرو فروع: ' + d.manager + ' (' + mgrsLevelLabel() + ')</b><button onclick="mgrsCloseDetail()" style="padding:6px 14px;border:1px solid #e5e7eb;background:#faf9fb;border-radius:20px;font-size:12px;cursor:pointer">إغلاق</button></div>';
+  html += '<div style="font-size:12px;color:#6b7280;margin:6px 0">' + mgrsHierarchyText(d) + ' • ' + d.branchCount + ' فرع • ' + details.length + ' كود فرع</div>';
+  if (!MGRS_EVAL_LOADED) html += '<div style="font-size:12px;color:#92400e;background:#fef3c7;border-radius:8px;padding:8px">ارفع Evaluation عشان يظهر اسم مدير الفرع ورقم Oracle لكل فرع — دلوقتي ظاهر اسم الفرع من الداشبورد بس.</div>';
+  html += '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th style="padding:8px;font-size:12px;text-align:right;border-bottom:2px solid #5E2D91">الفرع</th><th style="padding:8px;font-size:12px;text-align:right;border-bottom:2px solid #5E2D91">مدير الفرع</th><th style="padding:8px;font-size:12px;text-align:right;border-bottom:2px solid #5E2D91">Oracle</th></tr></thead><tbody>';
+  details.forEach(function (r) {
+    html += '<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px;font-size:12px">' + r.branch + '<div style="font-size:10px;color:#9ca3af">' + r.code + '</div></td><td style="padding:8px;font-size:12px">' + (r.managers.length ? r.managers.join(' • ') : '— (مش في Evaluation)') + '</td><td style="padding:8px;font-size:12px">' + (r.oracles.length ? r.oracles.join(', ') : '—') + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+  if (el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function mgrsCloseDetail() { MGRS_DETAIL_INDEX = -1; var el = document.getElementById('mgrs-detail'); if (el) el.innerHTML = ''; }
 function renderManagers() {
   var el = document.getElementById('mgrs-table');
   var kpi = document.getElementById('mgrs-kpis');
@@ -11968,6 +12063,10 @@ function renderManagers() {
   mgrsLoadEvalMapFromStorage();
   var stEl = document.getElementById('mgrs-eval-status');
   if (stEl) stEl.textContent = mgrsEvalStatusText();
+  mgrsPopulateHierarchy();
+  var msEl = document.getElementById('mgrs-month'); if (msEl) msEl.value = MGRS_MONTH_FILTER;
+  var lvEl = document.getElementById('mgrs-level'); if (lvEl) lvEl.value = MGRS_LEVEL;
+  var dtEl = document.getElementById('mgrs-detail'); if (dtEl) dtEl.innerHTML = '';
   var data = (typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
   if (!data.length) {
     el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">مفيش بيانات فروع محمّلة لسه.<br>سجّل دخول في الداشبورد الأول، وبعدين افتح تاب Managers — التقرير بيتبني من نفس البيانات المحمّلة، من غير رفع شيت.</div>';
@@ -11980,7 +12079,7 @@ function renderManagers() {
     var html = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
     MGRS_MONTHS.forEach(function (m) {
       var n = c[m];
-      var style = n === 0 ? 'border:1px solid #fca5a5;background:#fef2f2' : 'border:1px solid #e5e7eb;background:#faf9fb';
+      var style = n === 0 ? 'border:1px solid #fca5a5;background:#fef2f2' : (MGRS_MONTH_FILTER === m ? 'border:2px solid #5E2D91;background:#f5f3ff' : 'border:1px solid #e5e7eb;background:#faf9fb');
       html += '<div style="' + style + ';border-radius:10px;padding:8px 10px;font-size:12px"><span>' + MGRS_MONTH_NAMES[m] + ' 2026</span><div style="font-weight:800;font-size:14px">' + n.toLocaleString('en-US') + ' صف فرع</div></div>';
     });
     html += '</div>';
@@ -11992,25 +12091,39 @@ function renderManagers() {
     monthsEl.innerHTML = html;
   }
   var q = mgrsNorm(MGRS_SEARCH).toLowerCase();
-  var arr = mgrsAggregate().filter(function (d) { return !q || d.manager.toLowerCase().indexOf(q) >= 0; });
+  var arr = mgrsAggregate().filter(function (d) {
+    if (!q) return true;
+    if (d.manager.toLowerCase().indexOf(q) >= 0) return true;
+    if (d.regions.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    if (d.supervisors.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    if (d.areas.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    var bi = mgrsBranchInfoFor(d);
+    if (bi.names.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    if (bi.branches.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    if (bi.oracles.join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    if (Object.keys(d.storeNames).map(function (k) { return d.storeNames[k]; }).join(' ').toLowerCase().indexOf(q) >= 0) return true;
+    return false;
+  });
+  MGRS_LAST_ROWS = arr;
   if (!arr.length) {
     el.innerHTML = '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">لا توجد بيانات مطابقة للبحث الحالي.</div>';
     if (kpi) kpi.innerHTML = '';
     return;
   }
   if (kpi) {
-    kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + arr.length + '</b> مدير (' + mgrsLevelLabel() + ') · الفترة يناير–سبتمبر 2026 · مرتّب من الأعلى % إجمالي للأقل · الأرقام على أساس Sales.</div>';
+    kpi.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;font-size:12px"><b>' + arr.length + '</b> مدير (' + mgrsLevelLabel() + ') · الفترة ' + (MGRS_MONTH_FILTER === 'all' ? 'يناير–سبتمبر 2026' : MGRS_MONTH_NAMES[MGRS_MONTH_FILTER] + ' 2026') + (MGRS_REGION ? ' · Regional: ' + MGRS_REGION : '') + (MGRS_SUPERVISOR ? ' · Supervisor: ' + MGRS_SUPERVISOR : '') + (MGRS_AREA ? ' · Area: ' + MGRS_AREA : '') + (q ? ' · بحث: ' + MGRS_SEARCH : '') + ' · مرتّب من الأعلى % إجمالي للأقل · الأرقام على أساس Sales · مديرو الفروع: العدد بس في الجدول، ودوس "عرض" عشان تشوف أسماءهم تحت الجدول.</div>';
   }
   var th = 'padding:9px 8px;font-size:11px;font-weight:800;color:white;text-align:center;white-space:nowrap';
-  var html2 = '<table style="width:100%;border-collapse:collapse;min-width:1150px"><thead><tr>' +
-    '<th style="' + th + ';background:#5E2D91">#</th><th style="' + th + ';background:#5E2D91;text-align:right">المدير</th><th style="' + th + ';background:#5E2D91;text-align:right">مدير الفرع<div style="font-size:10px;font-weight:400">من Evaluation</div></th><th style="' + th + ';background:#5E2D91">فروع</th><th style="' + th + ';background:#5E2D91">شهور</th><th style="' + th + ';background:#5E2D91">إجمالي %</th><th style="' + th + ';background:#5E2D91">إجمالي Gap</th>' +
+  var html2 = '<table style="width:100%;border-collapse:collapse;min-width:1200px"><thead><tr>' +
+    '<th style="' + th + ';background:#5E2D91">#</th><th style="' + th + ';background:#5E2D91;text-align:right">المدير</th><th style="' + th + ';background:#5E2D91;text-align:right">التسلسل<div style="font-size:10px;font-weight:400">Regional / Supervisor</div></th><th style="' + th + ';background:#5E2D91">مديرو الفروع<div style="font-size:10px;font-weight:400">العدد + عرض</div></th><th style="' + th + ';background:#5E2D91">فروع</th><th style="' + th + ';background:#5E2D91">شهور</th><th style="' + th + ';background:#5E2D91">إجمالي %</th><th style="' + th + ';background:#5E2D91">إجمالي Gap</th>' +
     PRODUCTS.map(function (p) { return '<th style="' + th + ';background:#5E2D91">' + mgrsProductLabel(p) + ' %<div style="font-size:10px;font-weight:400">Gap عدد / نسبة</div></th>'; }).join('') +
     '<th style="' + th + ';background:#5E2D91">Low<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">Mid<div style="font-size:10px;font-weight:400">عدد / حصة</div></th><th style="' + th + ';background:#5E2D91">High<div style="font-size:10px;font-weight:400">عدد / حصة</div></th></tr></thead><tbody>';
   arr.forEach(function (d, i) {
     var mixTot = d.low + d.mid + d.high;
     var bi = mgrsBranchInfoFor(d);
-    var bmCell = !MGRS_EVAL_LOADED ? '<span style="color:#9ca3af">—</span>' : (bi.names.length ? bi.names.join(' • ') + '<div style="font-size:10px;color:#6b7280">' + bi.names.length + ' اسم</div>' : '<span style="color:#9ca3af">— (مش في Evaluation)</span>');
-    html2 += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px;text-align:center;font-size:12px">' + (i + 1) + '</td><td style="padding:8px;font-size:12px;font-weight:700">' + d.manager + '</td><td style="padding:8px;font-size:11px;max-width:260px">' + bmCell + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.branchCount + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.monthCount + '</td>' +
+    var bmCell = !MGRS_EVAL_LOADED ? '<span style="color:#9ca3af">—</span>' : (bi.names.length ? '<b>' + bi.names.length + '</b> اسم <button onclick="mgrsShowDetail(' + i + ')" style="margin-right:6px;padding:4px 12px;background:#5E2D91;color:white;border:none;border-radius:20px;font-size:11px;cursor:pointer">عرض</button>' : '<span style="color:#9ca3af">0</span>');
+    var hierCell = MGRS_LEVEL === 'area' ? ('<span style="font-size:11px">' + (d.regions.join(' / ') || '—') + '</span><div style="font-size:10px;color:#6b7280">' + (d.supervisors.join(' / ') || '—') + '</div>') : (MGRS_LEVEL === 'supervisor' ? ('<span style="font-size:11px">' + (d.regions.join(' / ') || '—') + '</span>') : '<span style="font-size:11px">—</span>');
+    html2 += '<tr style="background:' + (i % 2 ? '#faf9fb' : 'white') + ';border-bottom:1px solid #f3f4f6"><td style="padding:8px;text-align:center;font-size:12px">' + (i + 1) + '</td><td style="padding:8px;font-size:12px;font-weight:700">' + d.manager + '</td><td style="padding:8px;font-size:11px">' + hierCell + '</td><td style="padding:8px;text-align:center;font-size:12px;white-space:nowrap">' + bmCell + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.branchCount + '</td><td style="padding:8px;text-align:center;font-size:12px">' + d.monthCount + '</td>' +
       '<td style="padding:8px;text-align:center"><span style="font-size:12px;font-weight:800;color:' + mgrsPctColor(d.totalPct) + '">' + (d.totalPct == null ? '—' : d.totalPct.toFixed(1) + '%') + '</span></td>' +
       '<td style="padding:8px;text-align:center;font-size:12px">' + (d.totalT ? (d.totalT - d.totalA).toLocaleString('en-US') + '<div style="font-size:10px;color:#6b7280">' + (100 - d.totalPct).toFixed(1) + '%</div>' : '—') + '</td>' +
       PRODUCTS.map(function (p) {
@@ -12054,13 +12167,13 @@ async function mgrsExportExcel(btn) {
     await mgrsLoadExcelJS();
     var wb = new ExcelJS.Workbook(); wb.creator = 'FAKHARANY360';
     var ws = wb.addWorksheet('Managers Jan-Sep 2026');
-    var headers = ['#', 'Manager', 'Branch Managers', 'Branches (names)', 'Level', 'Branches', 'Store-months', 'Months present', 'Total Target', 'Total Ach', 'Total Ach%', 'Total Gap (count)', 'Total Gap %'];
+    var headers = ['#', 'Manager', 'Hierarchy', 'Branch Managers', 'Oracle IDs', 'Branches (names)', 'Level', 'Branches', 'Store-months', 'Months present', 'Total Target', 'Total Ach', 'Total Ach%', 'Total Gap (count)', 'Total Gap %'];
     PRODUCTS.forEach(function (p) { headers.push(mgrsProductLabel(p) + ' Target', mgrsProductLabel(p) + ' Ach', mgrsProductLabel(p) + ' Ach%', mgrsProductLabel(p) + ' Gap (count)', mgrsProductLabel(p) + ' Gap %'); });
     headers.push('Low', 'Mid', 'High', '12PT', 'Low%', 'Mid%', 'High%');
     ws.columns = headers.map(function (h, i) { return { width: i === 1 ? 32 : 14 }; });
     ws.mergeCells('A1:' + ws.getColumn(headers.length).letter + '1');
     var t = ws.getCell('A1');
-    t.value = 'FAKHARANY360 — Managers Jan-Sep 2026 — ' + mgrsLevelLabel() + ' — Sales basis — Gap = Target - Ach';
+    t.value = 'FAKHARANY360 — Managers ' + (MGRS_MONTH_FILTER === 'all' ? 'Jan-Sep 2026' : MGRS_MONTH_NAMES[MGRS_MONTH_FILTER] + ' 2026') + ' — ' + mgrsLevelLabel() + ' — Sales basis — Gap = Target - Ach';
     t.font = { name: 'Calibri', bold: true, size: 13, color: { argb: 'FF5E2D91' } };
     var hr = ws.addRow(headers); mgrsStyleHeader(hr);
     ws.autoFilter = 'A2:' + ws.getColumn(headers.length).letter + '2';
@@ -12068,12 +12181,12 @@ async function mgrsExportExcel(btn) {
     arr.forEach(function (d, i) {
       var mixTot = d.low + d.mid + d.high;
       var bi2 = mgrsBranchInfoFor(d);
-      var row = [i + 1, d.manager, bi2.names.join('; ') || null, bi2.branches.join('; ') || null, mgrsLevelLabel(), d.branchCount, d.rows, d.monthCount, d.totalT, d.totalA, d.totalT ? d.totalA / d.totalT : null, d.totalT - d.totalA, d.totalT ? (d.totalT - d.totalA) / d.totalT : null];
+      var row = [i + 1, d.manager, mgrsHierarchyText(d), bi2.names.join('; ') || null, bi2.oracles.join('; ') || null, bi2.branches.join('; ') || null, mgrsLevelLabel(), d.branchCount, d.rows, d.monthCount, d.totalT, d.totalA, d.totalT ? d.totalA / d.totalT : null, d.totalT - d.totalA, d.totalT ? (d.totalT - d.totalA) / d.totalT : null];
       PRODUCTS.forEach(function (p) { var tt = d[p.key + 'T'], aa = d[p.key + 'A']; row.push(tt, aa, tt ? aa / tt : null, tt - aa, tt ? (tt - aa) / tt : null); });
       row.push(d.low, d.mid, d.high, d.pt12, mixTot ? d.low / mixTot : null, mixTot ? d.mid / mixTot : null, mixTot ? d.high / mixTot : null);
       var r = ws.addRow(row);
-      [11, 13].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
-      PRODUCTS.forEach(function (p, pi) { var c = r.getCell(16 + pi * 5); if (c.value != null) c.numFmt = '0.00%'; var c2 = r.getCell(18 + pi * 5); if (c2.value != null) c2.numFmt = '0.00%'; });
+      [13, 15].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
+      PRODUCTS.forEach(function (p, pi) { var c = r.getCell(18 + pi * 5); if (c.value != null) c.numFmt = '0.00%'; var c2 = r.getCell(20 + pi * 5); if (c2.value != null) c2.numFmt = '0.00%'; });
       [headers.length - 2, headers.length - 1, headers.length].forEach(function (ci) { var c = r.getCell(ci); if (c.value != null) c.numFmt = '0.00%'; });
       r.eachCell(function (cell) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 ? 'FFFAF9FB' : 'FFFFFFFF' } }; cell.font = { name: 'Calibri', size: 11 }; });
     });
@@ -12090,6 +12203,7 @@ async function mgrsExportExcel(btn) {
       ['Tariffs', 'Low = tariffs 25,29,32,37; Mid = 40,45,46,52; High = 50+. % = share of Low+Mid+High. 12PT is a volume column only.'],
       ['Products', 'Mobile, WE Gold, ADSL (FBB), Fixed, Wallet, WE Air.'],
       ['Branch Managers', 'Distinct Evaluation Name values per store code (Jan-Sep sheets), linked to the dashboard manager by store code. Upload Evaluation once in the Managers tab; it is saved in this browser\'s localStorage only, not sent anywhere.'],
+      ['Oracle IDs', 'Distinct Evaluation Oracle ID values per store code, linked by store code. Search by Oracle in the tab needs Evaluation uploaded with Oracle IDs.'],
       ['Rows loaded', (typeof RAW_DATA !== 'undefined' ? RAW_DATA.length : 0) + ' store-month rows in total (all months in source).']
     ];
     MGRS_MONTHS.forEach(function (m) { info.push(['Month ' + MGRS_MONTH_NAMES[m] + ' 2026', c[m] + ' store rows']); });
