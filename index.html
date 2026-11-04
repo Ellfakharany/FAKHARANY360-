@@ -1090,7 +1090,6 @@ document.addEventListener('DOMContentLoaded', function() {
       <button class="tab-btn" onclick="switchTab('rankings')"><i class="fas fa-trophy mr-1"></i>Rankings</button>
       <button class="tab-btn" onclick="switchTab('heatmap')"><i class="fas fa-th mr-1"></i>Heatmap</button>
       <button class="tab-btn" onclick="switchTab('packages')"><i class="fas fa-th-list mr-1"></i>Package Mix</button>
-      <button class="tab-btn" onclick="switchTab('charts')"><i class="fas fa-chart-bar mr-1"></i>Charts</button>
       <button class="tab-btn" onclick="switchTab('insights')" style="position:relative"><i class="fas fa-lightbulb mr-1"></i>Smart Insights<span style="position:absolute;top:-4px;right:-4px;background:#e91e8c;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">AI</span></button>
       <button class="tab-btn" onclick="switchTab('managers')" id="mgr-tab-btn" style="position:relative"><i class="fas fa-user-tie mr-1"></i>Managers<span style="position:absolute;top:-4px;right:-4px;background:#16a34a;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">NEW</span></button>
       <button class="tab-btn" onclick="switchTab('mtd')" id="mtd-tab-btn" style="position:relative"><i class="fas fa-calendar-day mr-1"></i>MTD<span style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">LIVE</span></button>
@@ -1302,8 +1301,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <div id="monthly-perf-drill" style="margin-top:12px"></div>
       </div>
 
-      <!-- MANAGERS PERFORMANCE (LINKED BY STORE CODE + MONTH) -->
-      <div id="mgr-perf-overview-slot">
+    </div>
+
+    <!-- MANAGERS TAB (Dedicated Tab View Only — Not in Overview) -->
+    <div id="tab-managers" class="tab-content hidden">
+      <div id="mgr-perf-tab-slot">
         <div id="mgr-perf-master" class="mb-6">
           <!-- Section Header & Top Actions (v1 layout) -->
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px">
@@ -1321,10 +1323,10 @@ document.addEventListener('DOMContentLoaded', function() {
               <button id="mgr-reset-custom-eval-btn" onclick="resetCustomEvalData()" style="display:none;padding:6px 10px;border-radius:16px;border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;cursor:pointer" title="استعادة شيت التقييم المرفوع على Supabase">
                 <i class="fas fa-undo mr-1"></i>استعادة الأصلي
               </button>
-              <button id="mgr-export-excel-btn" onclick="exportManagersPerfExcel(this)" class="export-restricted" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28)">
+              <button id="mgr-export-excel-btn" onclick="exportManagersPerfExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28)">
                 <i class="fas fa-file-excel"></i> Export Excel (تنسيق احترافي)
               </button>
-              <button id="mgr-export-csv-btn" onclick="exportManagersPerfCSV()" class="export-restricted" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer">
+              <button id="mgr-export-csv-btn" onclick="exportManagersPerfCSV()" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer">
                 <i class="fas fa-file-csv" style="color:#16a34a"></i> CSV
               </button>
             </div>
@@ -1439,12 +1441,6 @@ document.addEventListener('DOMContentLoaded', function() {
           <div id="mgr-perf-tables-container"></div>
         </div>
       </div>
-
-    </div>
-
-    <!-- MANAGERS TAB (Dedicated Tab View) -->
-    <div id="tab-managers" class="tab-content hidden">
-      <div id="mgr-perf-tab-slot"></div>
     </div>
 
     <!-- PRODUCTS TAB -->
@@ -14136,20 +14132,10 @@ async function exportManagersPerfCSV() {
     }
   } catch (e) {}
 
-  function moveMgrMasterToSlot(tabName) {
-    var master = document.getElementById('mgr-perf-master');
-    if (!master) return;
-    var targetSlot = document.getElementById(tabName === 'managers' ? 'mgr-perf-tab-slot' : 'mgr-perf-overview-slot');
-    if (targetSlot && master.parentNode !== targetSlot) {
-      targetSlot.appendChild(master);
-    }
-  }
-
   var _origSwitchTab = switchTab;
   switchTab = function (name) {
-    moveMgrMasterToSlot(name);
     var res = _origSwitchTab.apply(this, arguments);
-    if (name === 'managers' || name === 'overview') {
+    if (name === 'managers') {
       try { renderManagersPerf(); } catch (e) { console.error('[ManagersPerf]', e); }
     }
     return res;
@@ -14158,11 +14144,10 @@ async function exportManagersPerfCSV() {
   var _origRenderAll = renderAll;
   renderAll = function () {
     var res = _origRenderAll.apply(this, arguments);
-    if (activeTab === 'overview' || activeTab === 'managers') {
-      try {
-        moveMgrMasterToSlot(activeTab);
-        renderManagersPerf();
-      } catch (e) { console.error('[ManagersPerf]', e); }
+    if (activeTab === 'managers') {
+      try { renderManagersPerf(); } catch (e) { console.error('[ManagersPerf]', e); }
+    } else {
+      updateEvalStatusBadge();
     }
     return res;
   };
