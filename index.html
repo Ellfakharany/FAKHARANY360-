@@ -1305,150 +1305,138 @@ document.addEventListener('DOMContentLoaded', function() {
       <!-- MANAGERS PERFORMANCE (LINKED BY STORE CODE + MONTH) -->
       <div id="mgr-perf-overview-slot">
         <div id="mgr-perf-master" class="mb-6">
-          <!-- Section Header & Top Actions -->
+          <!-- Section Header & Top Actions (v1 layout) -->
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <div class="section-title" style="margin-bottom:0"><i class="fas fa-user-tie mr-2"></i>Managers Performance — أداء المديرين والـ Gap بالشهور</div>
-              <span id="mgr-eval-status-badge" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;font-size:10px;font-weight:800;padding:3px 10px;border-radius:14px">
-                <i class="fas fa-info-circle mr-1"></i>في انتظار رفع شيت الـ Evaluation (من Supabase أو مانوال)
+              <div class="section-title" style="margin-bottom:0"><i class="fas fa-user-tie mr-2"></i>Managers Performance — أداء المديرين بالشهور</div>
+              <span id="mgr-eval-status-badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:10px;font-weight:800;padding:3px 10px;border-radius:14px">
+                <i class="fas fa-link mr-1"></i>مربوط بكود الفرع والشهر
               </span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <!-- Cloud Upload via Admin Modal (visible for admin) -->
-              <button onclick="openUploadModal()" class="export-restricted" title="رفع شيت الـ Evaluation وحفظه على Supabase لكل الفريق" style="display:inline-flex;align-items:center;gap:6px;padding:6px 13px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;border:none;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(15,118,110,0.25)">
-                <i class="fas fa-cloud-upload-alt"></i> رفع لـ Supabase (Upload)
-              </button>
-              <!-- Manual Upload Button (Kept as requested!) -->
-              <label title="رفع شيت الـ Evaluation مانوال (.xlsx) في المتصفح مباشرة" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:white;color:#5E2D91;border:1.5px solid #5E2D91;border-radius:20px;font-size:11px;font-weight:800;transition:all .2s">
-                <i class="fas fa-file-upload"></i> رفع شيت Evaluation مانوال
+              <label title="رفع شيت Evaluation جديد أو محدّث (.xlsx) مانوال في المتصفح" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:white;color:#5E2D91;border:1.5px solid #5E2D91;border-radius:20px;font-size:11px;font-weight:800;transition:all .2s">
+                <i class="fas fa-file-upload"></i> تحديث شيت الـ Evaluation
                 <input type="file" id="mgr-eval-upload-input" accept=".xlsx,.xls" style="display:none" onchange="handleEvalWorkbookUpload(this.files[0]); this.value=''">
               </label>
-              <button id="mgr-reset-custom-eval-btn" onclick="resetCustomEvalData()" style="display:none;padding:6px 10px;border-radius:16px;border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;cursor:pointer" title="مسح النسخة المانوال من المتصفح والاعتماد على Supabase">
-                <i class="fas fa-trash-alt mr-1"></i>مسح المانوال
+              <button id="mgr-reset-custom-eval-btn" onclick="resetCustomEvalData()" style="display:none;padding:6px 10px;border-radius:16px;border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;cursor:pointer" title="استعادة شيت التقييم المرفوع على Supabase">
+                <i class="fas fa-undo mr-1"></i>استعادة الأصلي
               </button>
               <button id="mgr-export-excel-btn" onclick="exportManagersPerfExcel(this)" class="export-restricted" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28)">
-                <i class="fas fa-file-excel"></i> Export Excel (بالـ Gap والتقييم)
+                <i class="fas fa-file-excel"></i> Export Excel (تنسيق احترافي)
               </button>
               <button id="mgr-export-csv-btn" onclick="exportManagersPerfCSV()" class="export-restricted" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer">
                 <i class="fas fa-file-csv" style="color:#16a34a"></i> CSV
               </button>
-              <button id="mgr-section-toggle-btn" onclick="toggleMgrSectionBody()" style="padding:6px 14px;border-radius:20px;border:1.5px solid #5E2D91;background:#5E2D91;color:white;font-size:11px;font-weight:800;cursor:pointer">
-                <i class="fas fa-eye mr-1"></i>عرض الجداول
-              </button>
             </div>
           </div>
 
-          <div style="font-size:10.5px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">
-            بيربط كود الفرع (<strong>Store Code</strong>) والشهر (<strong>Month</strong>) بين الداشبورد وشيت الـ <strong>Evaluation</strong> (سواء المرفوع على <strong>Supabase</strong> من زرار Upload أو المرفوع <strong>مانوال</strong>)، وبيحسب لكل مدير <strong>الـ Gap اللي ناقصه في كل منتج على مدار السنة/الفلاتر المختارة عشان يكوڤره</strong>.
+          <div style="font-size:10.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            بيتم ربط أداء كل فرع في كل شهر من الداشبورد مع شيت الـ <strong>Evaluation 2026</strong> عن طريق <strong>كود الفرع (Store Code) + الشهر (Month)</strong>، بحيث يظهر اسم المدير الفعلي للفرع في الشهر ده (حتى لو اتنقل بين أكتر من فرع خلال السنة) مع أرقام المنتجات والـ <strong>Gap (+/-)</strong> وتفاصيل التقييم الشهري.
           </div>
 
-          <div id="mgr-perf-body" style="display:none">
-            <!-- Summary KPI Cards for Managers -->
-            <div id="mgr-kpi-grid" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"></div>
+          <!-- Summary KPI Cards for Managers (5 cards as in v1, with +/- Gap inside the Mobile card) -->
+          <div id="mgr-kpi-grid" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"></div>
 
-            <!-- Main Control Bar -->
-            <div class="chart-card mb-4" style="padding:14px">
-              <!-- Row 1: View Mode + Manager Level + Metric / Gap Mode -->
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:12px;border-bottom:1px solid #f3f4f6">
-                <!-- Layout Mode -->
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">طريقة العرض:</span>
-                  <div style="display:inline-flex;border:1.5px solid #5E2D91;border-radius:20px;overflow:hidden;background:white">
-                    <button id="mgr-view-bymonth" onclick="setMgrViewMode('bymonth')" style="padding:6px 13px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s">
-                      <i class="fas fa-layer-group mr-1"></i>جداول الشهور تحت بعض (By Month)
-                    </button>
-                    <button id="mgr-view-bymanager" onclick="setMgrViewMode('bymanager')" style="padding:6px 13px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s">
-                      <i class="fas fa-user-clock mr-1"></i>شهور كل مدير تحت بعض (By Manager)
-                    </button>
-                    <button id="mgr-view-summary" onclick="setMgrViewMode('summary')" style="padding:6px 13px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s">
-                      <i class="fas fa-trophy mr-1"></i>ملخص السنة والـ Gap المجمع
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Manager Role Level -->
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">المستوى:</span>
-                  <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
-                    <button id="mgr-lvl-store" onclick="setMgrLevel('storeManager')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white">🏪 مدير الفرع</button>
-                    <button id="mgr-lvl-area" onclick="setMgrLevel('areaManager')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">📍 Area Mgr</button>
-                    <button id="mgr-lvl-sup" onclick="setMgrLevel('supervisor')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">🧑‍💼 Supervisor</button>
-                    <button id="mgr-lvl-rm" onclick="setMgrLevel('regionalManager')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">👔 Regional Mgr</button>
-                  </div>
-                </div>
-
-                <!-- Metric & Product Gap Mode -->
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">الأعمدة:</span>
-                  <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
-                    <button id="mgr-met-combined" onclick="setMgrMetricMode('combined')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white">الأداء + التقييم</button>
-                    <button id="mgr-met-gaps" onclick="setMgrMetricMode('product_gaps')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:transparent;color:#dc2626" title="يعرض التارجت والمحقق والـ Gap اللي ناقص في كل منتج عشان يكوڤره">🎯 الـ Gap اللي ناقص لكل منتج</button>
-                    <button id="mgr-met-prods" onclick="setMgrMetricMode('products_detail')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">TGT / ACH / GAP / %</button>
-                    <button id="mgr-met-eval" onclick="setMgrMetricMode('eval_detail')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">تفاصيل التقييم 100%</button>
-                  </div>
+          <!-- Main Control Bar (v1 exact layout) -->
+          <div class="chart-card mb-4" style="padding:14px">
+            <!-- Row 1: View Mode + Manager Level + Metric Mode -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:12px;border-bottom:1px solid #f3f4f6">
+              <!-- Layout Mode -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">طريقة العرض:</span>
+                <div style="display:inline-flex;border:1.5px solid #5E2D91;border-radius:20px;overflow:hidden;background:white">
+                  <button id="mgr-view-bymonth" onclick="setMgrViewMode('bymonth')" style="padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white;transition:all .2s">
+                    <i class="fas fa-layer-group mr-1"></i>جداول الشهور تحت بعض (By Month)
+                  </button>
+                  <button id="mgr-view-bymanager" onclick="setMgrViewMode('bymanager')" style="padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s">
+                    <i class="fas fa-user-clock mr-1"></i>شهور كل مدير تحت بعض (By Manager)
+                  </button>
+                  <button id="mgr-view-summary" onclick="setMgrViewMode('summary')" style="padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s">
+                    <i class="fas fa-trophy mr-1"></i>الملخص والترتيب العام
+                  </button>
                 </div>
               </div>
 
-              <!-- Row 2: Search, Specific Manager Filter, Region, Month, Sort, Gap Only Filter -->
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:12px">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
-                  <!-- Search Input -->
-                  <div style="position:relative;min-width:210px;flex:1;max-width:280px">
-                    <input id="mgr-search-input" type="text" placeholder="🔍 ابحث باسم المدير أو الكود أو الفرع..." oninput="onMgrFilterInput()" style="width:100%;padding:7px 28px 7px 12px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11.5px;outline:none" />
-                    <span onclick="clearMgrSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#9ca3af;font-size:11px" title="مسح البحث">✕</span>
-                  </div>
-
-                  <!-- Specific Manager Select -->
-                  <select id="mgr-select-person" onchange="onMgrPersonSelect(this.value)" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;max-width:220px;outline:none">
-                    <option value="">👤 كل المديرين (All Managers)</option>
-                  </select>
-
-                  <!-- Region Filter -->
-                  <select id="mgr-select-region" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
-                    <option value="">🌍 كل المناطق</option>
-                  </select>
-
-                  <!-- Month Filter inside Section -->
-                  <select id="mgr-select-month" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
-                    <option value="">📅 كل الشهور تحت بعض</option>
-                  </select>
-
-                  <!-- Sort Selector -->
-                  <select id="mgr-sort-by" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#5E2D91;background:#f5f3ff;outline:none">
-                    <option value="eval_desc">الترتيب: الأعلى تقييماً (Eval %)</option>
-                    <option value="mob_gap_desc">الترتيب: الأكبر عجزاً في الموبايل (Mobile Gap)</option>
-                    <option value="tot_gap_desc">الترتيب: الأكبر عجزاً إجمالياً (Total Gap)</option>
-                    <option value="mob_pct_desc">الترتيب: الأعلى تحقيقاً (Mobile %)</option>
-                    <option value="mob_ach_desc">الترتيب: الأعلى مبيعات (Mobile Ach)</option>
-                    <option value="eval_asc">الترتيب: الأقل تقييماً</option>
-                    <option value="name_asc">الترتيب: أبجدياً (الاسم)</option>
-                  </select>
+              <!-- Manager Role Level -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">المستوى:</span>
+                <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
+                  <button id="mgr-lvl-store" onclick="setMgrLevel('storeManager')" style="padding:5px 12px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white">🏪 مدير الفرع</button>
+                  <button id="mgr-lvl-area" onclick="setMgrLevel('areaManager')" style="padding:5px 12px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">📍 Area Mgr</button>
+                  <button id="mgr-lvl-sup" onclick="setMgrLevel('supervisor')" style="padding:5px 12px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">🧑‍💼 Supervisor</button>
+                  <button id="mgr-lvl-rm" onclick="setMgrLevel('regionalManager')" style="padding:5px 12px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">👔 Regional Mgr</button>
                 </div>
+              </div>
 
-                <!-- Right-side Quick Toggles -->
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <button id="mgr-gap-only-btn" onclick="toggleMgrGapOnlyFilter()" style="padding:6px 12px;border-radius:16px;border:1.5px solid #fca5a5;background:white;color:#dc2626;font-size:10.5px;font-weight:800;cursor:pointer" title="فلترة المديرين اللي ناقصهم Gap عشان يكوڤروا التارجت">
-                    <i class="fas fa-bullseye mr-1"></i><span id="mgr-gap-only-label">اللي عليهم Gap فقط</span>
-                  </button>
-                  <button id="mgr-scope-toggle-btn" onclick="toggleMgrDataScope()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #5E2D91;background:#f5f3ff;color:#5E2D91;font-size:10.5px;font-weight:800;cursor:pointer" title="التبديل بين فروع الفلتر الحالي أو كل فروع شيت الـ Evaluation">
-                    <i class="fas fa-database mr-1"></i><span id="mgr-scope-label">نطاق الداشبورد</span>
-                  </button>
-                  <button id="mgr-month-order-btn" onclick="toggleMgrMonthOrder()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer">
-                    <i class="fas fa-sort-numeric-down mr-1"></i><span id="mgr-month-order-label">يناير ← سبتمبر</span>
-                  </button>
-                  <button id="mgr-showall-btn" onclick="toggleMgrShowAllRows()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer">
-                    <i class="fas fa-list-ol mr-1"></i><span id="mgr-showall-label">عرض الكل</span>
-                  </button>
-                  <button onclick="expandCollapseAllMgrBlocks()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer">
-                    <i class="fas fa-compress-arrows-alt mr-1"></i>طي / فتح الكل
-                  </button>
+              <!-- Metric Columns Mode (Exact 3 options from v1) -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">التفاصيل:</span>
+                <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
+                  <button id="mgr-met-combined" onclick="setMgrMetricMode('combined')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white">الأداء + التقييم</button>
+                  <button id="mgr-met-prods" onclick="setMgrMetricMode('products_detail')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">Target / Ach / %</button>
+                  <button id="mgr-met-eval" onclick="setMgrMetricMode('eval_detail')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">تفاصيل التقييم 100%</button>
                 </div>
               </div>
             </div>
 
-            <!-- Dynamic Stacked Tables Container -->
-            <div id="mgr-perf-tables-container"></div>
+            <!-- Row 2: Search, Specific Manager Filter, Region/Scope Filter, Month Order, Sort, Expand/Collapse -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:12px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
+                <!-- Search Input -->
+                <div style="position:relative;min-width:220px;flex:1;max-width:300px">
+                  <input id="mgr-search-input" type="text" placeholder="🔍 ابحث باسم المدير أو Oracle ID أو الفرع أو الكود..." oninput="onMgrFilterInput()" style="width:100%;padding:7px 28px 7px 12px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11.5px;outline:none" />
+                  <span onclick="clearMgrSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#9ca3af;font-size:11px" title="مسح البحث">✕</span>
+                </div>
+
+                <!-- Specific Manager Select -->
+                <select id="mgr-select-person" onchange="onMgrPersonSelect(this.value)" style="padding:7px 12px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;max-width:230px;outline:none">
+                  <option value="">👤 كل المديرين (All Managers)</option>
+                </select>
+
+                <!-- Region Filter -->
+                <select id="mgr-select-region" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                  <option value="">🌍 كل المناطق (All Regions)</option>
+                </select>
+
+                <!-- Month Filter inside Section -->
+                <select id="mgr-select-month" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                  <option value="">📅 كل الشهور تحت بعض (All Months)</option>
+                </select>
+
+                <!-- Sort Selector -->
+                <select id="mgr-sort-by" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#5E2D91;background:#f5f3ff;outline:none">
+                  <option value="eval_desc">الترتيب: الأعلى تقييماً (Eval %)</option>
+                  <option value="mob_pct_desc">الترتيب: الأعلى تحقيقاً (Mobile %)</option>
+                  <option value="mob_ach_desc">الترتيب: الأعلى مبيعات (Mobile Ach)</option>
+                  <option value="mob_gap_asc">الترتيب: الأكبر عجزاً (Mobile Gap -)</option>
+                  <option value="mob_gap_desc">الترتيب: الأكبر فائضاً (Mobile Gap +)</option>
+                  <option value="mix_desc">الترتيب: الأعلى Sales Mix (30%)</option>
+                  <option value="perf_desc">الترتيب: الأعلى Performance (25%)</option>
+                  <option value="eval_asc">الترتيب: الأقل تقييماً</option>
+                  <option value="name_asc">الترتيب: أبجدياً (الاسم)</option>
+                </select>
+              </div>
+
+              <!-- Right-side Quick Toggles -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <button id="mgr-scope-toggle-btn" onclick="toggleMgrDataScope()" style="padding:6px 12px;border-radius:16px;border:1.5px solid #5E2D91;background:#f5f3ff;color:#5E2D91;font-size:10.5px;font-weight:800;cursor:pointer" title="التبديل بين فروع الفلتر الحالي أو كل فروع شيت الـ Evaluation">
+                  <i class="fas fa-database mr-1"></i><span id="mgr-scope-label">نطاق الداشبورد الحالي</span>
+                </button>
+                <button id="mgr-month-order-btn" onclick="toggleMgrMonthOrder()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer" title="عكس ترتيب الشهور (يناير ← سبتمبر أو سبتمبر ← يناير)">
+                  <i class="fas fa-sort-numeric-down mr-1"></i><span id="mgr-month-order-label">يناير ← سبتمبر</span>
+                </button>
+                <button id="mgr-showall-btn" onclick="toggleMgrShowAllRows()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer">
+                  <i class="fas fa-list-ol mr-1"></i><span id="mgr-showall-label">عرض الكل</span>
+                </button>
+                <button onclick="expandCollapseAllMgrBlocks()" style="padding:6px 11px;border-radius:16px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:10.5px;font-weight:700;cursor:pointer" title="طي أو فتح كل جداول الشهور/المديرين">
+                  <i class="fas fa-compress-arrows-alt mr-1"></i>طي / فتح الكل
+                </button>
+              </div>
+            </div>
           </div>
+
+          <!-- Dynamic Stacked Tables Container -->
+          <div id="mgr-perf-tables-container"></div>
         </div>
       </div>
 
@@ -11987,15 +11975,15 @@ function mtdNwRenderExtras() {
 
 <script>
 // ════════════════════════════════════════════════════════════════════════════
-//  MANAGERS PERFORMANCE & PRODUCT GAP MODULE (أداء المديرين والـ Gap بالشهور)
-//  • Zero heavy inline JSON bloat — loads Evaluation data from Supabase
-//    (uploaded via the Admin Upload Modal) and/or via the Manual Upload button.
-//  • Links branch performance per month (RAW_DATA) with Evaluation sheets
-//    by (Store Code + Month).
-//  • Calculates per-product Gap to Cover (اللي ناقص عشان يكوڤر التارجت)
-//    across the selected filters/months for every manager and every product.
-//  • Protects Excel/CSV exports with a Warning confirmation + the same
-//    password hash (EXPORT_PASSWORD_HASH) used across the dashboard.
+//  MANAGERS PERFORMANCE (أداء المديرين بالشهور) — v3
+//  • Restores the exact v1 layout, warning badges (⚠️ إنذار), and 5th KPI card
+//    (التنقلات والإنذارات).
+//  • Keeps v2's Supabase Upload integration (via Upload Data modal) + Manual
+//    Upload button + Warning & Password gate on Export (EXPORT_PASSWORD_HASH).
+//  • Shows Gap as "+X" or "-X" (Gap: +128 / Gap: -72) right inside the same
+//    KPI card and inside the existing product cells in the table without
+//    adding extra columns per product.
+//  • Adds a dedicated "Product Gaps" sheet in the exported Excel workbook.
 // ════════════════════════════════════════════════════════════════════════════
 
 var EVAL_SUPABASE_DATA = [];   // populated from Supabase monthly_closure (EVAL-<MM-YYYY> rows)
@@ -12003,15 +11991,13 @@ var EVAL_CUSTOM_DATA = null;   // populated from manual upload button in the sec
 var EVAL_CUSTOM_LS_KEY = 'fk360_eval_manual_v2';
 var EVAL_INDEX_CACHE = null;
 
-var MGR_SECTION_OPEN = false;       // collapsed in Overview by default for instant page load; auto-opens on Managers tab
 var MGR_VIEW_MODE = 'bymonth';      // 'bymonth' | 'bymanager' | 'summary'
 var MGR_LEVEL = 'storeManager';     // 'storeManager' | 'areaManager' | 'supervisor' | 'regionalManager'
-var MGR_METRIC_MODE = 'combined';   // 'combined' | 'product_gaps' | 'products_detail' | 'eval_detail'
+var MGR_METRIC_MODE = 'combined';   // 'combined' | 'products_detail' | 'eval_detail'
 var MGR_DATA_SCOPE = 'dashboard';   // 'dashboard' | 'all_eval'
-var MGR_GAP_ONLY = false;           // filter to managers who have a shortfall (Gap > 0) to cover
 var MGR_MONTH_ASC = true;           // true: Jan -> Sep, false: Sep -> Jan
-var MGR_SHOW_ALL_ROWS = false;      // false: paginate (15 rows per table for fast DOM), true: show all
-var MGR_PAGE_SIZE = 15;
+var MGR_SHOW_ALL_ROWS = false;      // false: paginate (25 rows per table), true: show all
+var MGR_PAGE_SIZE = 25;
 var MGR_BLOCK_COLLAPSED = {};       // blockKey -> boolean
 var MGR_SUMMARY_EXPANDED = {};      // mgrKey -> boolean
 var MGR_SELECTED_PERSON = '';       // mgrKey when filtering to a single manager
@@ -12211,18 +12197,18 @@ function updateEvalStatusBadge() {
   var count = idx.allRecords.length;
   var mCount = idx.months.length;
   if (count > 0) {
-    var srcTxt = (EVAL_CUSTOM_DATA && EVAL_CUSTOM_DATA.length)
-      ? 'مانوال (' + mCount + ' شهور · ' + fmtN(count) + ' سجل)'
-      : 'مربوط بـ Supabase (' + mCount + ' شهور · ' + fmtN(count) + ' سجل)';
+    var firstM = idx.months[0] ? (MONTH_LABELS[idx.months[0]] || idx.months[0]) : '';
+    var lastM = idx.months[mCount - 1] ? (MONTH_LABELS[idx.months[mCount - 1]] || idx.months[mCount - 1]) + ' ' + (idx.months[mCount - 1].split('-')[1] || '') : '';
+    var rangeTxt = (firstM && lastM) ? (firstM + ' – ' + lastM) : (mCount + ' شهور');
     badge.style.background = '#dcfce7';
     badge.style.color = '#15803d';
     badge.style.borderColor = '#86efac';
-    badge.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + srcTxt;
+    badge.innerHTML = '<i class="fas fa-link mr-1"></i>مربوط بكود الفرع والشهر (' + rangeTxt + ')';
   } else {
     badge.style.background = '#fef3c7';
     badge.style.color = '#b45309';
     badge.style.borderColor = '#fde68a';
-    badge.innerHTML = '<i class="fas fa-info-circle mr-1"></i>ارفع شيت الـ Evaluation من زرار Upload لـ Supabase أو مانوال لربط أسماء وتقييم مديري الفروع';
+    badge.innerHTML = '<i class="fas fa-info-circle mr-1"></i>ارفع شيت الـ Evaluation من زرار Upload Data أو مانوال لربط أسماء وتقييم المديرين';
   }
 }
 
@@ -12251,11 +12237,9 @@ function buildEvalIndex() {
     monthsSet[rec.month] = true;
   }
 
-  // 1. Supabase records
   if (Array.isArray(EVAL_SUPABASE_DATA)) {
     EVAL_SUPABASE_DATA.forEach(addRec);
   }
-  // 2. Manual uploaded records override/extend
   if (Array.isArray(EVAL_CUSTOM_DATA)) {
     EVAL_CUSTOM_DATA.forEach(addRec);
   }
@@ -12306,7 +12290,7 @@ function enrichRawDataWithEvaluation(rows) {
       r._evalRec = ev;
       r._evalExactMonth = (ev.month === m);
     } else {
-      r.storeManager = r.storeManager || ('فرع: ' + (r.store || code || '—'));
+      r.storeManager = r.storeManager || ('غير مسجل (' + (r.store || code || '—') + ')');
       r.oracleId = r.oracleId || '—';
       r.hiringDate = r.hiringDate || '';
       r._evalRec = null;
@@ -12362,7 +12346,7 @@ function getManagersLinkedRecords() {
     var cls = (rawRow && rawRow.classification) || h.cls || '';
     var reg = (rawRow && rawRow.region) || (evRec && evRec.evalRegion) || h.region || '';
 
-    var smName = (evRec && evRec.managerName) || (rawRow && rawRow.storeManager) || ('فرع: ' + storeName);
+    var smName = (evRec && evRec.managerName) || (rawRow && rawRow.storeManager) || ('غير مسجل (' + storeName + ')');
     var oid = (evRec && evRec.oracleId) || (rawRow && rawRow.oracleId) || '—';
     var hdate = (evRec && evRec.hiringDate) || (rawRow && rawRow.hiringDate) || '';
 
@@ -12552,7 +12536,7 @@ function populateMgrSectionDropdowns(allRows, scopeRows) {
   }
 }
 
-// ── Aggregate rows AND compute per-product Gaps (اللي ناقص عشان يكوڤر التارجت) ──
+// ── Aggregate rows & compute signed Gap (Ach - Target, so + for surplus and - for deficit) ──
 function calcMgrGroup(rows) {
   var g = calcGroup(rows);
   var evRows = rows.filter(function (r) { return r.evalScore !== null && r.evalScore !== undefined; });
@@ -12573,24 +12557,19 @@ function calcMgrGroup(rows) {
   var perf25Avg = avg(evRows, 'perf25');
   var warnCount = evRows.filter(function (r) { return r.warn === 'Yes'; }).length;
 
-  // Per-Product Gap Calculation:
-  // remToCover = Math.max(0, Target - Ach) -> how much the manager is missing to cover 100% target!
-  // netGap     = Ach - Target              -> negative = deficit, positive = surplus
   var prodGaps = {};
-  var totalRemToCover = 0;
+  var totalSignedGap = 0;
   PRODUCTS.forEach(function (p) {
     var t = Number(g[p.tKey]) || 0;
     var a = Number(g[p.aKey]) || 0;
-    var rem = Math.max(0, t - a);
-    var net = a - t;
+    var net = a - t; // + when surplus, - when deficit
     prodGaps[p.key] = {
       target: t,
       ach: a,
-      remToCover: rem,
       netGap: net,
       pct: t > 0 ? (a / t * 100) : 0
     };
-    totalRemToCover += rem;
+    totalSignedGap += net;
   });
 
   var uniqueBranches = [];
@@ -12625,9 +12604,8 @@ function calcMgrGroup(rows) {
     warnCount: warnCount,
     warn: warnCount > 0 ? 'Yes' : 'No',
     prodGaps: prodGaps,
-    mobileRemToCover: prodGaps.mobile ? prodGaps.mobile.remToCover : 0,
-    totalRemToCover: totalRemToCover,
-    hasAnyGap: totalRemToCover > 0,
+    mobileNetGap: prodGaps.mobile ? prodGaps.mobile.netGap : 0,
+    totalSignedGap: totalSignedGap,
     branches: uniqueBranches,
     months: uniqueMonths,
     effMobPct: effMobPct,
@@ -12642,10 +12620,12 @@ function sortMgrAggList(list) {
   list.sort(function (a, b) {
     if (mode === 'name_asc') return (a.label || '').localeCompare(b.label || '');
     if (mode === 'eval_asc') return ((a.agg.evalScore !== null ? a.agg.evalScore : 999) - (b.agg.evalScore !== null ? b.agg.evalScore : 999));
-    if (mode === 'mob_gap_desc') return (b.agg.mobileRemToCover || 0) - (a.agg.mobileRemToCover || 0);
-    if (mode === 'tot_gap_desc') return (b.agg.totalRemToCover || 0) - (a.agg.totalRemToCover || 0);
+    if (mode === 'mob_gap_asc') return (a.agg.mobileNetGap || 0) - (b.agg.mobileNetGap || 0);
+    if (mode === 'mob_gap_desc') return (b.agg.mobileNetGap || 0) - (a.agg.mobileNetGap || 0);
     if (mode === 'mob_pct_desc') return (b.agg.effMobPct || 0) - (a.agg.effMobPct || 0);
     if (mode === 'mob_ach_desc') return (b.agg.mobileSubs || 0) - (a.agg.mobileSubs || 0);
+    if (mode === 'mix_desc') return (b.agg.mix30 || 0) - (a.agg.mix30 || 0);
+    if (mode === 'perf_desc') return (b.agg.perf25 || 0) - (a.agg.perf25 || 0);
     var ea = a.agg.evalScore !== null ? a.agg.evalScore : -1;
     var eb = b.agg.evalScore !== null ? b.agg.evalScore : -1;
     if (Math.abs(eb - ea) > 0.0001) return eb - ea;
@@ -12655,19 +12635,6 @@ function sortMgrAggList(list) {
 }
 
 // ── UI Toggles & Filter Handlers ──
-function toggleMgrSectionBody(forceOpen) {
-  MGR_SECTION_OPEN = (forceOpen !== undefined) ? !!forceOpen : !MGR_SECTION_OPEN;
-  var bodyEl = document.getElementById('mgr-perf-body');
-  var btnEl = document.getElementById('mgr-section-toggle-btn');
-  if (bodyEl) bodyEl.style.display = MGR_SECTION_OPEN ? 'block' : 'none';
-  if (btnEl) {
-    btnEl.innerHTML = MGR_SECTION_OPEN ? '<i class="fas fa-eye-slash mr-1"></i>إخفاء الجداول' : '<i class="fas fa-eye mr-1"></i>عرض الجداول';
-    btnEl.style.background = MGR_SECTION_OPEN ? 'white' : '#5E2D91';
-    btnEl.style.color = MGR_SECTION_OPEN ? '#5E2D91' : 'white';
-  }
-  if (MGR_SECTION_OPEN) renderManagersPerf();
-}
-
 function setMgrViewMode(mode) {
   MGR_VIEW_MODE = mode;
   ['bymonth', 'bymanager', 'summary'].forEach(function (m) {
@@ -12697,31 +12664,15 @@ function setMgrLevel(lvl) {
 
 function setMgrMetricMode(mode) {
   MGR_METRIC_MODE = mode;
-  var map = { combined: 'mgr-met-combined', product_gaps: 'mgr-met-gaps', products_detail: 'mgr-met-prods', eval_detail: 'mgr-met-eval' };
+  var map = { combined: 'mgr-met-combined', products_detail: 'mgr-met-prods', eval_detail: 'mgr-met-eval' };
   Object.keys(map).forEach(function (k) {
     var b = document.getElementById(map[k]);
     if (b) {
-      var active = (k === mode);
-      b.style.background = active ? (k === 'product_gaps' ? '#dc2626' : '#5E2D91') : 'transparent';
-      b.style.color = active ? 'white' : (k === 'product_gaps' ? '#dc2626' : '#4b5563');
-      b.style.fontWeight = active ? '800' : '700';
+      b.style.background = (k === mode) ? '#5E2D91' : 'transparent';
+      b.style.color = (k === mode) ? 'white' : '#4b5563';
+      b.style.fontWeight = (k === mode) ? '800' : '700';
     }
   });
-  renderManagersPerf();
-}
-
-function toggleMgrGapOnlyFilter() {
-  MGR_GAP_ONLY = !MGR_GAP_ONLY;
-  var btn = document.getElementById('mgr-gap-only-btn');
-  if (btn) {
-    btn.style.background = MGR_GAP_ONLY ? '#dc2626' : 'white';
-    btn.style.color = MGR_GAP_ONLY ? 'white' : '#dc2626';
-    btn.style.borderColor = MGR_GAP_ONLY ? '#dc2626' : '#fca5a5';
-  }
-  if (MGR_GAP_ONLY && MGR_METRIC_MODE === 'eval_detail') {
-    setMgrMetricMode('product_gaps');
-    return;
-  }
   renderManagersPerf();
 }
 
@@ -12746,7 +12697,7 @@ function toggleMgrShowAllRows() {
     btn.style.color = MGR_SHOW_ALL_ROWS ? 'white' : '#374151';
     btn.style.borderColor = MGR_SHOW_ALL_ROWS ? '#5E2D91' : '#e5e7eb';
   }
-  if (lbl) lbl.textContent = MGR_SHOW_ALL_ROWS ? 'عرض مختصر (15)' : 'عرض الكل';
+  if (lbl) lbl.textContent = MGR_SHOW_ALL_ROWS ? 'عرض مختصر (25)' : 'عرض الكل';
   renderManagersPerf();
 }
 
@@ -12801,12 +12752,13 @@ function expandCollapseAllMgrBlocks() {
       MGR_LAST_MODEL.byManager.forEach(function (m) { MGR_SUMMARY_EXPANDED[m.key] = true; });
     }
   } else {
-    var list = (MGR_LAST_MODEL && (MGR_VIEW_MODE === 'bymonth' ? MGR_LAST_MODEL.byMonth : MGR_LAST_MODEL.byManager)) || [];
-    var anyOpenBlock = list.some(function (x) { return !MGR_BLOCK_COLLAPSED[x.key]; });
-    if (anyOpenBlock) {
-      list.forEach(function (x) { MGR_BLOCK_COLLAPSED[x.key] = true; });
-    } else {
+    var bKeys = Object.keys(MGR_BLOCK_COLLAPSED);
+    var anyCollapsed = bKeys.some(function (k) { return MGR_BLOCK_COLLAPSED[k]; });
+    if (anyCollapsed) {
       MGR_BLOCK_COLLAPSED = {};
+    } else if (MGR_LAST_MODEL) {
+      var list = MGR_VIEW_MODE === 'bymonth' ? MGR_LAST_MODEL.byMonth : MGR_LAST_MODEL.byManager;
+      (list || []).forEach(function (x) { MGR_BLOCK_COLLAPSED[x.key] = true; });
     }
   }
   renderManagersPerf();
@@ -12862,9 +12814,6 @@ function buildManagersModel() {
         transferredFrom: transferredThisMonth ? prevMonthEntry.store : null
       };
     });
-    if (MGR_GAP_ONLY) {
-      entities = entities.filter(function (e) { return e.agg.hasAnyGap; });
-    }
     sortMgrAggList(entities);
     return {
       key: 'MO|' + m,
@@ -12876,7 +12825,7 @@ function buildManagersModel() {
     };
   });
 
-  // 2. Group By Manager (Across all selected months in the year)
+  // 2. Group By Manager
   var byMgrMap = {};
   rows.forEach(function (r) {
     var k = getMgrEntityKey(r);
@@ -12930,10 +12879,6 @@ function buildManagersModel() {
       movedAcrossYear: uniqueBranchNames.length > 1
     };
   });
-
-  if (MGR_GAP_ONLY) {
-    byManager = byManager.filter(function (m) { return m.agg.hasAnyGap; });
-  }
   sortMgrAggList(byManager);
 
   return {
@@ -12946,7 +12891,7 @@ function buildManagersModel() {
   };
 }
 
-// ── Format Badges & Gap Cells ──
+// ── Format Badges & Inline +/- Gap ──
 function mgrScoreBadge(pctVal, isEval) {
   if (pctVal === null || pctVal === undefined || isNaN(pctVal)) return '<span style="color:#9ca3af">—</span>';
   var v = Math.round(pctVal * 10) / 10;
@@ -12960,138 +12905,123 @@ function mgrScoreBadge(pctVal, isEval) {
     else if (v >= 80) { bg = '#fef3c7'; fg = '#b45309'; }
     else { bg = '#fee2e2'; fg = '#b91c1c'; }
   }
-  return '<span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:800;background:' + bg + ';color:' + fg + '">' + v.toFixed(1) + '%</span>';
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800;background:' + bg + ';color:' + fg + '">' + v.toFixed(1) + '%</span>';
 }
 
-function mgrGapBadge(target, ach, isTotalRow) {
-  if (!(target > 0) && !(ach > 0)) return '<span style="color:#9ca3af">—</span>';
-  var rem = Math.max(0, target - ach);
-  var sur = Math.max(0, ach - target);
-  if (rem > 0) {
-    if (isTotalRow) return '<span style="color:#fca5a5;font-weight:900">-' + fmtN(rem) + '</span>';
-    return '<span title="ناقص ' + fmtN(rem) + ' لتغطية التارجت (100%)" style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10.5px;font-weight:900;background:#fee2e2;color:#b91c1c">ناقص ' + fmtN(rem) + '</span>';
-  }
-  if (isTotalRow) return '<span style="color:#86efac;font-weight:900">✓ +' + fmtN(sur) + '</span>';
-  return '<span title="تم تغطية التارجت بالكامل بفائض +' + fmtN(sur) + '" style="display:inline-block;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:800;background:#dcfce7;color:#15803d">✓ +' + fmtN(sur) + '</span>';
+function fmtSignedGapStr(ach, tgt) {
+  var d = Math.round((Number(ach) || 0) - (Number(tgt) || 0));
+  return (d > 0 ? '+' : '') + fmtN(d);
 }
 
+function mgrInlineGapHTML(ach, tgt, isTotalRow) {
+  var t = Number(tgt) || 0, a = Number(ach) || 0;
+  if (t === 0 && a === 0) return '';
+  var d = Math.round(a - t);
+  var sign = d > 0 ? '+' : '';
+  var clr = d >= 0 ? (isTotalRow ? '#86efac' : '#15803d') : (isTotalRow ? '#fca5a5' : '#dc2626');
+  return '<div style="font-size:9px;font-weight:800;color:' + clr + ';margin-top:1px">Gap: ' + sign + fmtN(d) + '</div>';
+}
+
+// ── Render 5 Summary KPI Cards (Restored v1 layout + +/- Gap inside the Mobile card) ──
 function mgrRenderKPIs(model) {
   var el = document.getElementById('mgr-kpi-grid');
   if (!el) return;
   var g = model.grandAgg;
   var mgrCount = model.byManager.length;
   var monthsCount = model.months.length;
+  var movedCount = model.byManager.filter(function (m) { return m.movedAcrossYear; }).length;
   var evalPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
   var mobPct = g.effMobPct ? g.effMobPct.toFixed(1) + '%' : '0.0%';
-  var mobGap = g.mobileRemToCover || 0;
-  var mgrsWithMobGap = model.byManager.filter(function (m) { return (m.agg.mobileRemToCover || 0) > 0; }).length;
   var topMgr = model.byManager[0] || null;
   var topEval = (topMgr && topMgr.agg.evalScore !== null) ? (topMgr.agg.evalScore * 100).toFixed(1) + '%' : (topMgr ? topMgr.agg.effMobPct.toFixed(1) + '%' : '—');
   var roleAr = MGR_LEVEL === 'storeManager' ? 'مدير فرع' : (MGR_LEVEL === 'areaManager' ? 'Area Manager' : (MGR_LEVEL === 'supervisor' ? 'Supervisor' : 'Regional Manager'));
 
-  function card(title, val, sub, icon, borderClr, valClr) {
+  var mobGapDiff = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
+  var mobGapClr = mobGapDiff >= 0 ? '#15803d' : '#dc2626';
+  var mobSubHTML = g.hasRawMob
+    ? ('Ach: ' + fmtN(g.mobileSubs) + ' / Tgt: ' + fmtN(g.mobileTarget) + ' · <strong style="color:' + mobGapClr + '">Gap: ' + (mobGapDiff > 0 ? '+' : '') + fmtN(mobGapDiff) + '</strong>')
+    : 'من واقع نسبة التفعيل في التقييم';
+
+  function card(title, val, subHTML, icon, borderClr, valClr) {
     return '<div class="kpi-card" style="border-top:3px solid ' + borderClr + ';padding:12px 14px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
         '<span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">' + title + '</span>' +
         '<i class="fas ' + icon + '" style="color:' + borderClr + ';font-size:13px;opacity:.85"></i>' +
       '</div>' +
-      '<div style="font-size:19px;font-weight:900;color:' + (valClr || '#111827') + ';line-height:1.2">' + val + '</div>' +
-      '<div style="font-size:10px;color:#6b7280;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + mgrEsc(sub) + '">' + sub + '</div>' +
+      '<div style="font-size:20px;font-weight:900;color:' + (valClr || '#111827') + ';line-height:1.2">' + val + '</div>' +
+      '<div style="font-size:10px;color:#6b7280;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + subHTML + '</div>' +
     '</div>';
   }
 
   el.innerHTML =
     card('إجمالي المديرين', fmtN(mgrCount) + ' <span style="font-size:11px;font-weight:700;color:#6b7280">' + roleAr + '</span>', monthsCount + ' شهور · ' + fmtN(g.rowCount) + ' سجل شهري', 'fa-user-tie', '#5E2D91', '#5E2D91') +
-    card('متوسط التقييم العام', evalPct, 'Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—'), 'fa-star', '#16a34a', '#15803d') +
-    card('تحقيق الموبايل العام', mobPct, g.hasRawMob ? ('Ach: ' + fmtN(g.mobileSubs) + ' / Tgt: ' + fmtN(g.mobileTarget)) : 'من واقع نسبة التفعيل في التقييم', 'fa-mobile-alt', '#2563eb', '#1d4ed8') +
-    card('الـ Gap المتبقي (Mobile)', mobGap > 0 ? ('ناقص ' + fmtN(mobGap)) : ('✓ مغطى بالكامل'), mgrsWithMobGap + ' مدير ناقصهم تارجت موبايل للتغطية', 'fa-bullseye', '#dc2626', mobGap > 0 ? '#dc2626' : '#15803d') +
-    card('الأول في الترتيب', topMgr ? mgrEsc(topMgr.label) : '—', topMgr ? ('التقييم: ' + topEval + (topMgr.oracleId && topMgr.oracleId !== '—' ? ' · ID: ' + topMgr.oracleId : '')) : '—', 'fa-trophy', '#f5a623', '#b45309');
+    card('متوسط التقييم الشهري', evalPct, 'Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—'), 'fa-star', '#16a34a', '#15803d') +
+    card('تحقيق الموبايل العام', mobPct, mobSubHTML, 'fa-mobile-alt', '#2563eb', '#1d4ed8') +
+    card('الأول في الترتيب', topMgr ? mgrEsc(topMgr.label) : '—', topMgr ? ('التقييم: ' + topEval + (topMgr.oracleId && topMgr.oracleId !== '—' ? ' · ID: ' + mgrEsc(topMgr.oracleId) : '')) : '—', 'fa-trophy', '#f5a623', '#b45309') +
+    card('التنقلات والإنذارات', movedCount + ' <span style="font-size:11px;font-weight:700;color:#6b7280">تنقّل بين الفروع</span>', 'إنذارات Warning Mail: ' + fmtN(g.warnCount), 'fa-exchange-alt', '#e91e8c', '#be185d');
 }
 
-// ── Build Table Headers & Rows for HTML (including Product Gaps mode!) ──
+// ── Build Table Headers & Rows for HTML (Exact v1 columns + inline +/- Gap inside the product cells) ──
 function getEffectiveMetricMode(hasRawProducts) {
-  if (!hasRawProducts && (MGR_METRIC_MODE === 'products_detail' || MGR_METRIC_MODE === 'product_gaps')) return 'eval_detail';
+  if (!hasRawProducts && MGR_METRIC_MODE === 'products_detail') return 'eval_detail';
   return MGR_METRIC_MODE;
 }
 
 function buildMgrTableTheadHTML(firstColTitle, secondColTitle, effMode, hasRawProducts) {
-  var thBase = 'padding:7px 7px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.02em;text-align:center;border:1px solid rgba(255,255,255,0.15);white-space:nowrap';
-
-  // MODE: Dedicated Product Gaps ("الـ Gap اللي ناقص لكل منتج عشان يكوڤره")
-  if (effMode === 'product_gaps' && hasRawProducts) {
-    var prodGapHeaders = PRODUCTS.map(function (p) {
-      return '<th colspan="3" style="' + thBase + ';background:' + p.color + '"><i class="fas ' + p.icon + ' mr-1"></i>' + p.label + ' (Gap)</th>';
-    }).join('');
-    var prodGapSubs = PRODUCTS.map(function () {
-      return '<th style="' + thBase + ';background:#374151;font-size:9px">TGT / ACH</th>' +
-             '<th style="' + thBase + ';background:#991b1b;font-size:9px">الناقص (GAP)</th>' +
-             '<th style="' + thBase + ';background:#374151;font-size:9px">%</th>';
-    }).join('');
-    return '<thead>' +
-      '<tr style="background:#1a1a2e">' +
-        '<th rowspan="2" style="' + thBase + ';width:32px">#</th>' +
-        '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:185px">' + firstColTitle + '</th>' +
-        '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:160px">' + secondColTitle + '</th>' +
-        '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:125px">Area Mgr / Supervisor</th>' +
-        prodGapHeaders +
-        '<th rowspan="2" style="' + thBase + ';background:#0f766e">Eval %</th>' +
-      '</tr>' +
-      '<tr>' + prodGapSubs + '</tr>' +
-    '</thead>';
-  }
-
+  var thBase = 'padding:7px 8px;font-size:10px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.02em;text-align:center;border:1px solid rgba(255,255,255,0.15);white-space:nowrap';
   var showProds = hasRawProducts && (effMode === 'combined' || effMode === 'products_detail');
   var prodDetails = (effMode === 'products_detail');
 
   if (showProds) {
-    var colsPerProd = prodDetails ? 4 : 2;
+    var colsPerProd = prodDetails ? 3 : 1;
     var prodTop = PRODUCTS.map(function (p) {
       return '<th colspan="' + colsPerProd + '" style="' + thBase + ';background:' + p.color + '"><i class="fas ' + p.icon + ' mr-1"></i>' + p.label + '</th>';
     }).join('');
-    var evalTop = '<th colspan="' + (prodDetails ? 2 : 3) + '" style="' + thBase + ';background:#0f766e"><i class="fas fa-award mr-1"></i>التقييم (Eval)</th>';
+    var evalTop = '<th colspan="' + (prodDetails ? 3 : 5) + '" style="' + thBase + ';background:#0f766e"><i class="fas fa-award mr-1"></i>التقييم الشهري (Evaluation)</th>';
 
     var row1 = '<tr style="background:#1a1a2e">' +
-      '<th rowspan="2" style="' + thBase + ';width:32px">#</th>' +
-      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:185px">' + firstColTitle + '</th>' +
-      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:160px">' + secondColTitle + '</th>' +
-      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:125px">Area Mgr / Supervisor</th>' +
+      '<th rowspan="2" style="' + thBase + ';width:34px">#</th>' +
+      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:190px">' + firstColTitle + '</th>' +
+      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:165px">' + secondColTitle + '</th>' +
+      '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:130px">Area Mgr / Supervisor</th>' +
       prodTop + evalTop + '</tr>';
 
     var prodSub = prodDetails
       ? PRODUCTS.map(function () {
           return '<th style="' + thBase + ';background:#374151;font-size:9px">TGT</th>' +
                  '<th style="' + thBase + ';background:#374151;font-size:9px">ACH</th>' +
-                 '<th style="' + thBase + ';background:#991b1b;font-size:9px">GAP</th>' +
-                 '<th style="' + thBase + ';background:#374151;font-size:9px">%</th>';
+                 '<th style="' + thBase + ';background:#374151;font-size:9px">% / GAP</th>';
         }).join('')
       : PRODUCTS.map(function () {
-          return '<th style="' + thBase + ';background:#374151;font-size:9px">ACH / %</th>' +
-                 '<th style="' + thBase + ';background:#7f1d1d;font-size:9px">الناقص (Gap)</th>';
+          return '<th style="' + thBase + ';background:#374151;font-size:9px">ACH / % / GAP</th>';
         }).join('');
 
     var evalSub = prodDetails
-      ? '<th style="' + thBase + ';background:#115e59;font-size:9px">Perf 25%</th>' +
+      ? '<th style="' + thBase + ';background:#115e59;font-size:9px">Mix 30%</th>' +
+        '<th style="' + thBase + ';background:#115e59;font-size:9px">Perf 25%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Eval %</th>'
-      : '<th style="' + thBase + ';background:#115e59;font-size:9px">Mix 30%</th>' +
+      : '<th style="' + thBase + ';background:#115e59;font-size:9px">Act %</th>' +
+        '<th style="' + thBase + ';background:#115e59;font-size:9px">Mob 35%</th>' +
+        '<th style="' + thBase + ';background:#115e59;font-size:9px">Mix 30%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Perf 25%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Eval %</th>';
 
     return '<thead>' + row1 + '<tr>' + prodSub + evalSub + '</tr></thead>';
   }
 
-  // Evaluation breakdown mode
+  // Evaluation breakdown mode (exact v1 layout from screenshot 663896.jpg)
   var mobCols = hasRawProducts
-    ? '<th colspan="4" style="' + thBase + ';background:#5E2D91"><i class="fas fa-mobile-alt mr-1"></i>Mobile + Gap</th>'
+    ? '<th colspan="3" style="' + thBase + ';background:#5E2D91"><i class="fas fa-mobile-alt mr-1"></i>Mobile (Dashboard)</th>'
     : '';
   var mobSub = hasRawProducts
-    ? '<th style="' + thBase + ';background:#4c1d95;font-size:9px">TGT</th><th style="' + thBase + ';background:#4c1d95;font-size:9px">ACH</th><th style="' + thBase + ';background:#991b1b;font-size:9px">GAP</th><th style="' + thBase + ';background:#4c1d95;font-size:9px">%</th>'
+    ? '<th style="' + thBase + ';background:#4c1d95;font-size:9px">TGT</th><th style="' + thBase + ';background:#4c1d95;font-size:9px">ACH</th><th style="' + thBase + ';background:#4c1d95;font-size:9px">% / GAP</th>'
     : '';
 
   var r1 = '<tr style="background:#1a1a2e">' +
-    '<th rowspan="2" style="' + thBase + ';width:32px">#</th>' +
-    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:190px">' + firstColTitle + '</th>' +
-    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:165px">' + secondColTitle + '</th>' +
-    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:130px">Area Mgr / Regional</th>' +
+    '<th rowspan="2" style="' + thBase + ';width:34px">#</th>' +
+    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:195px">' + firstColTitle + '</th>' +
+    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:170px">' + secondColTitle + '</th>' +
+    '<th rowspan="2" style="' + thBase + ';text-align:left;min-width:135px">Area Mgr / Regional</th>' +
     mobCols +
     '<th colspan="3" style="' + thBase + ';background:#5E2D91">Sales & Mix (65%)</th>' +
     '<th style="' + thBase + ';background:#2563eb">TNPS (10%)</th>' +
@@ -13118,78 +13048,73 @@ function buildMgrTableTheadHTML(firstColTitle, secondColTitle, effMode, hasRawPr
 }
 
 function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
-  var tdBase = 'padding:6px 7px;text-align:center;font-size:11px;border-bottom:1px solid #f1f5f9;white-space:nowrap' + (isTotalRow ? ';color:white;font-weight:800' : '');
+  var tdBase = 'padding:7px 8px;text-align:center;font-size:11px;border-bottom:1px solid #f1f5f9;white-space:nowrap' + (isTotalRow ? ';color:white;font-weight:800' : '');
+  var showProds = hasRawProducts && (effMode === 'combined' || effMode === 'products_detail');
+  var prodDetails = (effMode === 'products_detail');
+
   var fmtScore = function (v, decimals) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return Number(v).toFixed(decimals !== undefined ? decimals : 1);
   };
-  var evalPctVal = agg.evalScore !== null ? agg.evalScore * 100 : null;
-  var warnChip = agg.warn === 'Yes'
-    ? '<span style="display:inline-block;margin-left:3px;padding:1px 4px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:8.5px;font-weight:800">⚠️' + (agg.warnCount > 1 ? agg.warnCount : '') + '</span>'
-    : '';
-
-  // MODE: Product Gaps ("الـ Gap اللي ناقص لكل منتج")
-  if (effMode === 'product_gaps' && hasRawProducts) {
-    var gapCells = PRODUCTS.map(function (p) {
-      var t = agg[p.tKey] || 0, a = agg[p.aKey] || 0;
-      var ap = t > 0 ? Math.round(a / t * 100) : 0;
-      var clr = isTotalRow ? '#e9d5ff' : (ap >= 100 ? '#15803d' : (ap >= 80 ? '#b45309' : '#b91c1c'));
-      return '<td style="' + tdBase + ';font-size:10px;color:' + (isTotalRow ? '#e5e7eb' : '#4b5563') + '">' +
-          '<div>T: <strong>' + fmtN(t) + '</strong></div>' +
-          '<div>A: <strong style="color:' + (isTotalRow ? 'white' : '#111827') + '">' + fmtN(a) + '</strong></div>' +
-        '</td>' +
-        '<td style="' + tdBase + ';background:' + (isTotalRow ? 'transparent' : '#fffafa') + '">' + mgrGapBadge(t, a, isTotalRow) + '</td>' +
-        '<td style="' + tdBase + ';font-weight:800;color:' + clr + ';border-right:1px solid #e5e7eb">' + (t > 0 ? ap + '%' : '—') + '</td>';
-    }).join('');
-    return gapCells +
-      '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
-  }
-
-  var showProds = hasRawProducts && (effMode === 'combined' || effMode === 'products_detail');
-  var prodDetails = (effMode === 'products_detail');
 
   if (showProds) {
     var prodCells = PRODUCTS.map(function (p) {
-      var t = agg[p.tKey] || 0, a = agg[p.aKey] || 0;
+      var t = agg[p.tKey] || 0;
+      var a = agg[p.aKey] || 0;
       var ap = t > 0 ? Math.round(a / t * 100) : 0;
       var clr = isTotalRow ? '#e9d5ff' : (ap >= 100 ? '#15803d' : (ap >= 80 ? '#b45309' : '#b91c1c'));
+      var gapLine = mgrInlineGapHTML(a, t, isTotalRow);
       if (prodDetails) {
         return '<td style="' + tdBase + ';color:' + (isTotalRow ? '#e5e7eb' : '#6b7280') + '">' + fmtN(t) + '</td>' +
                '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#111827') + '">' + fmtN(a) + '</td>' +
-               '<td style="' + tdBase + '">' + mgrGapBadge(t, a, isTotalRow) + '</td>' +
-               '<td style="' + tdBase + ';font-weight:800;color:' + clr + ';border-right:1px solid #e5e7eb">' + (t > 0 ? ap + '%' : '—') + '</td>';
+               '<td style="' + tdBase + ';font-weight:800;color:' + clr + ';border-right:1px solid #e5e7eb">' +
+                 '<div>' + (t > 0 ? ap + '%' : '—') + '</div>' +
+                 gapLine +
+               '</td>';
       }
-      return '<td style="' + tdBase + '">' +
-        '<div style="font-size:11px;font-weight:700;color:' + (isTotalRow ? 'white' : '#1f2937') + '">' + fmtN(a) + ' <span style="font-size:9px;color:#9ca3af">/ ' + fmtN(t) + '</span></div>' +
+      return '<td style="' + tdBase + ';border-right:1px solid #f1f5f9">' +
+        '<div style="font-size:11.5px;font-weight:700;color:' + (isTotalRow ? 'white' : '#1f2937') + '">' + fmtN(a) + '</div>' +
         '<div style="font-size:9.5px;font-weight:800;color:' + clr + '">' + (t > 0 ? ap + '%' : '—') + '</div>' +
-      '</td>' +
-      '<td style="' + tdBase + ';border-right:1px solid #f1f5f9">' + mgrGapBadge(t, a, isTotalRow) + '</td>';
+        gapLine +
+      '</td>';
     }).join('');
+
+    var evalPctVal = agg.evalScore !== null ? agg.evalScore * 100 : null;
+    var actPctVal = agg.actPct !== null ? agg.actPct * 100 : null;
+    var warnChip = agg.warn === 'Yes'
+      ? '<span style="display:inline-block;margin-left:4px;padding:1px 5px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:9px;font-weight:800">⚠️' + (agg.warnCount > 1 ? agg.warnCount : '') + '</span>'
+      : '';
 
     if (prodDetails) {
       return prodCells +
+        '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mix30, 1) + '</td>' +
         '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#0f766e') + '">' + fmtScore(agg.perf25, 1) + '</td>' +
         '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
     }
 
     return prodCells +
+      '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#4b5563') + '">' + (actPctVal !== null ? actPctVal.toFixed(1) + '%' : '—') + '</td>' +
+      '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#5E2D91') + '">' + fmtScore(agg.mob35, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mix30, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#0f766e') + '">' + fmtScore(agg.perf25, 1) + '</td>' +
       '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
   }
 
-  // Evaluation breakdown mode
+  // Evaluation breakdown mode (exact v1 columns + inline +/- Gap inside the Mobile % cell)
   var mobCells = '';
   if (hasRawProducts) {
     var mt = agg.mobileTarget || 0, ma = agg.mobileSubs || 0, mp = mt > 0 ? (ma / mt * 100) : 0;
     mobCells = '<td style="' + tdBase + ';color:' + (isTotalRow ? '#e5e7eb' : '#6b7280') + '">' + fmtN(mt) + '</td>' +
                '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#111827') + '">' + fmtN(ma) + '</td>' +
-               '<td style="' + tdBase + '">' + mgrGapBadge(mt, ma, isTotalRow) + '</td>' +
-               '<td style="' + tdBase + ';border-right:1px solid #e5e7eb">' + (isTotalRow ? (mt > 0 ? mp.toFixed(1) + '%' : '—') : mgrScoreBadge(mt > 0 ? mp : null, false)) + '</td>';
+               '<td style="' + tdBase + ';border-right:1px solid #e5e7eb">' +
+                 '<div>' + (isTotalRow ? (mt > 0 ? mp.toFixed(1) + '%' : '—') : mgrScoreBadge(mt > 0 ? mp : null, false)) + '</div>' +
+                 mgrInlineGapHTML(ma, mt, isTotalRow) +
+               '</td>';
   }
 
   var actVal = agg.actPct !== null ? agg.actPct * 100 : null;
   var tnpsVal = agg.tnps !== null ? agg.tnps * 100 : null;
+  var evVal = agg.evalScore !== null ? agg.evalScore * 100 : null;
   var warnBadge = agg.warn === 'Yes'
     ? '<span style="padding:2px 7px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-size:9.5px;font-weight:800">⚠️ Yes' + (agg.warnCount > 1 ? ' (' + agg.warnCount + ')' : '') + '</span>'
     : '<span style="color:' + (isTotalRow ? '#d1d5db' : '#16a34a') + ';font-size:10px;font-weight:700">No</span>';
@@ -13206,14 +13131,12 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
     '<td style="' + tdBase + ';color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mgm5, 1) + '</td>' +
     '<td style="' + tdBase + ';font-weight:800;color:' + (isTotalRow ? '#99f6e4' : '#0f766e') + ';background:' + (isTotalRow ? 'transparent' : '#f0fdfa') + '">' + fmtScore(agg.perf25, 1) + ' <span style="font-size:9px;opacity:.7">/25</span></td>' +
     '<td style="' + tdBase + '">' + warnBadge + '</td>' +
-    '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + '</td>';
+    '<td style="' + tdBase + '">' + (isTotalRow ? (evVal !== null ? evVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evVal, true)) + '</td>';
 }
 
 // ── Main Renderer ──
 function renderManagersPerf() {
   updateEvalStatusBadge();
-  if (!MGR_SECTION_OPEN && activeTab !== 'managers') return;
-
   var container = document.getElementById('mgr-perf-tables-container');
   if (!container) return;
 
@@ -13222,7 +13145,7 @@ function renderManagersPerf() {
   var scopeBtn = document.getElementById('mgr-scope-toggle-btn');
   if (scopeLbl && scopeBtn) {
     if (!hasRaw || MGR_DATA_SCOPE === 'all_eval') {
-      scopeLbl.textContent = 'شامل كل شيت التقييم';
+      scopeLbl.textContent = 'شامل كل شيت التقييم (All Eval)';
       scopeBtn.style.background = '#5E2D91';
       scopeBtn.style.color = 'white';
     } else {
@@ -13238,9 +13161,9 @@ function renderManagersPerf() {
 
   if (!model.rows.length) {
     container.innerHTML = '<div class="chart-card" style="padding:36px;text-align:center;color:#6b7280">' +
-      '<div style="font-size:32px;margin-bottom:8px">📋</div>' +
-      '<div style="font-size:14px;font-weight:800;color:#374151;margin-bottom:6px">لا توجد بيانات معروضة حالياً</div>' +
-      '<div style="font-size:12px;max-width:520px;margin:0 auto;line-height:1.6">ارفع ملف <strong>Evaluation 2026.xlsx</strong> من زرار <strong>"رفع لـ Supabase (Upload)"</strong> أو زرار <strong>"رفع شيت Evaluation مانوال"</strong> بالأعلى لعرض أداء وتقييم المديرين ونواقص التارجت (Gap) بالشهور.</div>' +
+      '<div style="font-size:32px;margin-bottom:8px">🔍</div>' +
+      '<div style="font-size:14px;font-weight:800;color:#374151;margin-bottom:4px">لا توجد بيانات مطابقة للفلاتر الحالية</div>' +
+      '<div style="font-size:11.5px">تأكد من رفع شيت <strong>Evaluation 2026.xlsx</strong> من زرار <strong>Upload Data</strong> أو <strong>تحديث شيت الـ Evaluation</strong>، أو جرّب مسح البحث.</div>' +
     '</div>';
     return;
   }
@@ -13256,7 +13179,7 @@ function renderManagersPerf() {
   }
 }
 
-// ── VIEW 1: Stacked Monthly Tables ("ك table تحت بعض بالشهور") ──
+// ── VIEW 1: Stacked Monthly Tables ("ك table تحت بعض بالشهور" — Restored v1 layout + warnings + inline Gap) ──
 function renderMgrByMonthStackedHTML(model, effMode) {
   var hasRaw = model.hasRawProducts;
   var thead = buildMgrTableTheadHTML('Store Manager (اسم المدير)', 'Branch (الفرع والكود)', effMode, hasRaw);
@@ -13268,24 +13191,24 @@ function renderMgrByMonthStackedHTML(model, effMode) {
     var tg = mBlock.totalAgg;
     var evAvgTxt = tg.evalScore !== null ? (tg.evalScore * 100).toFixed(1) + '%' : '—';
     var mobPctTxt = tg.effMobPct ? tg.effMobPct.toFixed(1) + '%' : '—';
-    var mobGapTxt = tg.mobileRemToCover > 0 ? ('ناقص ' + fmtN(tg.mobileRemToCover)) : 'مغطى ✓';
+    var mobGapTxt = hasRaw ? (' · Gap: ' + fmtSignedGapStr(tg.mobileSubs, tg.mobileTarget)) : '';
 
     var headerBar = '<div onclick="toggleMgrBlockCollapse(\'' + mBlock.key + '\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;padding:11px 16px;border-radius:' + (isCollapsed ? '12px' : '12px 12px 0 0') + ';box-shadow:0 2px 8px rgba(94,45,145,0.18)">' +
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
         '<i class="fas fa-chevron-' + (isCollapsed ? 'left' : 'down') + '" style="font-size:11px;opacity:.85"></i>' +
-        '<span style="font-size:14px;font-weight:900"><i class="fas fa-calendar-check mr-2"></i>' + mgrEsc(mBlock.monthLabelEn) + ' — ' + mgrEsc(mBlock.monthLabelAr) + '</span>' +
+        '<span style="font-size:14px;font-weight:900;letter-spacing:.01em"><i class="fas fa-calendar-check mr-2"></i>' + mgrEsc(mBlock.monthLabelEn) + ' — ' + mgrEsc(mBlock.monthLabelAr) + '</span>' +
         '<span style="background:rgba(255,255,255,0.18);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:800">👤 ' + fmtN(totalEntities) + ' مدير</span>' +
         '<span style="background:rgba(255,255,255,0.18);padding:2px 10px;border-radius:12px;font-size:11px;font-weight:800">🏪 ' + fmtN(tg.storeCount) + ' فرع</span>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:800">' +
-        '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px">⭐ التقييم: ' + evAvgTxt + '</span>' +
-        '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px">📱 Mobile: ' + mobPctTxt + '</span>' +
-        (hasRaw ? '<span style="background:' + (tg.mobileRemToCover > 0 ? '#fee2e2;color:#b91c1c' : '#dcfce7;color:#15803d') + ';padding:3px 10px;border-radius:12px">🎯 Gap الموبايل: ' + mobGapTxt + '</span>' : '') +
+        '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px">⭐ متوسط التقييم: ' + evAvgTxt + '</span>' +
+        '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px">📱 Mobile: ' + mobPctTxt + mobGapTxt + '</span>' +
+        (tg.warnCount > 0 ? '<span style="background:#fee2e2;color:#b91c1c;padding:3px 9px;border-radius:12px">⚠️ ' + tg.warnCount + ' إنذار</span>' : '') +
       '</div>' +
     '</div>';
 
     if (isCollapsed) {
-      return '<div style="margin-bottom:14px">' + headerBar + '</div>';
+      return '<div style="margin-bottom:18px">' + headerBar + '</div>';
     }
 
     var rowsHTML = visibleEntities.map(function (ent, idx) {
@@ -13296,25 +13219,25 @@ function renderMgrByMonthStackedHTML(model, effMode) {
         : '';
       var transferBadge = ent.transferredFrom
         ? '<span title="انتقل هذا الشهر من فرع: ' + mgrEsc(ent.transferredFrom) + '" style="display:inline-block;background:#fef3c7;color:#b45309;font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px">🔄 من: ' + mgrEsc(ent.transferredFrom) + '</span>'
-        : (ent.movedAcrossYear ? '<span style="display:inline-block;background:#e0e7ff;color:#3730a3;font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;margin-left:4px">🔄 تنقّل</span>' : '');
+        : (ent.movedAcrossYear ? '<span title="تنقّل بين أكثر من فرع خلال السنة — اضغط على الاسم لعرض مسار شهوره" style="display:inline-block;background:#e0e7ff;color:#3730a3;font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;margin-left:4px">🔄 تنقّل</span>' : '');
 
       var branchText = MGR_LEVEL === 'storeManager'
         ? '<div dir="auto" style="font-size:11.5px;font-weight:700;color:#1f2937">' + mgrEsc(s.store || '—') + '</div>' +
-          '<div style="font-size:9.5px;color:#6b7280;font-family:monospace">' + mgrEsc(s.storeCode || '') + '</div>'
+          '<div style="font-size:9.5px;color:#6b7280;font-family:monospace">' + mgrEsc(s.storeCode || '') + (s.classification ? ' · ' + mgrEsc(s.classification) : '') + '</div>'
         : '<div style="font-size:11px;font-weight:700;color:#374151">' + fmtN(ent.agg.storeCount) + ' فرع</div>' +
           '<div style="font-size:9.5px;color:#6b7280">' + mgrEsc(s.region || '') + '</div>';
 
       var hierText = '<div style="font-size:10.5px;font-weight:700;color:#374151">' + mgrEsc(s.areaManager || '—') + '</div>' +
                      '<div style="font-size:9.5px;color:#6b7280">' + mgrEsc(s.supervisor && s.supervisor !== 'Unassigned' ? s.supervisor : (s.regionalManager || '')) + '</div>';
 
-      return '<tr style="background:' + bg + '">' +
-        '<td style="padding:6px 5px;text-align:center;font-size:10.5px;font-weight:700;color:#9ca3af;border-bottom:1px solid #f1f5f9">' + (idx + 1) + '</td>' +
-        '<td onclick="selectSpecificManagerDrill(\'' + ent.key.replace(/'/g, "\\'") + '\')" style="cursor:pointer;padding:6px 9px;border-bottom:1px solid #f1f5f9" title="اضغط لعرض جدول شهور هذا المدير والـ Gap السنوي تحت بعض">' +
+      return '<tr style="background:' + bg + ';transition:background .15s" onmouseover="this.style.background=\'#f5f0ff\'" onmouseout="this.style.background=\'' + bg + '\'">' +
+        '<td style="padding:7px 6px;text-align:center;font-size:10.5px;font-weight:700;color:#9ca3af;border-bottom:1px solid #f1f5f9">' + (idx + 1) + '</td>' +
+        '<td onclick="selectSpecificManagerDrill(\'' + ent.key.replace(/'/g, "\\'") + '\')" style="cursor:pointer;padding:7px 10px;border-bottom:1px solid #f1f5f9" title="اضغط لعرض جدول شهور هذا المدير تحت بعض">' +
           '<div style="font-size:11.5px;font-weight:800;color:#5E2D91">' + mgrEsc(ent.label) + transferBadge + '</div>' +
-          '<div style="margin-top:2px">' + oidBadge + '</div>' +
+          '<div style="margin-top:2px">' + oidBadge + (ent.hiringDate ? '<span style="font-size:9px;color:#9ca3af">تعيين: ' + mgrEsc(ent.hiringDate) + '</span>' : '') + '</div>' +
         '</td>' +
-        '<td style="padding:6px 9px;border-bottom:1px solid #f1f5f9">' + branchText + '</td>' +
-        '<td style="padding:6px 9px;border-bottom:1px solid #f1f5f9">' + hierText + '</td>' +
+        '<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9">' + branchText + '</td>' +
+        '<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9">' + hierText + '</td>' +
         buildMgrMetricCellsHTML(ent.agg, effMode, hasRaw, false) +
       '</tr>';
     }).join('');
@@ -13327,13 +13250,13 @@ function renderMgrByMonthStackedHTML(model, effMode) {
     '</tr>';
 
     var moreFooter = (!MGR_SHOW_ALL_ROWS && totalEntities > MGR_PAGE_SIZE)
-      ? '<div style="padding:8px 14px;background:#faf9fb;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#6b7280">' +
-          '<span>يتم عرض أول <strong>' + MGR_PAGE_SIZE + '</strong> من أصل <strong>' + fmtN(totalEntities) + '</strong> مدير في ' + mgrEsc(mBlock.monthLabelAr) + ' (لتسريع التصفح)</span>' +
+      ? '<div style="padding:9px 14px;background:#faf9fb;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#6b7280">' +
+          '<span>يتم عرض أول <strong>' + MGR_PAGE_SIZE + '</strong> من أصل <strong>' + fmtN(totalEntities) + '</strong> مدير في ' + mgrEsc(mBlock.monthLabelAr) + '</span>' +
           '<button onclick="toggleMgrShowAllRows()" style="padding:4px 14px;border-radius:14px;border:1.5px solid #5E2D91;background:#5E2D91;color:white;font-size:10.5px;font-weight:800;cursor:pointer">عرض الكل (' + fmtN(totalEntities) + ')</button>' +
         '</div>'
       : '';
 
-    return '<div style="margin-bottom:18px;background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
+    return '<div style="margin-bottom:22px;background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
       headerBar +
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
         thead + '<tbody>' + rowsHTML + totalRowHTML + '</tbody>' +
@@ -13343,7 +13266,7 @@ function renderMgrByMonthStackedHTML(model, effMode) {
   }).join('');
 }
 
-// ── VIEW 2: Stacked Manager Tables ("شهور كل مدير تحت بعض + إجمالي الـ Gap على مدار السنة") ──
+// ── VIEW 2: Stacked Manager Tables ("شهور كل مدير تحت بعض") ──
 function renderMgrByManagerStackedHTML(model, effMode) {
   var hasRaw = model.hasRawProducts;
   var thead = buildMgrTableTheadHTML('Month (الشهر)', 'Branch in Month (الفرع والكود في الشهر)', effMode, hasRaw);
@@ -13356,28 +13279,29 @@ function renderMgrByManagerStackedHTML(model, effMode) {
     var s = mgr.sample || {};
     var evAvgTxt = tg.evalScore !== null ? (tg.evalScore * 100).toFixed(1) + '%' : '—';
     var mobPctTxt = tg.effMobPct ? tg.effMobPct.toFixed(1) + '%' : '—';
-    var mobGapTxt = tg.mobileRemToCover > 0 ? ('ناقص ' + fmtN(tg.mobileRemToCover)) : 'مغطى ✓';
+    var mobGapTxt = hasRaw ? (' · Gap: ' + fmtSignedGapStr(tg.mobileSubs, tg.mobileTarget)) : '';
     var branchesSummary = mgr.uniqueBranchNames.join(' ← ');
 
     var headerBar = '<div onclick="toggleMgrBlockCollapse(\'' + mgr.key.replace(/'/g, "\\'") + '\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:linear-gradient(135deg,#1e1b4b,#5E2D91);color:white;padding:11px 16px;border-radius:' + (isCollapsed ? '12px' : '12px 12px 0 0') + '">' +
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
         '<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:8px;font-size:11px;font-weight:900">#' + (mIdx + 1) + '</span>' +
         '<span style="font-size:14px;font-weight:900"><i class="fas fa-user-tie mr-1.5"></i>' + mgrEsc(mgr.label) + '</span>' +
-        (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:#f3e8ff;color:#5E2D91;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800">ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
+        (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:#f3e8ff;color:#5E2D91;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
         '<span style="background:rgba(255,255,255,0.15);padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700">📅 ' + mgr.monthEntries.length + ' شهور</span>' +
         '<span dir="auto" style="background:' + (mgr.movedAcrossYear ? '#fef3c7;color:#92400e' : 'rgba(255,255,255,0.15);color:white') + ';padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:800">' +
           (mgr.movedAcrossYear ? '🔄 ' + mgr.uniqueBranchNames.length + ' فروع: ' : '🏪 ') + mgrEsc(branchesSummary) +
         '</span>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:800">' +
+        '<span style="color:#e9d5ff;font-size:10.5px">' + mgrEsc(s.areaManager || '') + (s.regionalManager ? ' · ' + mgrEsc(s.regionalManager) : '') + '</span>' +
         '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px">⭐ متوسط التقييم: ' + evAvgTxt + '</span>' +
-        '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px">📱 Mobile: ' + mobPctTxt + '</span>' +
-        (hasRaw ? '<span style="background:' + (tg.mobileRemToCover > 0 ? '#fee2e2;color:#b91c1c' : '#dcfce7;color:#15803d') + ';padding:3px 10px;border-radius:12px">🎯 Gap السنة (Mobile): ' + mobGapTxt + '</span>' : '') +
+        '<span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px">📱 Mobile: ' + mobPctTxt + mobGapTxt + '</span>' +
+        (tg.warnCount > 0 ? '<span style="background:#fee2e2;color:#b91c1c;padding:3px 9px;border-radius:12px">⚠️ ' + tg.warnCount + ' إنذار</span>' : '') +
       '</div>' +
     '</div>';
 
     if (isCollapsed) {
-      return '<div style="margin-bottom:14px">' + headerBar + '</div>';
+      return '<div style="margin-bottom:16px">' + headerBar + '</div>';
     }
 
     var rowsHTML = mgr.monthEntries.map(function (me, idx) {
@@ -13389,32 +13313,32 @@ function renderMgrByManagerStackedHTML(model, effMode) {
 
       var branchCell = MGR_LEVEL === 'storeManager'
         ? '<div dir="auto" style="font-size:11.5px;font-weight:700;color:#1f2937">' + mgrEsc(ms.store || '—') + movedBadge + '</div>' +
-          '<div style="font-size:9.5px;color:#6b7280;font-family:monospace">' + mgrEsc(ms.storeCode || '') + '</div>'
+          '<div style="font-size:9.5px;color:#6b7280;font-family:monospace">' + mgrEsc(ms.storeCode || '') + (ms.classification ? ' · ' + mgrEsc(ms.classification) : '') + '</div>'
         : '<div style="font-size:11px;font-weight:700;color:#374151">' + fmtN(me.agg.storeCount) + ' فرع</div>';
 
       var hierCell = '<div style="font-size:10.5px;font-weight:700;color:#374151">' + mgrEsc(ms.areaManager || '—') + '</div>' +
                      '<div style="font-size:9.5px;color:#6b7280">' + mgrEsc(ms.supervisor && ms.supervisor !== 'Unassigned' ? ms.supervisor : (ms.regionalManager || '')) + '</div>';
 
       return '<tr style="background:' + bg + '">' +
-        '<td style="padding:6px 5px;text-align:center;font-size:10.5px;font-weight:700;color:#9ca3af;border-bottom:1px solid #f1f5f9">' + (idx + 1) + '</td>' +
-        '<td style="padding:6px 9px;border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
-          '<div style="font-size:11.5px;font-weight:800;color:#5E2D91">' + mgrEsc(me.monthLabelEn) + '</div>' +
+        '<td style="padding:7px 6px;text-align:center;font-size:10.5px;font-weight:700;color:#9ca3af;border-bottom:1px solid #f1f5f9">' + (idx + 1) + '</td>' +
+        '<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
+          '<div style="font-size:12px;font-weight:800;color:#5E2D91">' + mgrEsc(me.monthLabelEn) + '</div>' +
           '<div style="font-size:9.5px;color:#6b7280">' + mgrEsc(me.monthLabelAr) + '</div>' +
         '</td>' +
-        '<td style="padding:6px 9px;border-bottom:1px solid #f1f5f9">' + branchCell + '</td>' +
-        '<td style="padding:6px 9px;border-bottom:1px solid #f1f5f9">' + hierCell + '</td>' +
+        '<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9">' + branchCell + '</td>' +
+        '<td style="padding:7px 10px;border-bottom:1px solid #f1f5f9">' + hierCell + '</td>' +
         buildMgrMetricCellsHTML(me.agg, effMode, hasRaw, false) +
       '</tr>';
     }).join('');
 
     var totalRowHTML = '<tr style="background:#3b1d63;color:white;border-top:2px solid #1a1a2e">' +
-      '<td colspan="2" style="padding:8px 12px;font-size:11.5px;font-weight:900;color:white">إجمالي السنة / الفلاتر (' + mgr.monthEntries.length + ' شهور) — المتبقي للتغطية</td>' +
+      '<td colspan="2" style="padding:8px 12px;font-size:11.5px;font-weight:900;color:white">الإجمالي / المتوسط (' + mgr.monthEntries.length + ' شهور)</td>' +
       '<td dir="auto" style="padding:8px 10px;font-size:10.5px;font-weight:800;color:#e9d5ff">' + mgrEsc(branchesSummary) + '</td>' +
       '<td style="padding:8px 10px;font-size:10px;color:#c4b5fd">' + mgrEsc(s.areaManager || '—') + '</td>' +
       buildMgrMetricCellsHTML(tg, effMode, hasRaw, true) +
     '</tr>';
 
-    return '<div style="margin-bottom:18px;background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
+    return '<div style="margin-bottom:20px;background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
       headerBar +
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
         thead + '<tbody>' + rowsHTML + totalRowHTML + '</tbody>' +
@@ -13432,7 +13356,7 @@ function renderMgrByManagerStackedHTML(model, effMode) {
   return cardsHTML + moreFooter;
 }
 
-// ── VIEW 3: Consolidated Yearly Summary & Gap Table (with Click-to-Expand Monthly History) ──
+// ── VIEW 3: Consolidated Summary & Ranking Table (with Click-to-Expand Monthly History) ──
 function renderMgrSummaryTableHTML(model, effMode) {
   var hasRaw = model.hasRawProducts;
   var thead = buildMgrTableTheadHTML('Manager (اضغط لفتح الشهور تحت بعض)', 'Branches & Months (الفروع والشهور)', effMode, hasRaw);
@@ -13449,16 +13373,16 @@ function renderMgrSummaryTableHTML(model, effMode) {
     var branchesTxt = mgr.uniqueBranchNames.join(' ← ');
 
     var mainRow = '<tr onclick="toggleMgrSummaryExpand(\'' + mgr.key.replace(/'/g, "\\'") + '\')" style="cursor:pointer;background:' + bg + ';border-bottom:1px solid #e5e7eb">' +
-      '<td style="padding:7px 5px;text-align:center;font-size:11px;font-weight:800;color:#5E2D91">' + (idx + 1) + '</td>' +
-      '<td style="padding:7px 9px">' +
+      '<td style="padding:8px 6px;text-align:center;font-size:11px;font-weight:800;color:#5E2D91">' + (idx + 1) + '</td>' +
+      '<td style="padding:8px 10px">' +
         '<div style="font-size:12px;font-weight:800;color:#1f2937"><i class="fas fa-chevron-' + (isExp ? 'down' : 'left') + ' mr-1.5" style="font-size:9px;color:#5E2D91"></i>' + mgrEsc(mgr.label) + '</div>' +
         '<div style="margin-top:2px">' + oidBadge + '<span style="font-size:9.5px;color:#6b7280">📅 ' + mgr.monthEntries.length + ' شهور</span></div>' +
       '</td>' +
-      '<td dir="auto" style="padding:7px 9px">' +
+      '<td dir="auto" style="padding:8px 10px">' +
         '<div style="font-size:11px;font-weight:700;color:#374151">' + mgrEsc(branchesTxt) + '</div>' +
         (mgr.movedAcrossYear ? '<span style="font-size:9px;background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:6px;font-weight:800">🔄 تنقّل بين ' + mgr.uniqueBranchNames.length + ' فروع</span>' : '<span style="font-size:9.5px;color:#9ca3af">' + mgrEsc(s.storeCode || '') + '</span>') +
       '</td>' +
-      '<td style="padding:7px 9px">' +
+      '<td style="padding:8px 10px">' +
         '<div style="font-size:10.5px;font-weight:700;color:#374151">' + mgrEsc(s.areaManager || '—') + '</div>' +
         '<div style="font-size:9.5px;color:#6b7280">' + mgrEsc(s.supervisor && s.supervisor !== 'Unassigned' ? s.supervisor : (s.regionalManager || '')) + '</div>' +
       '</td>' +
@@ -13470,10 +13394,10 @@ function renderMgrSummaryTableHTML(model, effMode) {
     var subRows = mgr.monthEntries.map(function (me) {
       var ms = me.agg.sample || {};
       return '<tr style="background:#faf5ff;border-bottom:1px dashed #e9d5ff">' +
-        '<td style="padding:5px;text-align:center;color:#7c3aed;font-size:10px">↳</td>' +
-        '<td style="padding:5px 9px 5px 22px;font-size:11px;font-weight:800;color:#5E2D91">📅 ' + mgrEsc(me.monthLabelEn) + ' (' + mgrEsc(me.monthLabelAr) + ')</td>' +
-        '<td dir="auto" style="padding:5px 9px;font-size:11px;font-weight:700;color:#374151">🏪 ' + mgrEsc(ms.store || '—') + ' <span style="font-size:9.5px;color:#6b7280;font-family:monospace">(' + mgrEsc(ms.storeCode || '') + ')</span></td>' +
-        '<td style="padding:5px 9px;font-size:10px;color:#6b7280">' + mgrEsc(ms.areaManager || '—') + '</td>' +
+        '<td style="padding:6px;text-align:center;color:#7c3aed;font-size:10px">↳</td>' +
+        '<td style="padding:6px 10px 6px 24px;font-size:11px;font-weight:800;color:#5E2D91">📅 ' + mgrEsc(me.monthLabelEn) + ' (' + mgrEsc(me.monthLabelAr) + ')</td>' +
+        '<td dir="auto" style="padding:6px 10px;font-size:11px;font-weight:700;color:#374151">🏪 ' + mgrEsc(ms.store || '—') + ' <span style="font-size:9.5px;color:#6b7280;font-family:monospace">(' + mgrEsc(ms.storeCode || '') + ')</span></td>' +
+        '<td style="padding:6px 10px;font-size:10px;color:#6b7280">' + mgrEsc(ms.areaManager || '—') + '</td>' +
         buildMgrMetricCellsHTML(me.agg, effMode, hasRaw, false) +
       '</tr>';
     }).join('');
@@ -13482,7 +13406,7 @@ function renderMgrSummaryTableHTML(model, effMode) {
   }).join('');
 
   var totalRow = '<tr style="background:#1a1a2e;color:white;border-top:2px solid #5E2D91">' +
-    '<td colspan="2" style="padding:9px 12px;font-size:12px;font-weight:900;color:white">GRAND TOTAL / OVERALL GAP (' + fmtN(totalMgrs) + ' مدير)</td>' +
+    '<td colspan="2" style="padding:9px 12px;font-size:12px;font-weight:900;color:white">GRAND TOTAL / AVERAGE (' + fmtN(totalMgrs) + ' مدير)</td>' +
     '<td style="padding:9px 10px;font-size:11px;font-weight:800;color:#e9d5ff">' + fmtN(model.grandAgg.storeCount) + ' فرع · ' + model.months.length + ' شهور</td>' +
     '<td style="padding:9px 10px;color:#9ca3af">—</td>' +
     buildMgrMetricCellsHTML(model.grandAgg, effMode, hasRaw, true) +
@@ -13497,7 +13421,7 @@ function renderMgrSummaryTableHTML(model, effMode) {
 
   return '<div style="background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
     '<div style="background:linear-gradient(135deg,#1a1a2e,#5E2D91);color:white;padding:10px 16px;font-size:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center">' +
-      '<span><i class="fas fa-bullseye mr-2" style="color:#fbbf24"></i>ملخص أداء المديرين وإجمالي الـ Gap اللي ناقص لكل منتج على مدار السنة/الفلاتر (اضغط على أي مدير لفتح الشهور)</span>' +
+      '<span><i class="fas fa-trophy mr-2" style="color:#fbbf24"></i>الترتيب والملخص العام للمديرين عبر الشهور (اضغط على أي مدير لفتح جدول شهوره تحت بعض)</span>' +
       '<span style="font-size:11px;opacity:.85">' + fmtN(totalMgrs) + ' مدير · ' + model.months.length + ' شهور</span>' +
     '</div>' +
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
@@ -13531,8 +13455,8 @@ function handleEvalWorkbookUpload(file) {
       }
       var rstBtn = document.getElementById('mgr-reset-custom-eval-btn');
       if (rstBtn) rstBtn.style.display = 'inline-flex';
-      toggleMgrSectionBody(true);
-      mgrToast('✅ تم تحميل شيت التقييم مانوال بنجاح (' + fmtN(parsedRecords.length) + ' سجل شهري)');
+      renderManagersPerf();
+      mgrToast('✅ تم تحديث وربط شيت التقييم بنجاح (' + fmtN(parsedRecords.length) + ' سجل شهري)');
     } catch (err) {
       console.error('[Manual Eval Upload]', err);
       mgrToast('❌ تعذر قراءة ملف التقييم: ' + (err.message || err), true);
@@ -13549,12 +13473,12 @@ function resetCustomEvalData() {
   if (rstBtn) rstBtn.style.display = 'none';
   if (Array.isArray(RAW_DATA) && RAW_DATA.length) enrichRawDataWithEvaluation(RAW_DATA);
   renderManagersPerf();
-  mgrToast('✅ تم مسح النسخة المانوال والاعتماد على بيانات Supabase');
+  mgrToast('✅ تم استعادة شيت التقييم المرفوع على Supabase');
 }
 
-// ── Warning + Password Gate (Uses the exact same password hash EXPORT_PASSWORD_HASH as the rest of the dashboard) ──
+// ── Warning + Password Gate (Same EXPORT_PASSWORD_HASH as the rest of the dashboard) ──
 async function mgrExportAuthWithWarning() {
-  var ok = confirm('⚠️ تحذير أمني:\nأنت على وشك تصدير بيانات أداء وتقييم المديرين ونواقص التارجت (Product Gaps).\nهذا الملف سري ومخصص للاستخدام الإداري فقط.\n\nهل تريد المتابعة وإدخال كلمة المرور؟');
+  var ok = confirm('⚠️ تحذير أمني:\nأنت على وشك تصدير بيانات أداء وتقييم المديرين.\nهذا الملف سري ومخصص للاستخدام الإداري فقط.\n\nهل تريد المتابعة وإدخال كلمة المرور؟');
   if (!ok) return false;
   var pw = prompt('🔐 أدخل كلمة المرور لتحميل الملف:', '');
   if (pw === null) return false;
@@ -13566,7 +13490,7 @@ async function mgrExportAuthWithWarning() {
   return true;
 }
 
-// ── Well-Formatted Multi-Sheet Excel Export (with Product Gaps + Stacked Monthly + Stacked Manager Sheets) ──
+// ── Well-Formatted Multi-Sheet Excel Export (Clean sheets + dedicated Product Gaps sheet) ──
 async function exportManagersPerfExcel(btn) {
   var model = MGR_LAST_MODEL || buildManagersModel();
   if (!model || !model.rows.length) {
@@ -13614,128 +13538,7 @@ async function exportManagersPerfExcel(btn) {
       return { bg: '#FEE2E2', fg: '#B91C1C' };
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // SHEET 1: Product Gaps Summary (اللي ناقص لكل مدير على مدار السنة عشان يكوڤره)
-    // ════════════════════════════════════════════════════════════════════════
-    var wsGap = wb.addWorksheet('Product Gaps (نواقص التغطية)');
-    wsGap.views = [{ state: 'frozen', ySplit: 3, showGridLines: false }];
-    wsGap.properties.tabColor = { argb: 'FFDC2626' };
-
-    var gapCols = [
-      { hdr: '#', w: 6 },
-      { hdr: 'Manager Name (اسم المدير)', w: 30 },
-      { hdr: 'Oracle ID', w: 13 },
-      { hdr: 'Active Months', w: 13 },
-      { hdr: 'Branches (الفروع)', w: 30 },
-      { hdr: 'Regional Manager', w: 22 },
-      { hdr: 'Supervisor', w: 22 },
-      { hdr: 'Area Manager', w: 24 }
-    ];
-    PRODUCTS.forEach(function (p) {
-      gapCols.push(
-        { hdr: p.label + ' TGT', w: 12, prod: p.key },
-        { hdr: p.label + ' ACH', w: 12, prod: p.key },
-        { hdr: p.label + ' الناقص (Gap to Cover)', w: 16, prod: p.key, isGap: true },
-        { hdr: p.label + ' %', w: 11, prod: p.key }
-      );
-    });
-    gapCols.push(
-      { hdr: 'إجمالي الناقص (Total Gap)', w: 16, isGap: true },
-      { hdr: 'Avg Evaluation %', w: 15 }
-    );
-
-    var NGap = gapCols.length;
-    gapCols.forEach(function (c, i) { wsGap.getColumn(i + 1).width = c.w; });
-    wsGap.mergeCells(1, 1, 1, NGap);
-    styleCell(wsGap.getCell(1, 1), { bg: '#7F1D1D', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#7F1D1D' });
-    wsGap.getCell(1, 1).value = 'FAKHARANY360 — Product Gaps to Cover Per Manager (الـ Gap اللي ناقص لكل مدير في كل منتج على مدار السنة/الفلاتر عشان يكوڤره) · ' + model.byManager.length + ' Managers';
-    wsGap.getRow(1).height = 28;
-
-    gapCols.forEach(function (col, ci) {
-      var cell = wsGap.getCell(3, ci + 1);
-      cell.value = col.hdr;
-      var hBg = col.isGap ? '#991B1B' : (col.prod ? '#5E2D91' : '#1A1A2E');
-      styleCell(cell, { bg: hBg, fg: '#FFFFFF', b: true, sz: 10, al: 'center', bd: '#374151', wrap: true });
-    });
-    wsGap.getRow(3).height = 26;
-
-    var rGap = 4;
-    model.byManager.forEach(function (mgr, idx) {
-      var tg = mgr.agg;
-      var s = mgr.sample || {};
-      var rowBg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
-      var c = 1;
-      function putG(v, opts) {
-        var cell = wsGap.getCell(rGap, c++);
-        cell.value = (v === null || v === undefined) ? '—' : v;
-        styleCell(cell, Object.assign({ bg: rowBg, fg: '#1F2937' }, opts || {}));
-      }
-      putG(idx + 1, { b: true });
-      putG(mgr.label, { al: 'left', b: true, fg: '#5E2D91' });
-      putG(mgr.oracleId || '—', {});
-      putG(mgr.monthEntries.length, { b: true });
-      putG(mgr.uniqueBranchNames.join(' <- '), { al: 'left' });
-      putG(s.regionalManager || '—', { al: 'left' });
-      putG(s.supervisor || '—', { al: 'left' });
-      putG(s.areaManager || '—', { al: 'left' });
-
-      PRODUCTS.forEach(function (p) {
-        var t = tg[p.tKey] || 0, a = tg[p.aKey] || 0;
-        var rem = Math.max(0, t - a);
-        var ratio = t > 0 ? (a / t) : null;
-        putG(t, { numFmt: '#,##0', fg: '#4B5563' });
-        putG(a, { numFmt: '#,##0', b: true });
-        if (rem > 0) {
-          putG(rem, { numFmt: '#,##0', b: true, bg: '#FEE2E2', fg: '#B91C1C' });
-        } else {
-          putG(0, { numFmt: '#,##0', b: true, bg: '#DCFCE7', fg: '#15803D' });
-        }
-        if (ratio !== null) {
-          var pc = pctColors(ratio, false);
-          putG(ratio, { numFmt: '0.0%', b: true, bg: pc.bg, fg: pc.fg });
-        } else {
-          putG('—', { fg: '#9CA3AF' });
-        }
-      });
-
-      var totRem = tg.totalRemToCover || 0;
-      putG(totRem, { numFmt: '#,##0', b: true, bg: totRem > 0 ? '#FEE2E2' : '#DCFCE7', fg: totRem > 0 ? '#B91C1C' : '#15803D' });
-      if (tg.evalScore !== null) {
-        var ec = pctColors(tg.evalScore, true);
-        putG(tg.evalScore, { numFmt: '0.0%', b: true, bg: ec.bg, fg: ec.fg });
-      } else {
-        putG('—', { fg: '#9CA3AF' });
-      }
-      wsGap.getRow(rGap).height = 20;
-      rGap++;
-    });
-
-    // Grand total row on Product Gaps sheet
-    var gTot = model.grandAgg;
-    var cg = 1;
-    function putGT(v, opts) {
-      var cell = wsGap.getCell(rGap, cg++);
-      cell.value = (v === null || v === undefined) ? '—' : v;
-      styleCell(cell, Object.assign({ bg: '#1A1A2E', fg: '#FFFFFF', b: true }, opts || {}));
-    }
-    putGT('TOTAL');
-    putGT('الإجمالي العام (' + model.byManager.length + ' مدير)', { al: 'left' });
-    putGT('—');
-    putGT(model.months.length);
-    putGT(gTot.storeCount + ' فرع', { al: 'left' });
-    putGT('—'); putGT('—'); putGT('—');
-    PRODUCTS.forEach(function (p) {
-      var t = gTot[p.tKey] || 0, a = gTot[p.aKey] || 0, rem = Math.max(0, t - a);
-      putGT(t, { numFmt: '#,##0' });
-      putGT(a, { numFmt: '#,##0' });
-      putGT(rem, { numFmt: '#,##0', bg: rem > 0 ? '#991B1B' : '#15803D' });
-      putGT(t > 0 ? a / t : 0, { numFmt: '0.0%' });
-    });
-    putGT(gTot.totalRemToCover || 0, { numFmt: '#,##0', bg: '#991B1B' });
-    putGT(gTot.evalScore !== null ? gTot.evalScore : '—', gTot.evalScore !== null ? { numFmt: '0.0%' } : {});
-    wsGap.getRow(rGap).height = 23;
-
-    // Helper for Sheet 2 (By Month) and Sheet 3 (By Manager)
+    // Helper for clean By Month & By Manager sheets (NO extra Gap column per product)
     function getTableColumns(col2Header, col3Header) {
       var cols = [
         { hdr: '#', w: 6 },
@@ -13751,26 +13554,25 @@ async function exportManagersPerfExcel(btn) {
       if (hasRaw) {
         PRODUCTS.forEach(function (p) {
           cols.push(
-            { hdr: p.label + ' TGT', w: 11, prod: p.key },
-            { hdr: p.label + ' ACH', w: 11, prod: p.key },
-            { hdr: p.label + ' الناقص (Gap)', w: 13, prod: p.key, isGap: true },
-            { hdr: p.label + ' %', w: 10, prod: p.key }
+            { hdr: p.label + ' TGT', w: 12, prod: p.key },
+            { hdr: p.label + ' ACH', w: 12, prod: p.key },
+            { hdr: p.label + ' %', w: 11, prod: p.key }
           );
         });
       }
       cols.push(
-        { hdr: 'Ach.Activation %', w: 14 },
-        { hdr: 'Mobile (35%)', w: 13 },
-        { hdr: 'Sales Mix (30%)', w: 13 },
-        { hdr: 'TNPS (10%)', w: 11 },
+        { hdr: 'Ach.Activation %', w: 15 },
+        { hdr: 'Mobile (35%)', w: 14 },
+        { hdr: 'Sales Mix (30%)', w: 14 },
+        { hdr: 'TNPS (10%)', w: 12 },
         { hdr: 'Info (5%)', w: 10 },
         { hdr: 'Effort (5%)', w: 10 },
-        { hdr: 'Appear (5%)', w: 10 },
-        { hdr: 'Attend (5%)', w: 10 },
+        { hdr: 'Appear (5%)', w: 11 },
+        { hdr: 'Attend (5%)', w: 11 },
         { hdr: 'Mgmt (5%)', w: 10 },
-        { hdr: 'Perf Total (25%)', w: 13 },
-        { hdr: 'Warning Mail', w: 12 },
-        { hdr: 'Evaluation %', w: 14 }
+        { hdr: 'Perf Total (25%)', w: 14 },
+        { hdr: 'Warning Mail', w: 13 },
+        { hdr: 'Evaluation %', w: 15 }
       );
       return cols;
     }
@@ -13800,15 +13602,9 @@ async function exportManagersPerfExcel(btn) {
       if (hasRaw) {
         PRODUCTS.forEach(function (p) {
           var t = agg[p.tKey] || 0, a = agg[p.aKey] || 0;
-          var rem = Math.max(0, t - a);
           var ratio = t > 0 ? (a / t) : null;
           put(t, { numFmt: '#,##0', fg: isTotal ? '#E5E7EB' : '#4B5563' });
           put(a, { numFmt: '#,##0', b: true });
-          if (rem > 0) {
-            put(rem, { numFmt: '#,##0', b: true, bg: isTotal ? '#7F1D1D' : '#FEE2E2', fg: isTotal ? '#FECACA' : '#B91C1C' });
-          } else {
-            put(0, { numFmt: '#,##0', b: true, bg: isTotal ? '#14532D' : '#DCFCE7', fg: isTotal ? '#86EFAC' : '#15803D' });
-          }
           if (ratio !== null) {
             var pc = isTotal ? { bg: '#3B1D63', fg: '#E9D5FF' } : pctColors(ratio, false);
             put(ratio, { numFmt: '0.0%', b: true, bg: pc.bg, fg: pc.fg });
@@ -13848,7 +13644,7 @@ async function exportManagersPerfExcel(btn) {
     }
 
     // ════════════════════════════════════════════════════════════
-    // SHEET 2: Stacked By Month (جداول الشهور تحت بعض)
+    // SHEET 1: Stacked By Month (جداول الشهور تحت بعض)
     // ════════════════════════════════════════════════════════════
     var ws1 = wb.addWorksheet('By Month (بالشهور تحت بعض)');
     ws1.views = [{ showGridLines: false }];
@@ -13860,7 +13656,7 @@ async function exportManagersPerfExcel(btn) {
     var r1 = 1;
     ws1.mergeCells(r1, 1, r1, N1);
     styleCell(ws1.getCell(r1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
-    ws1.getCell(r1, 1).value = 'FAKHARANY360 — Managers Monthly Performance & Product Gaps (جداول أداء المديرين تحت بعض بالشهور) · ' + model.months.length + ' Months';
+    ws1.getCell(r1, 1).value = 'FAKHARANY360 — Managers Monthly Performance (جداول أداء المديرين تحت بعض بالشهور) · ' + model.months.length + ' Months';
     ws1.getRow(r1).height = 28;
     r1 += 2;
 
@@ -13878,7 +13674,7 @@ async function exportManagersPerfExcel(btn) {
       cols1.forEach(function (col, ci) {
         var cell = ws1.getCell(r1, ci + 1);
         cell.value = col.hdr;
-        var hBg = col.isGap ? '#991B1B' : (ci < 9 ? '#1A1A2E' : (col.prod ? '#4C1D95' : '#0F766E'));
+        var hBg = ci < 9 ? '#1A1A2E' : (col.prod ? '#4C1D95' : '#0F766E');
         styleCell(cell, { bg: hBg, fg: '#FFFFFF', b: true, sz: 10, al: 'center', bd: '#374151' });
       });
       ws1.getRow(r1).height = 22;
@@ -13894,7 +13690,7 @@ async function exportManagersPerfExcel(btn) {
     });
 
     // ════════════════════════════════════════════════════════════
-    // SHEET 3: Stacked By Manager (شهور كل مدير تحت بعض + إجمالي الـ Gap)
+    // SHEET 2: Stacked By Manager (شهور كل مدير تحت بعض)
     // ════════════════════════════════════════════════════════════
     var ws2 = wb.addWorksheet('By Manager (شهور كل مدير)');
     ws2.views = [{ showGridLines: false }];
@@ -13906,7 +13702,7 @@ async function exportManagersPerfExcel(btn) {
     var r2 = 1;
     ws2.mergeCells(r2, 1, r2, N2);
     styleCell(ws2.getCell(r2, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
-    ws2.getCell(r2, 1).value = 'FAKHARANY360 — Performance & Yearly Product Gaps Per Manager (جدول شهور كل مدير تحت بعض) · ' + model.byManager.length + ' Managers';
+    ws2.getCell(r2, 1).value = 'FAKHARANY360 — Performance Per Manager Across Months (جدول شهور كل مدير تحت بعض) · ' + model.byManager.length + ' Managers';
     ws2.getRow(r2).height = 28;
     r2 += 2;
 
@@ -13919,15 +13715,14 @@ async function exportManagersPerfExcel(btn) {
       ws2.mergeCells(r2, 1, r2, N2);
       for (var cc = 1; cc <= N2; cc++) styleCell(ws2.getCell(r2, cc), { bg: '#1E1B4B', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#1E1B4B' });
       ws2.getCell(r2, 1).value = '#' + (mIdx + 1) + ' 👤 ' + mgr.label + (mgr.oracleId ? ' [Oracle ID: ' + mgr.oracleId + ']' : '') +
-        ' · (' + mgr.monthEntries.length + ' Months) · الفروع: ' + branchesStr + ' · Avg Eval: ' + evAvg + ' · Mobile: ' + mobPct +
-        (hasRaw ? (' · Mobile Gap to Cover: ' + (tg.mobileRemToCover || 0)) : '');
+        ' · (' + mgr.monthEntries.length + ' Months) · الفروع: ' + branchesStr + ' · Avg Eval: ' + evAvg + ' · Mobile: ' + mobPct;
       ws2.getRow(r2).height = 24;
       r2++;
 
       cols2.forEach(function (col, ci) {
         var cell = ws2.getCell(r2, ci + 1);
         cell.value = col.hdr;
-        var hBg = col.isGap ? '#991B1B' : (ci < 9 ? '#312E81' : (col.prod ? '#4C1D95' : '#0F766E'));
+        var hBg = ci < 9 ? '#312E81' : (col.prod ? '#4C1D95' : '#0F766E');
         styleCell(cell, { bg: hBg, fg: '#FFFFFF', b: true, sz: 10, al: 'center', bd: '#374151' });
       });
       ws2.getRow(r2).height = 21;
@@ -13938,12 +13733,244 @@ async function exportManagersPerfExcel(btn) {
         writeEntityRowToSheet(ws2, r2++, idx + 1, me.monthLabelEn + ' (' + me.monthLabelAr + ')', mgr.oracleId, ms.store || '—', ms.storeCode || '—', me.agg, false);
       });
 
-      writeEntityRowToSheet(ws2, r2++, 0, 'إجمالي السنة / المتبقي للتغطية — ' + mgr.label + ' (' + mgr.monthEntries.length + ' شهور)', mgr.oracleId, branchesStr, '', tg, true);
+      writeEntityRowToSheet(ws2, r2++, 0, 'إجمالي / متوسط ' + mgr.label + ' (' + mgr.monthEntries.length + ' شهور)', mgr.oracleId, branchesStr, '', tg, true);
       r2 += 2;
     });
 
+    // ════════════════════════════════════════════════════════════════════════
+    // SHEET 3: Product Gaps (شيت الـ Gap المجمع لكل مدير في كل منتج + / -)
+    // ════════════════════════════════════════════════════════════════════════
+    var wsGap = wb.addWorksheet('Product Gaps (الـ Gap)');
+    wsGap.views = [{ state: 'frozen', ySplit: 3, showGridLines: false }];
+    wsGap.properties.tabColor = { argb: 'FFDC2626' };
+
+    var gapCols = [
+      { hdr: '#', w: 6 },
+      { hdr: 'Manager Name (اسم المدير)', w: 30 },
+      { hdr: 'Oracle ID', w: 13 },
+      { hdr: 'Active Months', w: 13 },
+      { hdr: 'Branches (الفروع)', w: 30 },
+      { hdr: 'Regional Manager', w: 22 },
+      { hdr: 'Supervisor', w: 22 },
+      { hdr: 'Area Manager', w: 24 }
+    ];
+    PRODUCTS.forEach(function (p) {
+      gapCols.push(
+        { hdr: p.label + ' TGT', w: 12, prod: p.key },
+        { hdr: p.label + ' ACH', w: 12, prod: p.key },
+        { hdr: p.label + ' Gap', w: 13, prod: p.key, isGap: true },
+        { hdr: p.label + ' %', w: 11, prod: p.key }
+      );
+    });
+    gapCols.push(
+      { hdr: 'Total Gap', w: 14, isGap: true },
+      { hdr: 'Avg Evaluation %', w: 15 }
+    );
+
+    var NGap = gapCols.length;
+    gapCols.forEach(function (c, i) { wsGap.getColumn(i + 1).width = c.w; });
+    wsGap.mergeCells(1, 1, 1, NGap);
+    styleCell(wsGap.getCell(1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
+    wsGap.getCell(1, 1).value = 'FAKHARANY360 — Product Gaps Per Manager Across Selected Period (+ / -) · ' + model.byManager.length + ' Managers';
+    wsGap.getRow(1).height = 28;
+
+    gapCols.forEach(function (col, ci) {
+      var cell = wsGap.getCell(3, ci + 1);
+      cell.value = col.hdr;
+      var hBg = col.isGap ? '#7F1D1D' : (col.prod ? '#5E2D91' : '#1A1A2E');
+      styleCell(cell, { bg: hBg, fg: '#FFFFFF', b: true, sz: 10, al: 'center', bd: '#374151', wrap: true });
+    });
+    wsGap.getRow(3).height = 24;
+
+    var rGap = 4;
+    model.byManager.forEach(function (mgr, idx) {
+      var tg = mgr.agg;
+      var s = mgr.sample || {};
+      var rowBg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      var c = 1;
+      function putG(v, opts) {
+        var cell = wsGap.getCell(rGap, c++);
+        cell.value = (v === null || v === undefined) ? '—' : v;
+        styleCell(cell, Object.assign({ bg: rowBg, fg: '#1F2937' }, opts || {}));
+      }
+      putG(idx + 1, { b: true });
+      putG(mgr.label, { al: 'left', b: true, fg: '#5E2D91' });
+      putG(mgr.oracleId || '—', {});
+      putG(mgr.monthEntries.length, { b: true });
+      putG(mgr.uniqueBranchNames.join(' <- '), { al: 'left' });
+      putG(s.regionalManager || '—', { al: 'left' });
+      putG(s.supervisor || '—', { al: 'left' });
+      putG(s.areaManager || '—', { al: 'left' });
+
+      PRODUCTS.forEach(function (p) {
+        var t = tg[p.tKey] || 0, a = tg[p.aKey] || 0;
+        var net = Math.round(a - t);
+        var ratio = t > 0 ? (a / t) : null;
+        putG(t, { numFmt: '#,##0', fg: '#4B5563' });
+        putG(a, { numFmt: '#,##0', b: true });
+        putG(net, {
+          numFmt: '+#,##0;-#,##0;0',
+          b: true,
+          bg: net >= 0 ? '#DCFCE7' : '#FEE2E2',
+          fg: net >= 0 ? '#15803D' : '#B91C1C'
+        });
+        if (ratio !== null) {
+          var pc = pctColors(ratio, false);
+          putG(ratio, { numFmt: '0.0%', b: true, bg: pc.bg, fg: pc.fg });
+        } else {
+          putG('—', { fg: '#9CA3AF' });
+        }
+      });
+
+      var totNet = Math.round(tg.totalSignedGap || 0);
+      putG(totNet, {
+        numFmt: '+#,##0;-#,##0;0',
+        b: true,
+        bg: totNet >= 0 ? '#DCFCE7' : '#FEE2E2',
+        fg: totNet >= 0 ? '#15803D' : '#B91C1C'
+      });
+      if (tg.evalScore !== null) {
+        var ec = pctColors(tg.evalScore, true);
+        putG(tg.evalScore, { numFmt: '0.0%', b: true, bg: ec.bg, fg: ec.fg });
+      } else {
+        putG('—', { fg: '#9CA3AF' });
+      }
+      wsGap.getRow(rGap).height = 20;
+      rGap++;
+    });
+
+    var gTot = model.grandAgg;
+    var cg = 1;
+    function putGT(v, opts) {
+      var cell = wsGap.getCell(rGap, cg++);
+      cell.value = (v === null || v === undefined) ? '—' : v;
+      styleCell(cell, Object.assign({ bg: '#1A1A2E', fg: '#FFFFFF', b: true }, opts || {}));
+    }
+    putGT('TOTAL');
+    putGT('الإجمالي العام (' + model.byManager.length + ' مدير)', { al: 'left' });
+    putGT('—');
+    putGT(model.months.length);
+    putGT(gTot.storeCount + ' فرع', { al: 'left' });
+    putGT('—'); putGT('—'); putGT('—');
+    PRODUCTS.forEach(function (p) {
+      var t = gTot[p.tKey] || 0, a = gTot[p.aKey] || 0, net = Math.round(a - t);
+      putGT(t, { numFmt: '#,##0' });
+      putGT(a, { numFmt: '#,##0' });
+      putGT(net, { numFmt: '+#,##0;-#,##0;0', bg: net >= 0 ? '#15803D' : '#991B1B' });
+      putGT(t > 0 ? a / t : 0, { numFmt: '0.0%' });
+    });
+    var grandNet = Math.round(gTot.totalSignedGap || 0);
+    putGT(grandNet, { numFmt: '+#,##0;-#,##0;0', bg: grandNet >= 0 ? '#15803D' : '#991B1B' });
+    putGT(gTot.evalScore !== null ? gTot.evalScore : '—', gTot.evalScore !== null ? { numFmt: '0.0%' } : {});
+    wsGap.getRow(rGap).height = 23;
+
     // ════════════════════════════════════════════════════════════
-    // SHEET 4: Flat Linked Database (قاعدة البيانات المربوطة)
+    // SHEET 4: Managers Summary & Monthly Matrix (ملخص وترتيب المديرين)
+    // ════════════════════════════════════════════════════════════
+    var ws3 = wb.addWorksheet('Managers Summary (الملخص)');
+    ws3.views = [{ state: 'frozen', ySplit: 3, showGridLines: false }];
+    ws3.properties.tabColor = { argb: 'FF16A34A' };
+
+    var allMonthsChrono = MONTH_ORDER.filter(function (m) { return model.months.indexOf(m) >= 0; });
+    var cols3 = [
+      { hdr: 'Rank', w: 7 },
+      { hdr: 'Store Manager / Name', w: 30 },
+      { hdr: 'Oracle ID', w: 13 },
+      { hdr: 'Active Months', w: 13 },
+      { hdr: 'Branches Count', w: 14 },
+      { hdr: 'Branches Path (مسار الفروع)', w: 34 },
+      { hdr: 'Region', w: 15 },
+      { hdr: 'Regional Manager', w: 22 },
+      { hdr: 'Supervisor', w: 22 },
+      { hdr: 'Area Manager', w: 24 }
+    ];
+    if (hasRaw) {
+      cols3.push({ hdr: 'Mobile TGT', w: 13 }, { hdr: 'Mobile ACH', w: 13 }, { hdr: 'Mobile Gap', w: 13 }, { hdr: 'Mobile %', w: 12 });
+    }
+    cols3.push(
+      { hdr: 'Avg Ach.Act %', w: 14 },
+      { hdr: 'Avg Mob (35%)', w: 14 },
+      { hdr: 'Avg Mix (30%)', w: 14 },
+      { hdr: 'Avg Perf (25%)', w: 14 },
+      { hdr: 'Warnings Count', w: 14 },
+      { hdr: 'Overall Avg Eval %', w: 17 }
+    );
+    allMonthsChrono.forEach(function (m) {
+      cols3.push({ hdr: (MONTH_LABELS[m] || m) + ' Eval%', w: 12 });
+    });
+
+    var N3 = cols3.length;
+    cols3.forEach(function (col, i) { ws3.getColumn(i + 1).width = col.w; });
+    ws3.mergeCells(1, 1, 1, N3);
+    styleCell(ws3.getCell(1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
+    ws3.getCell(1, 1).value = 'FAKHARANY360 — Managers Overall Ranking & Month-by-Month Matrix (' + model.byManager.length + ' Managers)';
+    ws3.getRow(1).height = 28;
+
+    cols3.forEach(function (col, ci) {
+      var cell = ws3.getCell(3, ci + 1);
+      cell.value = col.hdr;
+      styleCell(cell, { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 10, al: 'center', bd: '#3B1D63' });
+    });
+    ws3.getRow(3).height = 24;
+
+    var r3 = 4;
+    model.byManager.forEach(function (mgr, idx) {
+      var tg = mgr.agg;
+      var s = mgr.sample || {};
+      var bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      var c = 1;
+      function put3(v, opts) {
+        var cell = ws3.getCell(r3, c++);
+        cell.value = (v === null || v === undefined) ? '—' : v;
+        styleCell(cell, Object.assign({ bg: bg, fg: '#1F2937' }, opts || {}));
+      }
+      put3(idx + 1, { b: true });
+      put3(mgr.label, { al: 'left', b: true, fg: '#5E2D91' });
+      put3(mgr.oracleId || '—', {});
+      put3(mgr.monthEntries.length, { b: true });
+      put3(mgr.uniqueBranchNames.length, { b: mgr.movedAcrossYear, bg: mgr.movedAcrossYear ? '#FEF3C7' : bg });
+      put3(mgr.uniqueBranchNames.join(' <- '), { al: 'left' });
+      put3(s.region || '—', {});
+      put3(s.regionalManager || '—', { al: 'left' });
+      put3(s.supervisor || '—', { al: 'left' });
+      put3(s.areaManager || '—', { al: 'left' });
+
+      if (hasRaw) {
+        var mt = tg.mobileTarget || 0, ma = tg.mobileSubs || 0, mnet = Math.round(ma - mt), mr = mt > 0 ? ma / mt : null;
+        put3(mt, { numFmt: '#,##0' });
+        put3(ma, { numFmt: '#,##0', b: true });
+        put3(mnet, { numFmt: '+#,##0;-#,##0;0', b: true, bg: mnet >= 0 ? '#DCFCE7' : '#FEE2E2', fg: mnet >= 0 ? '#15803D' : '#B91C1C' });
+        if (mr !== null) { var mc = pctColors(mr, false); put3(mr, { numFmt: '0.0%', b: true, bg: mc.bg, fg: mc.fg }); } else put3('—', {});
+      }
+
+      put3(tg.actPct !== null ? tg.actPct : null, { numFmt: '0.0%', b: true });
+      put3(tg.mob35 !== null ? tg.mob35 : null, { numFmt: '0.00' });
+      put3(tg.mix30 !== null ? tg.mix30 : null, { numFmt: '0.00' });
+      put3(tg.perf25 !== null ? tg.perf25 : null, { numFmt: '0.00', b: true });
+      put3(tg.warnCount, { b: tg.warnCount > 0, bg: tg.warnCount > 0 ? '#FEE2E2' : bg, fg: tg.warnCount > 0 ? '#B91C1C' : '#1F2937' });
+      if (tg.evalScore !== null) {
+        var ec = pctColors(tg.evalScore, true);
+        put3(tg.evalScore, { numFmt: '0.0%', b: true, bg: ec.bg, fg: ec.fg });
+      } else put3('—', {});
+
+      var mMap = {};
+      mgr.monthEntries.forEach(function (me) { mMap[me.month] = me.agg; });
+      allMonthsChrono.forEach(function (m) {
+        var ma2 = mMap[m];
+        if (ma2 && ma2.evalScore !== null) {
+          var mec = pctColors(ma2.evalScore, true);
+          put3(ma2.evalScore, { numFmt: '0.0%', b: true, bg: mec.bg, fg: mec.fg });
+        } else {
+          put3('—', { fg: '#9CA3AF' });
+        }
+      });
+
+      ws3.getRow(r3).height = 19;
+      r3++;
+    });
+
+    // ════════════════════════════════════════════════════════════
+    // SHEET 5: Flat Linked Database (قاعدة البيانات المربوطة)
     // ════════════════════════════════════════════════════════════
     var ws4 = wb.addWorksheet('All Linked Data (قاعدة البيانات)');
     ws4.views = [{ state: 'frozen', ySplit: 1 }];
@@ -13954,7 +13981,7 @@ async function exportManagersPerfExcel(btn) {
       ws4.getColumn(i + 1).width = col.w;
       var cell = ws4.getCell(1, i + 1);
       cell.value = col.hdr;
-      styleCell(cell, { bg: col.isGap ? '#991B1B' : '#111827', fg: '#FFFFFF', b: true, sz: 10 });
+      styleCell(cell, { bg: '#111827', fg: '#FFFFFF', b: true, sz: 10 });
     });
     ws4.getRow(1).height = 22;
 
@@ -13981,8 +14008,8 @@ async function exportManagersPerfExcel(btn) {
         put4(s.areaManager || '');
         if (hasRaw) {
           PRODUCTS.forEach(function (p) {
-            var t = agg[p.tKey] || 0, a = agg[p.aKey] || 0, rem = Math.max(0, t - a);
-            put4(t, '#,##0'); put4(a, '#,##0'); put4(rem, '#,##0'); put4(t > 0 ? a / t : 0, '0.0%');
+            var t = agg[p.tKey] || 0, a = agg[p.aKey] || 0;
+            put4(t, '#,##0'); put4(a, '#,##0'); put4(t > 0 ? a / t : 0, '0.0%');
           });
         }
         put4(agg.actPct, '0.0%');
@@ -14007,7 +14034,7 @@ async function exportManagersPerfExcel(btn) {
     var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    a.download = 'FAKHARANY360_Managers_Performance_Gaps_' + stamp + '.xlsx';
+    a.download = 'FAKHARANY360_Managers_Performance_' + stamp + '.xlsx';
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
@@ -14027,26 +14054,27 @@ async function exportManagersPerfExcel(btn) {
 function exportManagersPerfFallbackXLSX(model) {
   var wb = XLSX.utils.book_new();
   var aoaGap = [['#', 'Manager Name', 'Oracle ID', 'Months', 'Branches', 'Regional Mgr', 'Supervisor', 'Area Manager',
-    'Mobile TGT', 'Mobile ACH', 'Mobile Gap (الناقص)', 'Mobile %',
+    'Mobile TGT', 'Mobile ACH', 'Mobile Gap', 'Mobile %',
     'WE Gold TGT', 'WE Gold ACH', 'WE Gold Gap', 'WE Gold %',
     'FBB TGT', 'FBB ACH', 'FBB Gap', 'FBB %',
     'Fixed TGT', 'Fixed ACH', 'Fixed Gap', 'Fixed %',
     'Wallet TGT', 'Wallet ACH', 'Wallet Gap', 'Wallet %',
     'WE Air TGT', 'WE Air ACH', 'WE Air Gap', 'WE Air %',
-    'Total Gap to Cover', 'Avg Evaluation %']];
+    'Total Gap', 'Avg Evaluation %']];
   model.byManager.forEach(function (mgr, i) {
     var s = mgr.sample || {}, g = mgr.agg;
     var row = [i + 1, mgr.label, mgr.oracleId, mgr.monthEntries.length, mgr.uniqueBranchNames.join(' <- '), s.regionalManager, s.supervisor, s.areaManager];
     PRODUCTS.forEach(function (p) {
-      var t = g[p.tKey] || 0, a = g[p.aKey] || 0, rem = Math.max(0, t - a);
-      row.push(t, a, rem, t > 0 ? Math.round(a / t * 100) + '%' : '—');
+      var t = g[p.tKey] || 0, a = g[p.aKey] || 0, net = Math.round(a - t);
+      row.push(t, a, (net > 0 ? '+' : '') + net, t > 0 ? Math.round(a / t * 100) + '%' : '—');
     });
-    row.push(g.totalRemToCover || 0, g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—');
+    var totNet = Math.round(g.totalSignedGap || 0);
+    row.push((totNet > 0 ? '+' : '') + totNet, g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—');
     aoaGap.push(row);
   });
   var wsGap = XLSX.utils.aoa_to_sheet(aoaGap);
   XLSX.utils.book_append_sheet(wb, wsGap, 'Product Gaps');
-  XLSX.writeFile(wb, 'FAKHARANY360_Managers_Performance_Gaps.xlsx');
+  XLSX.writeFile(wb, 'FAKHARANY360_Managers_Performance.xlsx');
 }
 
 async function exportManagersPerfCSV() {
@@ -14059,9 +14087,9 @@ async function exportManagersPerfCSV() {
 
   var headers = ['Manager Name', 'Oracle ID', 'Active Months', 'Branches', 'Region', 'Regional Manager', 'Supervisor', 'Area Manager'];
   PRODUCTS.forEach(function (p) {
-    headers.push(p.label + ' Target', p.label + ' Ach', p.label + ' Gap to Cover (الناقص)', p.label + ' %');
+    headers.push(p.label + ' Target', p.label + ' Ach', p.label + ' Gap', p.label + ' %');
   });
-  headers.push('Total Gap to Cover', 'Avg Ach.Activation %', 'Avg Mobile (35%)', 'Avg Sales Mix (30%)', 'Avg Perf (25%)', 'Warnings Count', 'Avg Evaluation %');
+  headers.push('Total Gap', 'Avg Ach.Activation %', 'Avg Mobile (35%)', 'Avg Sales Mix (30%)', 'Avg Perf (25%)', 'Warnings Count', 'Avg Evaluation %');
 
   var lines = [headers.join(',')];
   function csvCell(v) {
@@ -14072,11 +14100,12 @@ async function exportManagersPerfCSV() {
     var s = mgr.sample || {}, g = mgr.agg;
     var row = [mgr.label, mgr.oracleId, mgr.monthEntries.length, mgr.uniqueBranchNames.join(' <- '), s.region, s.regionalManager, s.supervisor, s.areaManager];
     PRODUCTS.forEach(function (p) {
-      var t = g[p.tKey] || 0, a = g[p.aKey] || 0, rem = Math.max(0, t - a);
-      row.push(t, a, rem, t > 0 ? (a / t * 100).toFixed(1) + '%' : '0%');
+      var t = g[p.tKey] || 0, a = g[p.aKey] || 0, net = Math.round(a - t);
+      row.push(t, a, (net > 0 ? '+' : '') + net, t > 0 ? (a / t * 100).toFixed(1) + '%' : '0%');
     });
+    var totNet = Math.round(g.totalSignedGap || 0);
     row.push(
-      g.totalRemToCover || 0,
+      (totNet > 0 ? '+' : '') + totNet,
       g.actPct !== null ? (g.actPct * 100).toFixed(1) + '%' : '',
       g.mob35 !== null ? g.mob35.toFixed(2) : '',
       g.mix30 !== null ? g.mix30.toFixed(2) : '',
@@ -14089,7 +14118,7 @@ async function exportManagersPerfCSV() {
   var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'FAKHARANY360_Managers_Gaps_Summary.csv';
+  a.download = 'FAKHARANY360_Managers_Performance.csv';
   document.body.appendChild(a);
   a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
@@ -14119,14 +14148,9 @@ async function exportManagersPerfCSV() {
   var _origSwitchTab = switchTab;
   switchTab = function (name) {
     moveMgrMasterToSlot(name);
-    if (name === 'managers') {
-      toggleMgrSectionBody(true);
-    }
     var res = _origSwitchTab.apply(this, arguments);
-    if (name === 'managers' || (name === 'overview' && MGR_SECTION_OPEN)) {
+    if (name === 'managers' || name === 'overview') {
       try { renderManagersPerf(); } catch (e) { console.error('[ManagersPerf]', e); }
-    } else {
-      updateEvalStatusBadge();
     }
     return res;
   };
@@ -14134,13 +14158,11 @@ async function exportManagersPerfCSV() {
   var _origRenderAll = renderAll;
   renderAll = function () {
     var res = _origRenderAll.apply(this, arguments);
-    if (activeTab === 'managers' || (activeTab === 'overview' && MGR_SECTION_OPEN)) {
+    if (activeTab === 'overview' || activeTab === 'managers') {
       try {
         moveMgrMasterToSlot(activeTab);
         renderManagersPerf();
       } catch (e) { console.error('[ManagersPerf]', e); }
-    } else {
-      updateEvalStatusBadge();
     }
     return res;
   };
@@ -14157,9 +14179,6 @@ async function exportManagersPerfCSV() {
   var _origResetFilters = resetFilters;
   resetFilters = function () {
     MGR_SELECTED_PERSON = '';
-    MGR_GAP_ONLY = false;
-    var gBtn = document.getElementById('mgr-gap-only-btn');
-    if (gBtn) { gBtn.style.background = 'white'; gBtn.style.color = '#dc2626'; }
     var inp = document.getElementById('mgr-search-input'); if (inp) inp.value = '';
     var pSel = document.getElementById('mgr-select-person'); if (pSel) pSel.value = '';
     var rSel = document.getElementById('mgr-select-region'); if (rSel) rSel.value = '';
