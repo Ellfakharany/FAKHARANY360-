@@ -1444,10 +1444,56 @@ document.addEventListener('DOMContentLoaded', function() {
                   <button id="mgr-met-eval" onclick="setMgrMetricMode('eval_detail')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563">تفاصيل التقييم 100%</button>
                 </div>
               </div>
+
+              <!-- Independent Data Mode (Sales vs Activation for Managers Tab Only) -->
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">Data Type:</span>
+                <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
+                  <button id="mgr-dtype-sales" onclick="setMgrDataMode('sales')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#c0392b;color:white"><i class="fas fa-shopping-cart mr-1"></i>Sales</button>
+                  <button id="mgr-dtype-act" onclick="setMgrDataMode('activation')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563"><i class="fas fa-bolt mr-1"></i>Activation</button>
+                </div>
+              </div>
             </div>
 
-            <!-- Row 2: Search, Specific Manager Filter, Region/Scope Filter, Month Order, Sort, Expand/Collapse -->
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:12px">
+            <!-- Row 2: Dedicated Independent Hierarchy Filters (Isolated from other tabs) -->
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #f3f4f6">
+              <span style="font-size:10px;font-weight:800;color:#5E2D91;background:#f5f3ff;padding:4px 9px;border-radius:12px;border:1px solid #ddd6fe"><i class="fas fa-filter mr-1"></i>فلاتر المديرين المستقلة:</span>
+
+              <select id="mgr-f-regMgr" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">👔 كل Regional Managers</option>
+              </select>
+
+              <select id="mgr-f-supervisor" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">🧑‍💼 كل Supervisors</option>
+              </select>
+
+              <select id="mgr-f-areaMgr" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">📍 كل Area Managers</option>
+              </select>
+
+              <select id="mgr-f-partner" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">🤝 كل الشركات (Partners)</option>
+              </select>
+
+              <select id="mgr-f-class" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">🏷️ كل التصنيفات (Class)</option>
+              </select>
+
+              <select id="mgr-select-region" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">🌍 كل المناطق (All Regions)</option>
+              </select>
+
+              <select id="mgr-select-month" onchange="onMgrFilterInput()" style="padding:6px 10px;border:1.5px solid #d1d5db;border-radius:16px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
+                <option value="">📅 كل الشهور تحت بعض (All Months)</option>
+              </select>
+
+              <button onclick="resetMgrFiltersOnly()" style="padding:6px 12px;border-radius:16px;border:1.5px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:10.5px;font-weight:800;cursor:pointer" title="إعادة ضبط فلاتر تاب المديرين فقط">
+                <i class="fas fa-undo mr-1"></i>Reset فلاتر المديرين
+              </button>
+            </div>
+
+            <!-- Row 3: Search, Specific Manager Filter, Sort, Quick Toggles -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:10px">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
                 <!-- Search Input -->
                 <div style="position:relative;min-width:220px;flex:1;max-width:300px">
@@ -1456,18 +1502,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
 
                 <!-- Specific Manager Select -->
-                <select id="mgr-select-person" onchange="onMgrPersonSelect(this.value)" style="padding:7px 12px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;max-width:230px;outline:none">
+                <select id="mgr-select-person" onchange="onMgrPersonSelect(this.value)" style="padding:7px 12px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;max-width:250px;outline:none">
                   <option value="">👤 كل المديرين (All Managers)</option>
-                </select>
-
-                <!-- Region Filter -->
-                <select id="mgr-select-region" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
-                  <option value="">🌍 كل المناطق (All Regions)</option>
-                </select>
-
-                <!-- Month Filter inside Section -->
-                <select id="mgr-select-month" onchange="onMgrFilterInput()" style="padding:7px 10px;border:1.5px solid #d1d5db;border-radius:18px;font-size:11px;font-weight:700;color:#1f2937;background:white;outline:none">
-                  <option value="">📅 كل الشهور تحت بعض (All Months)</option>
                 </select>
 
                 <!-- Sort Selector -->
@@ -11937,6 +11973,7 @@ var EVAL_INDEX_CACHE = null;
 var MGR_VIEW_MODE = 'bymonth';      // 'bymonth' | 'bymanager' | 'summary'
 var MGR_LEVEL = 'storeManager';     // 'storeManager' | 'areaManager' | 'supervisor' | 'regionalManager'
 var MGR_METRIC_MODE = 'combined';   // 'combined' | 'products_detail' | 'eval_detail'
+var MGR_DATA_MODE = 'sales';        // 'sales' | 'activation' (independent for Managers tab)
 var MGR_DATA_SCOPE = 'dashboard';   // 'dashboard' | 'all_eval'
 var MGR_MONTH_ASC = true;           // true: Jan -> Sep, false: Sep -> Jan
 var MGR_SHOW_ALL_ROWS = false;      // false: paginate (25 rows per table), true: show all
@@ -12215,8 +12252,7 @@ function enrichRawDataWithEvaluation(rows) {
     var code = mgrNormCode(r.storeCode);
     var m = String(r.month || '').trim();
     var ev = (code && m && idx.byCodeMonth[code + '|' + m])
-          || (r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
-          || (code && idx.latestByCode[code])
+          || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
           || null;
     var h = (code && hierMap[code]) || null;
     if (ev) {
@@ -12231,11 +12267,18 @@ function enrichRawDataWithEvaluation(rows) {
       r.evalPerf25 = ev.perf25;
       r.evalWarn = ev.warn;
       r._evalRec = ev;
-      r._evalExactMonth = (ev.month === m);
+      r._evalExactMonth = true;
     } else {
-      r.storeManager = r.storeManager || ('غير مسجل (' + (r.store || code || '—') + ')');
-      r.oracleId = r.oracleId || '—';
-      r.hiringDate = r.hiringDate || '';
+      r.storeManager = 'بدون مدير مسجل (' + (r.store || code || '—') + ')';
+      r.oracleId = '—';
+      r.hiringDate = '';
+      r.evalScore = null;
+      r.evalActPct = null;
+      r.evalMob35 = null;
+      r.evalMix30 = null;
+      r.evalTnps = null;
+      r.evalPerf25 = null;
+      r.evalWarn = 'No';
       r._evalRec = null;
       r._evalExactMonth = false;
     }
@@ -12262,12 +12305,12 @@ function getManagersLinkedRecords() {
   }
 
   var getVal = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
-  var fRm = getVal('f-regMgr');
-  var fSv = getVal('f-supervisor');
-  var fAm = getVal('f-areaMgr');
-  var fAc = getVal('f-accMgr');
-  var fPt = getVal('f-partner');
-  var fMoGlobal = getVal('f-month');
+  // 100% independent filters inside the Managers tab (never reads f-regMgr, f-supervisor, f-areaMgr, f-month, selectedStore, or activeClass)
+  var fRm = getVal('mgr-f-regMgr');
+  var fSv = getVal('mgr-f-supervisor');
+  var fAm = getVal('mgr-f-areaMgr');
+  var fPt = getVal('mgr-f-partner');
+  var fCls = getVal('mgr-f-class');
   var fMoLocal = getVal('mgr-select-month');
   var fRegLocal = getVal('mgr-select-region');
   var searchQ = (getVal('mgr-search-input') || '').trim().toLowerCase();
@@ -12289,9 +12332,9 @@ function getManagersLinkedRecords() {
     var cls = (rawRow && rawRow.classification) || h.cls || '';
     var reg = (rawRow && rawRow.region) || (evRec && evRec.evalRegion) || h.region || '';
 
-    var smName = (evRec && evRec.managerName) || (rawRow && rawRow.storeManager) || ('غير مسجل (' + storeName + ')');
-    var oid = (evRec && evRec.oracleId) || (rawRow && rawRow.oracleId) || '—';
-    var hdate = (evRec && evRec.hiringDate) || (rawRow && rawRow.hiringDate) || '';
+    var smName = (evRec && evRec.managerName) ? evRec.managerName : ('بدون مدير مسجل (' + storeName + ')');
+    var oid = (evRec && evRec.oracleId) ? evRec.oracleId : '—';
+    var hdate = (evRec && evRec.hiringDate) ? evRec.hiringDate : '';
 
     return {
       month: month,
@@ -12310,13 +12353,13 @@ function getManagersLinkedRecords() {
       hasRawProducts: !!rawRow,
       hasEval: !!evRec,
       mobileTarget: rawRow ? (Number(rawRow.mobileTarget) || 0) : 0,
-      mobileSubs:   rawRow ? (Number(rawRow.mobileSubs) || 0)   : 0,
+      mobileSubs:   rawRow ? (Number(MGR_DATA_MODE === 'activation' ? (rawRow._actMobile !== undefined ? rawRow._actMobile : rawRow.mobileSubs) : (rawRow._salesMobile !== undefined ? rawRow._salesMobile : rawRow.mobileSubs)) || 0) : 0,
       goldTarget:   rawRow ? (Number(rawRow.goldTarget) || 0)   : 0,
       goldSubs:     rawRow ? (Number(rawRow.goldSubs) || 0)     : 0,
       fbbTarget:    rawRow ? (Number(rawRow.fbbTarget) || 0)    : 0,
-      fbbSubs:      rawRow ? (Number(rawRow.fbbSubs) || 0)      : 0,
+      fbbSubs:      rawRow ? (Number(MGR_DATA_MODE === 'activation' ? (rawRow._actFbb !== undefined ? rawRow._actFbb : rawRow.fbbSubs) : (rawRow._salesFbb !== undefined ? rawRow._salesFbb : rawRow.fbbSubs)) || 0) : 0,
       fixedTarget:  rawRow ? (Number(rawRow.fixedTarget) || 0)  : 0,
-      fixedSubs:    rawRow ? (Number(rawRow.fixedSubs) || 0)    : 0,
+      fixedSubs:    rawRow ? (Number(MGR_DATA_MODE === 'activation' ? (rawRow._actFixed !== undefined ? rawRow._actFixed : rawRow.fixedSubs) : (rawRow._salesFixed !== undefined ? rawRow._salesFixed : rawRow.fixedSubs)) || 0) : 0,
       walletTarget: rawRow ? (Number(rawRow.walletTarget) || 0) : 0,
       walletSales:  rawRow ? (Number(rawRow.walletSales) || 0)  : 0,
       fwaTarget:    rawRow ? (Number(rawRow.fwaTarget) || 0)    : 0,
@@ -12341,9 +12384,11 @@ function getManagersLinkedRecords() {
       var code = mgrNormCode(r.storeCode);
       var m = String(r.month || '').trim();
       var ev = (code && m && idx.byCodeMonth[code + '|' + m])
-            || (r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
-            || (code && idx.latestByCode[code])
+            || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
             || null;
+      if (MGR_LEVEL === 'storeManager' && idx.allRecords.length > 0 && !ev) {
+        return; // Do not attach vacant/un-evaluated store-month rows to managers
+      }
       var k = (code || r.store) + '|' + m;
       seenKey[k] = true;
       combinedRows.push(makeUnifiedRow(r, ev));
@@ -12355,29 +12400,26 @@ function getManagersLinkedRecords() {
       var rawRow = rawByCodeMonth[k] || null;
       combinedRows.push(makeUnifiedRow(rawRow, ev));
     });
-    if (hasRaw) {
+    if (hasRaw && MGR_LEVEL !== 'storeManager') {
       RAW_DATA.forEach(function (r) {
         var code = mgrNormCode(r.storeCode);
         var m = String(r.month || '').trim();
         var k = (code || r.store) + '|' + m;
         if (!seenKey[k]) {
           seenKey[k] = true;
-          var ev = (code && idx.latestByCode[code]) || null;
-          combinedRows.push(makeUnifiedRow(r, ev));
+          combinedRows.push(makeUnifiedRow(r, null));
         }
       });
     }
   }
 
-  var activeMoFilter = fMoLocal || fMoGlobal || '';
+  var activeMoFilter = fMoLocal || '';
   var baseAllMonths = combinedRows.filter(function (r) {
     if (fRm && r.regionalManager !== fRm) return false;
     if (fSv && r.supervisor !== fSv) return false;
     if (fAm && r.areaManager !== fAm) return false;
-    if (fAc && r.accountManager !== fAc) return false;
     if (fPt && r.partner !== fPt) return false;
-    if (typeof selectedStore !== 'undefined' && selectedStore && (r.storeCode || r.store) !== selectedStore) return false;
-    if (typeof activeClass !== 'undefined' && activeClass !== 'all' && r.classification !== activeClass) return false;
+    if (fCls && r.classification !== fCls) return false;
     if (fRegLocal && r.region !== fRegLocal) return false;
     if (activeMoFilter && r.month !== activeMoFilter) return false;
     return true;
@@ -12405,7 +12447,7 @@ function getManagersLinkedRecords() {
 
 function getMgrEntityKey(r) {
   if (MGR_LEVEL === 'storeManager') {
-    return (r.oracleId && r.oracleId !== '—') ? (r.oracleId + '|' + r.storeManager) : ('SM|' + r.storeManager);
+    return (r.oracleId && r.oracleId !== '—') ? ('OID|' + r.oracleId) : ('SM|' + (r.storeCode || r.storeManager));
   }
   if (MGR_LEVEL === 'areaManager') return 'AM|' + (r.areaManager || 'Unassigned');
   if (MGR_LEVEL === 'supervisor') return 'SV|' + (r.supervisor || 'Unassigned');
@@ -12420,6 +12462,31 @@ function getMgrEntityLabel(r) {
 }
 
 function populateMgrSectionDropdowns(allRows, scopeRows) {
+  function fillSelect(id, rowsSource, field, defaultLabel) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var cur = sel.value;
+    var vals = Array.from(new Set(rowsSource.map(function (r) { return r[field]; }).filter(function (v) { return v && v !== 'Unassigned'; }))).sort();
+    sel.innerHTML = '<option value="">' + defaultLabel + ' (' + vals.length + ')</option>';
+    vals.forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      if (v === cur) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+  var rmVal = (document.getElementById('mgr-f-regMgr') || {}).value || '';
+  var svVal = (document.getElementById('mgr-f-supervisor') || {}).value || '';
+  var rowsForRm = allRows;
+  var rowsForSv = rmVal ? allRows.filter(function (r) { return r.regionalManager === rmVal; }) : allRows;
+  var rowsForAm = rowsForSv.filter(function (r) { return !svVal || r.supervisor === svVal; });
+
+  fillSelect('mgr-f-regMgr', rowsForRm, 'regionalManager', '👔 كل Regional Managers');
+  fillSelect('mgr-f-supervisor', rowsForSv, 'supervisor', '🧑‍💼 كل Supervisors');
+  fillSelect('mgr-f-areaMgr', rowsForAm, 'areaManager', '📍 كل Area Managers');
+  fillSelect('mgr-f-partner', rowsForRm, 'partner', '🤝 كل الشركات');
+  fillSelect('mgr-f-class', rowsForRm, 'classification', '🏷️ كل التصنيفات');
+
   var regSel = document.getElementById('mgr-select-region');
   if (regSel) {
     var curReg = regSel.value;
@@ -12616,6 +12683,35 @@ function setMgrMetricMode(mode) {
       b.style.fontWeight = (k === mode) ? '800' : '700';
     }
   });
+  renderManagersPerf();
+}
+
+function setMgrDataMode(mode) {
+  MGR_DATA_MODE = mode;
+  var bSal = document.getElementById('mgr-dtype-sales');
+  var bAct = document.getElementById('mgr-dtype-act');
+  if (bSal) {
+    bSal.style.background = mode === 'sales' ? '#c0392b' : 'transparent';
+    bSal.style.color = mode === 'sales' ? 'white' : '#4b5563';
+    bSal.style.fontWeight = mode === 'sales' ? '800' : '700';
+  }
+  if (bAct) {
+    bAct.style.background = mode === 'activation' ? '#5E2D91' : 'transparent';
+    bAct.style.color = mode === 'activation' ? 'white' : '#4b5563';
+    bAct.style.fontWeight = mode === 'activation' ? '800' : '700';
+  }
+  renderManagersPerf();
+}
+
+function resetMgrFiltersOnly() {
+  MGR_SELECTED_PERSON = '';
+  ['mgr-search-input', 'mgr-select-person', 'mgr-select-region', 'mgr-select-month',
+   'mgr-f-regMgr', 'mgr-f-supervisor', 'mgr-f-areaMgr', 'mgr-f-partner', 'mgr-f-class'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var sortEl = document.getElementById('mgr-sort-by');
+  if (sortEl) sortEl.value = 'eval_desc';
   renderManagersPerf();
 }
 
@@ -12920,7 +13016,7 @@ function buildMgrTableTheadHTML(firstColTitle, secondColTitle, effMode, hasRawPr
     var prodTop = PRODUCTS.map(function (p) {
       return '<th colspan="' + colsPerProd + '" style="' + thBase + ';background:' + p.color + '"><i class="fas ' + p.icon + ' mr-1"></i>' + p.label + '</th>';
     }).join('');
-    var evalTop = '<th colspan="' + (prodDetails ? 3 : 5) + '" style="' + thBase + ';background:#0f766e"><i class="fas fa-award mr-1"></i>التقييم الشهري (Evaluation)</th>';
+    var evalTop = '<th colspan="' + (prodDetails ? 3 : 6) + '" style="' + thBase + ';background:#0f766e"><i class="fas fa-award mr-1"></i>التقييم الشهري (Evaluation)</th>';
 
     var row1 = '<tr style="background:#1a1a2e">' +
       '<th rowspan="2" style="' + thBase + ';width:34px">#</th>' +
@@ -12944,6 +13040,7 @@ function buildMgrTableTheadHTML(firstColTitle, secondColTitle, effMode, hasRawPr
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Perf 25%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Eval %</th>'
       : '<th style="' + thBase + ';background:#115e59;font-size:9px">Act %</th>' +
+        '<th style="' + thBase + ';background:#115e59;font-size:9px">TNPS 10%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Mob 35%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Mix 30%</th>' +
         '<th style="' + thBase + ';background:#115e59;font-size:9px">Perf 25%</th>' +
@@ -13035,8 +13132,10 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
         '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
     }
 
+    var tnpsPctVal = agg.tnps !== null && agg.tnps !== undefined ? agg.tnps * 100 : null;
     return prodCells +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#4b5563') + '">' + (actPctVal !== null ? actPctVal.toFixed(1) + '%' : '—') + '</td>' +
+      '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#2563eb') + '">' + (tnpsPctVal !== null ? tnpsPctVal.toFixed(0) + '%' : '—') + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#5E2D91') + '">' + fmtScore(agg.mob35, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mix30, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#0f766e') + '">' + fmtScore(agg.perf25, 1) + '</td>' +
@@ -14082,19 +14181,17 @@ async function exportManagersPerfCSV() {
   var _origSwitchTab = switchTab;
   switchTab = function (name) {
     var res = _origSwitchTab.apply(this, arguments);
+    var filtersBar = document.getElementById('filters-bar');
+    var execBanner = document.getElementById('exec-banner');
+    if (name === 'managers' || name === 'mtd') {
+      if (filtersBar) filtersBar.style.display = 'none';
+      if (execBanner) execBanner.style.display = 'none';
+    } else {
+      if (filtersBar) filtersBar.style.display = '';
+      if (execBanner) execBanner.style.display = '';
+    }
     if (name === 'managers') {
       try { renderManagersPerf(); } catch (e) { console.error('[ManagersPerf]', e); }
-    }
-    return res;
-  };
-
-  var _origRenderAll = renderAll;
-  renderAll = function () {
-    var res = _origRenderAll.apply(this, arguments);
-    if (activeTab === 'managers') {
-      try { renderManagersPerf(); } catch (e) { console.error('[ManagersPerf]', e); }
-    } else {
-      updateEvalStatusBadge();
     }
     return res;
   };
@@ -14105,17 +14202,12 @@ async function exportManagersPerfCSV() {
     if (injectedData && injectedData.length) {
       try { enrichRawDataWithEvaluation(injectedData); } catch (e) { console.warn('[ManagersPerf enrich]', e); }
     }
-    return _origInitAppWithData.apply(this, arguments);
-  };
-
-  var _origResetFilters = resetFilters;
-  resetFilters = function () {
-    MGR_SELECTED_PERSON = '';
-    var inp = document.getElementById('mgr-search-input'); if (inp) inp.value = '';
-    var pSel = document.getElementById('mgr-select-person'); if (pSel) pSel.value = '';
-    var rSel = document.getElementById('mgr-select-region'); if (rSel) rSel.value = '';
-    var mSel = document.getElementById('mgr-select-month'); if (mSel) mSel.value = '';
-    return _origResetFilters.apply(this, arguments);
+    var res = _origInitAppWithData.apply(this, arguments);
+    try {
+      if (activeTab === 'managers') renderManagersPerf();
+      else updateEvalStatusBadge();
+    } catch (e) {}
+    return res;
   };
 })();
 </script>
@@ -14685,7 +14777,7 @@ function mobileNavSwitchTab(tabName) {
 }
 
 function mobileNavToggleFilters() {
-  if (activeTab === 'mtd') {
+  if (activeTab === 'mtd' || activeTab === 'managers') {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
