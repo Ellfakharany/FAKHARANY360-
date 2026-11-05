@@ -7,14 +7,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>FAKHARANY³⁶⁰ · Performance Intelligence Platform</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -1071,7 +1068,22 @@ document.addEventListener('DOMContentLoaded', function() {
         <button onclick="refreshAllData()" id="refresh-data-btn" class="header-btn" title="تحديث البيانات (من غير خروج)"><i class="fas fa-sync-alt"></i></button>
         <span id="user-role-badge" class="user-badge admin" style="display:none"></span>
         <button onclick="doLogout()" id="logout-btn" class="header-btn" title="تسجيل خروج" style="display:none"><i class="fas fa-sign-out-alt"></i></button>
-        <button onclick="toggleDarkMode()" class="header-btn" title="Dark Mode"><i class="fas fa-moon"></i></button>
+        <!-- Theme Palette Picker -->
+        <div style="position:relative;display:inline-flex;align-items:center" id="theme-palette-wrap">
+          <button onclick="toggleThemePaletteMenu(event)" id="theme-palette-trigger" class="header-btn" title="تغيير ثيم وألوان الداشبورد" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.16)">
+            <i class="fas fa-palette"></i>
+            <span class="hidden md:inline" style="font-size:11.5px;font-weight:800">الثيم</span>
+            <span id="theme-active-dot" style="width:10px;height:10px;border-radius:50%;background:#e91e8c;border:1.5px solid white;display:inline-block"></span>
+          </button>
+          <div id="theme-palette-popover" style="display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:9999;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;padding:12px;width:275px;box-shadow:0 14px 36px rgba(0,0,0,0.28)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+              <span style="font-size:11.5px;font-weight:800;color:var(--text-primary)"><i class="fas fa-swatchbook mr-1" style="color:var(--we-purple)"></i>اختار ثيم الداشبورد</span>
+              <span onclick="closeThemePaletteMenu()" style="cursor:pointer;color:var(--text-muted);font-size:13px;padding:2px 6px">✕</span>
+            </div>
+            <div id="theme-palette-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px"></div>
+          </div>
+        </div>
+        <button onclick="toggleDarkMode()" id="dark-mode-btn" class="header-btn" title="الوضع الليلي (Dark Mode)"><i class="fas fa-moon"></i></button>
         <button onclick="toggleFullscreen()" class="header-btn" title="Fullscreen"><i class="fas fa-expand"></i></button>
         <a href="https://www.linkedin.com/in/m-elfakharany" target="_blank" rel="noopener" class="header-btn" title="LinkedIn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><i class="fab fa-linkedin" style="color:#0077B5"></i></a>
         <button onclick="openUploadModal()" id="admin-upload-btn" class="header-btn-accent" title="Upload Data to Supabase" style="display:none;background:linear-gradient(135deg,#16a34a,#15803d)"><i class="fas fa-cloud-upload-alt mr-1"></i><span class="hidden sm:inline">Upload Data</span></button>
@@ -1098,6 +1110,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <!-- Sticky Filters -->
   <div id="filters-bar" class="filters-sticky z-30 px-6 pt-3 pb-2 shadow">
+    <!-- Mobile Compact Filter Toggle Bar (Visible on Mobile <= 768px) -->
+    <div id="mobile-filter-bar-header" class="mobile-only-flex" style="display:none;align-items:center;justify-content:space-between;gap:8px;padding-bottom:6px">
+      <button onclick="toggleMobileFiltersBody()" id="mobile-filter-toggle-btn" style="display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:12px;border:1.5px solid var(--we-purple);background:var(--we-purple);color:white;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12)">
+        <i class="fas fa-sliders-h"></i>
+        <span id="mobile-filter-toggle-label">الفلاتر والتصفية</span>
+        <span id="mobile-filter-count-pill" style="display:none;background:white;color:var(--we-purple);font-size:10.5px;font-weight:900;padding:1px 7px;border-radius:10px">0</span>
+        <i class="fas fa-chevron-down" id="mobile-filter-chevron" style="font-size:10px;margin-left:2px"></i>
+      </button>
+      <div style="display:flex;align-items:center;gap:5px">
+        <button class="dash-mode-act-btn" onclick="setDashMode('activation')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #e5e7eb;background:white;color:#6b7280">
+          <i class="fas fa-bolt"></i> Act
+        </button>
+        <button class="dash-mode-sal-btn" onclick="setDashMode('sales')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #c0392b;background:#c0392b;color:white">
+          <i class="fas fa-shopping-cart"></i> Sales
+        </button>
+        <button onclick="resetFilters()" style="padding:7px 10px;border-radius:10px;border:1.5px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:11.5px;font-weight:800;cursor:pointer" title="إعادة ضبط الفلاتر">
+          <i class="fas fa-undo"></i>
+        </button>
+      </div>
+    </div>
+    <div id="filters-collapsible-body">
     <!-- Row -1: Activation / Sales Toggle (Mobile, Fixed & FBB only — matches MTD tab) -->
     <div class="flex flex-wrap gap-2 items-center mb-2">
       <span class="filter-label" style="align-self:center">Data Type:</span>
@@ -1182,6 +1215,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <button onclick="resetFilters()" class="reset-btn"><i class="fas fa-undo mr-1"></i>Reset</button>
       <span id="filter-count-badge" class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full font-semibold"></span>
     </div>
+    </div><!-- /#filters-collapsible-body -->
   </div>
   <!-- Overlay to close store dropdown -->
   <div id="store-overlay" class="hidden fixed inset-0 z-20" onclick="closeStoreDropdown()"></div>
@@ -1546,28 +1580,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
-    <!-- CHARTS TAB -->
-    <div id="tab-charts" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-chart-bar mr-2"></i>Contribution Charts</div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        <div class="chart-card">
-          <div class="chart-title">Store Contribution (Top 15)</div>
-          <canvas id="chart-store-contrib" height="280"></canvas>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Partner Contribution</div>
-          <canvas id="chart-partner-contrib" height="280"></canvas>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Area Manager Contribution</div>
-          <canvas id="chart-areamgr-contrib" height="220"></canvas>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Supervisor Contribution</div>
-          <canvas id="chart-supervisor-contrib" height="220"></canvas>
-        </div>
-      </div>
-    </div>
+    <!-- Charts tab removed -->
 
 
 
@@ -1643,7 +1656,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="ins-kpi-banner" style="background:linear-gradient(135deg,#5E2D91,#7b3dbf);border-radius:14px;padding:14px 18px;color:white;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center"></div>
 
       <!-- Insight Cards -->
-      <div id="ins-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px"></div>
+      <div id="ins-cards" class="ins-cards-grid"></div>
 
       <!-- Detail Table -->
       <div class="chart-card" style="overflow:hidden">
@@ -2565,14 +2578,14 @@ function resetFilters() {
 function renderAll() {
   updateExecBanner();
   renderExecKPIs();
-  renderProductKPIs('product-kpi-grid');
-  renderProductKPIs('product-kpi-grid2');
+  if (activeTab === 'overview') renderProductKPIs('product-kpi-grid');
+  if (activeTab === 'products') renderProductKPIs('product-kpi-grid2');
   if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); renderMonthlyPerf(); }
   if (activeTab === 'products') { renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (activeTab === 'tariff') { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (activeTab === 'rankings') { renderAllRankings(); }
   if (activeTab === 'heatmap') { renderHeatmap(); }
-  if (activeTab === 'charts') { renderContribCharts(); }
+  
   if (activeTab === 'packages') { renderPackages(); }
   if (activeTab === 'insights') { renderInsights(); }
 }
@@ -4006,114 +4019,7 @@ function renderContrib(dataKey, _, chartId, label, limit=20) {
   });
 }
 
-// ── [Fakharany section removed] ───────────────────────────────────────────────
-function renderFakharany_DISABLED() {
-  const fakData = filteredData.filter(r => FAKHARANY_TEAM.includes(r.areaManager));
-
-  // Team KPI cards
-  const teamEl = document.getElementById('fakharany-team-kpis');
-  if (teamEl) {
-    teamEl.innerHTML = FAKHARANY_TEAM.map(name => {
-      const rows = fakData.filter(r=>r.areaManager===name);
-      const g = calcGroup(rows);
-      const color = g.pct>=100?'#22c55e':g.pct>=90?'#eab308':'#ef4444';
-      const short = FAKHARANY_TEAM_SHORT[name]||name;
-      return `<div class="fak-team-card">
-        <div class="fak-role">Area Manager</div>
-        <div class="fak-name">${short}</div>
-        <div class="fak-ach kpi-animated" style="color:${color}">${g.pct}%</div>
-        <div style="font-size:11px;color:var(--text-muted)">Ach: ${fmtN(g.totalAch)} / ${fmtN(g.totalTarget)}</div>
-        <div style="font-size:11px;color:${g.gap>=0?'#22c55e':'#ef4444'};font-weight:600">Gap: ${g.gap>=0?'+':''}${fmtN(g.gap)}</div>
-      </div>`;
-    }).join('');
-  }
-
-  // Achievement % chart
-  const achData = FAKHARANY_TEAM.map(name => {
-    const rows = fakData.filter(r=>r.areaManager===name);
-    return pct(calcGroup(rows).totalAch, calcGroup(rows).totalTarget);
-  });
-  makeChart('chart-fak-ach', {
-    type:'bar',
-    data:{
-      labels: FAKHARANY_TEAM.map(n=>FAKHARANY_TEAM_SHORT[n]),
-      datasets:[{ label:'Achievement %', data:achData, backgroundColor:achData.map(v=>v>=100?'rgba(34,197,94,0.7)':v>=90?'rgba(234,179,8,0.7)':'rgba(239,68,68,0.7)'), borderRadius:6, borderWidth:0 }]
-    },
-    options:{ responsive:true, plugins:{legend:{display:false}}, ...chartDefaults() }
-  });
-
-  // Product Mix donut
-  const totalByProduct = PRODUCTS.map(p => sum(fakData, p.aKey));
-  makeChart('chart-fak-mix', {
-    type:'doughnut',
-    data:{ labels:PRODUCTS.map(p=>p.label), datasets:[{ data:totalByProduct, backgroundColor:PRODUCTS.map(p=>p.color), borderWidth:3 }] },
-    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{color:textColor(),font:{family:'Inter',size:11}} } } }
-  });
-
-  // Monthly trend
-  const months = MONTH_ORDER.filter(m=>fakData.some(r=>r.month===m));
-  const trendDatasets = FAKHARANY_TEAM.map((name,i)=>({
-    label: FAKHARANY_TEAM_SHORT[name],
-    data: months.map(m=>pct(calcGroup(fakData.filter(r=>r.areaManager===name&&r.month===m)).totalAch, calcGroup(fakData.filter(r=>r.areaManager===name&&r.month===m)).totalTarget)),
-    borderColor:CHART_COLORS[i], backgroundColor:CHART_COLORS[i]+'22', borderWidth:2, tension:0.4, fill:false, pointRadius:4
-  }));
-  makeChart('chart-fak-trend', {
-    type:'line',
-    data:{ labels:months.map(m=>MONTH_LABELS[m]||m), datasets:trendDatasets },
-    options:{ responsive:true, ...chartDefaults() }
-  });
-
-  // Ranking list
-  const rankEl = document.getElementById('fak-ranking-list');
-  if (rankEl) {
-    const ranked = FAKHARANY_TEAM.map(name=>{
-      const rows=fakData.filter(r=>r.areaManager===name);
-      const g=calcGroup(rows);
-      return { name:FAKHARANY_TEAM_SHORT[name], pct:g.pct, ach:g.totalAch, target:g.totalTarget, gap:g.gap };
-    }).sort((a,b)=>b.pct-a.pct);
-    rankEl.innerHTML = ranked.map((r,i)=>{
-      const color=r.pct>=100?'#22c55e':r.pct>=90?'#eab308':'#ef4444';
-      const medal=['🥇','🥈','🥉','4️⃣'][i]||String(i+1);
-      return `<div class="rank-item">
-        <div style="font-size:20px;width:28px;text-align:center">${medal}</div>
-        <div class="flex-1"><div class="rank-name">${r.name}</div>
-        <div class="rank-bar-container mt-1"><div class="rank-bar-fill" style="width:${Math.min(r.pct,100)}%;background:${color}"></div></div></div>
-        <div class="rank-stats">
-          <span class="rank-pct" style="color:${color}">${r.pct}%</span>
-          <span style="color:var(--text-muted)">${fmt(r.target)}</span>
-          <span>${fmt(r.ach)}</span>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // Detailed table
-  const fdt = document.getElementById('fak-detail-table');
-  if (fdt) {
-    const rows = fakData.map(r => ({
-      month: MONTH_LABELS[r.month]||r.month,
-      am: FAKHARANY_TEAM_SHORT[r.areaManager]||r.areaManager,
-      store: r.store, partner: r.partner,
-      mT:r.mobileTarget, mA:r.mobileSubs,
-      gT:r.goldTarget, gA:r.goldSubs,
-      fT:r.fbbTarget, fA:r.fbbSubs,
-      wT:r.walletTarget, wA:r.walletSales,
-    }));
-    fdt.innerHTML = `<thead><tr>
-      <th>Month</th><th>Area Mgr</th><th>Store</th><th>Partner</th>
-      <th>Mob T</th><th>Mob A</th><th>Gold T</th><th>Gold A</th>
-      <th>FBB T</th><th>FBB A</th><th>Wallet T</th><th>Wallet A</th>
-    </tr></thead><tbody>${rows.map(r=>`<tr>
-      <td>${r.month}</td><td>${r.am}</td><td title="${r.store}">${r.store.length>20?r.store.slice(0,20)+'…':r.store}</td>
-      <td title="${r.partner}">${r.partner.length>18?r.partner.slice(0,18)+'…':r.partner}</td>
-      <td>${fmtN(r.mT)}</td><td style="color:${r.mA>=r.mT?'#22c55e':'#ef4444'};font-weight:600">${fmtN(r.mA)}</td>
-      <td>${fmtN(r.gT)}</td><td style="color:${r.gA>=r.gT?'#22c55e':'#ef4444'};font-weight:600">${fmtN(r.gA)}</td>
-      <td>${fmtN(r.fT)}</td><td style="color:${r.fA>=r.fT?'#22c55e':'#ef4444'};font-weight:600">${fmtN(r.fA)}</td>
-      <td>${fmtN(r.wT)}</td><td style="color:${r.wA>=r.wT?'#22c55e':'#ef4444'};font-weight:600">${fmtN(r.wA)}</td>
-    </tr>`).join('')}</tbody>`;
-  }
-}
-
+// ── [Fakharany legacy code cleaned] ──
 // ── Tab Switching ─────────────────────────────────────────────────────────────
 function switchTab(name) {
   activeTab = name;
@@ -4140,7 +4046,7 @@ function switchTab(name) {
   if (name==='tariff')     { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
   if (name==='rankings')   renderAllRankings();
   if (name==='heatmap')    renderHeatmap();
-  if (name==='charts')     renderContribCharts();
+  
   if (name==='packages')   renderPackages();
   if (name==='insights')   renderInsights();
   if (name==='mtd')        renderMTD();
@@ -14169,6 +14075,664 @@ async function exportManagersPerfCSV() {
     var rSel = document.getElementById('mgr-select-region'); if (rSel) rSel.value = '';
     var mSel = document.getElementById('mgr-select-month'); if (mSel) mSel.value = '';
     return _origResetFilters.apply(this, arguments);
+  };
+})();
+</script>
+
+
+<!-- Mobile Bottom Navigation Bar (Visible on screens <= 768px) -->
+<nav id="mobile-bottom-nav" style="display:none">
+  <button onclick="mobileNavSwitchTab('overview')" id="mnav-overview" class="mnav-btn active">
+    <i class="fas fa-chart-pie"></i>
+    <span>Overview</span>
+  </button>
+  <button onclick="mobileNavSwitchTab('managers')" id="mnav-managers" class="mnav-btn">
+    <i class="fas fa-user-tie"></i>
+    <span>Managers</span>
+  </button>
+  <button onclick="mobileNavSwitchTab('mtd')" id="mnav-mtd" class="mnav-btn">
+    <i class="fas fa-calendar-day"></i>
+    <span>MTD Live</span>
+  </button>
+  <button onclick="mobileNavSwitchTab('rankings')" id="mnav-rankings" class="mnav-btn">
+    <i class="fas fa-trophy"></i>
+    <span>Rankings</span>
+  </button>
+  <button onclick="mobileNavToggleFilters()" id="mnav-filters" class="mnav-btn">
+    <i class="fas fa-sliders-h"></i>
+    <span>الفلاتر</span>
+  </button>
+</nav>
+
+<style id="fk360-v4-ux-styles">
+/* ── Dynamic Theme Variables & Global Overrides ── */
+:root {
+  --theme-tint: #f3e8ff;
+  --theme-tint-border: #d8b4fe;
+  --theme-header-grad: linear-gradient(135deg, var(--we-purple-dark) 0%, var(--we-purple) 55%, var(--we-purple-light) 100%);
+}
+
+.we-header {
+  background: var(--theme-header-grad) !important;
+  transition: background 0.3s ease;
+}
+
+.tab-btn.active {
+  background: var(--gray-bg) !important;
+  color: var(--we-purple) !important;
+  font-weight: 800 !important;
+}
+.dark .tab-btn.active {
+  background: var(--gray-bg) !important;
+  color: var(--we-purple-light) !important;
+}
+
+.section-title {
+  border-bottom-color: var(--we-purple) !important;
+  color: var(--text-primary) !important;
+}
+.section-title i {
+  color: var(--we-purple) !important;
+}
+.kpi-card::before {
+  background: linear-gradient(90deg, var(--we-purple), var(--we-accent)) !important;
+}
+.prod-pill.active {
+  background: var(--we-purple) !important;
+  border-color: var(--we-purple) !important;
+  color: #ffffff !important;
+}
+.class-pill.active {
+  background: var(--we-accent) !important;
+  border-color: var(--we-accent) !important;
+  color: #ffffff !important;
+}
+.toggle-btn.active {
+  background: var(--we-purple) !important;
+  border-color: var(--we-purple) !important;
+  color: #ffffff !important;
+}
+.exec-banner {
+  border-left: 4px solid var(--we-purple) !important;
+  background: var(--card-bg) !important;
+}
+#exec-banner-text {
+  color: var(--text-primary) !important;
+}
+
+/* ── Smart Insights Responsive Grid ── */
+.ins-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* ── Sticky Table Headers for Long Tables ── */
+.data-table thead th,
+#heatmap-table thead th,
+#mgr-perf-tables-container table thead tr:first-child th,
+#mtd-table-head th,
+#team-pivot-table table thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+}
+
+/* ── Dark Mode Comprehensive Fixes for Inline-Styled Tables & Cards ── */
+html.dark body {
+  background: #0b0f19 !important;
+  color: #f3f4f6 !important;
+}
+html.dark .chart-card,
+html.dark .kpi-card,
+html.dark .kpi-card-best,
+html.dark .pkg-group-card,
+html.dark #mgr-perf-tables-container > div,
+html.dark #mtd-details-view > div,
+html.dark #mtd-summary-view {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+  color: #f3f4f6 !important;
+}
+html.dark table tbody tr {
+  background-color: #111827 !important;
+  color: #e5e7eb !important;
+  border-color: #1f2937 !important;
+}
+html.dark table tbody tr:nth-child(even) {
+  background-color: #161f33 !important;
+}
+html.dark table tbody td {
+  border-color: #1f2937 !important;
+  color: #e5e7eb !important;
+}
+html.dark input,
+html.dark select {
+  background-color: #1f2937 !important;
+  color: #f3f4f6 !important;
+  border-color: #374151 !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MOBILE UX OVERHAUL (أسهل وأكبر وأوضح على الموبايل)
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .ins-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Add bottom padding so content is never hidden behind the pinned Mobile Bottom Nav */
+  body {
+    padding-bottom: 70px !important;
+  }
+
+  /* Header adjustments for mobile */
+  .we-header > div:first-child {
+    padding: 10px 12px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header-btn, .header-btn-accent {
+    min-height: 36px;
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Larger, clearer swipeable Top Tabs Bar */
+  .tabs-bar {
+    padding: 4px 10px 0 !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs-bar::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    padding: 9px 15px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    border-radius: 10px 10px 0 0 !important;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+  }
+
+  /* Collapsible Mobile Filters Bar */
+  .mobile-only-flex {
+    display: flex !important;
+  }
+  #filters-bar {
+    padding: 10px 12px !important;
+    position: sticky;
+    top: 0;
+    z-index: 35;
+  }
+  #filters-collapsible-body.mobile-collapsed {
+    display: none !important;
+  }
+  #filters-collapsible-body {
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  /* Hide duplicate desktop Data Type row inside collapsible body on mobile since it's in the mobile bar */
+  #filters-collapsible-body > div:first-child {
+    display: none !important;
+  }
+
+  /* 2-Column Touch-Friendly Filter Selects on Mobile */
+  #filters-collapsible-body > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    align-items: stretch !important;
+  }
+  .filter-group {
+    width: 100% !important;
+  }
+  .filter-label {
+    font-size: 11px !important;
+    margin-bottom: 2px;
+  }
+  .filter-select, .store-search-input {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 42px !important;
+    padding: 8px 10px !important;
+    font-size: 13.5px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Larger, easier-to-tap Product & Classification pills (swipeable single row on mobile) */
+  #class-slicer, #product-slicer, #mtd-prod-pills, #mtd-lowperf-pills, #class-perf-pills {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  #class-slicer::-webkit-scrollbar, #product-slicer::-webkit-scrollbar { display: none; }
+  .prod-pill, .class-pill {
+    padding: 7px 14px !important;
+    font-size: 12.5px !important;
+    flex-shrink: 0;
+  }
+
+  /* Bigger, clearer KPI Cards on Mobile */
+  #mgr-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  #mgr-kpi-grid > div:last-child {
+    grid-column: span 2;
+  }
+  .kpi-card {
+    padding: 14px !important;
+    border-radius: 14px !important;
+  }
+  .kpi-card .kpi-value {
+    font-size: 21px !important;
+  }
+
+  /* Managers & MTD Filter Controls on Mobile */
+  #mgr-perf-master select,
+  #mgr-perf-master input[type="text"],
+  #tab-mtd select,
+  #tab-mtd input[type="text"] {
+    min-height: 40px !important;
+    font-size: 13px !important;
+  }
+
+  /* Table cells readability on mobile */
+  #mgr-perf-tables-container td,
+  #mgr-perf-tables-container th,
+  #team-pivot-table td,
+  #team-pivot-table th {
+    padding: 8px 9px !important;
+    font-size: 11.5px !important;
+  }
+
+  /* Pinned Mobile Bottom Navigation Bar */
+  #mobile-bottom-nav {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 62px;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+    z-index: 90;
+    padding: 4px 6px env(safe-area-inset-bottom, 4px);
+  }
+  .mnav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mnav-btn i {
+    font-size: 16px;
+  }
+  .mnav-btn.active {
+    color: var(--we-purple);
+    background: var(--theme-tint);
+    font-weight: 800;
+  }
+
+  /* Theme Palette Popover centered on mobile */
+  #theme-palette-popover {
+    position: fixed !important;
+    top: 64px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+  }
+}
+</style>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  GLOBAL THEME PALETTE ENGINE & MOBILE UX CONTROLLER (v4)
+// ════════════════════════════════════════════════════════════════════════════
+var FK360_THEMES = {
+  purple: {
+    label: 'WE Purple',
+    labelAr: 'بنفسجي WE',
+    primary: '#5E2D91',
+    dark: '#3b1d63',
+    light: '#7c3aed',
+    accent: '#e91e8c',
+    bg: '#f8f7fc',
+    tint: '#f3e8ff',
+    dot: '#5E2D91',
+    isDark: false
+  },
+  ocean: {
+    label: 'Royal Ocean',
+    labelAr: 'أزرق ملكي',
+    primary: '#1e40af',
+    dark: '#1e3a8a',
+    light: '#2563eb',
+    accent: '#0891b2',
+    bg: '#f4f7fb',
+    tint: '#dbeafe',
+    dot: '#2563eb',
+    isDark: false
+  },
+  emerald: {
+    label: 'Emerald Teal',
+    labelAr: 'أخضر زمردي',
+    primary: '#0f766e',
+    dark: '#115e59',
+    light: '#0d9488',
+    accent: '#16a34a',
+    bg: '#f2fbf9',
+    tint: '#ccfbf1',
+    dot: '#0d9488',
+    isDark: false
+  },
+  midnight: {
+    label: 'Midnight Pro',
+    labelAr: 'كحلي فخم',
+    primary: '#0f172a',
+    dark: '#020617',
+    light: '#334155',
+    accent: '#3b82f6',
+    bg: '#f1f5f9',
+    tint: '#e2e8f0',
+    dot: '#0f172a',
+    isDark: false
+  },
+  crimson: {
+    label: 'Crimson Ruby',
+    labelAr: 'أحمر قرمزي',
+    primary: '#991b1b',
+    dark: '#7f1d1d',
+    light: '#dc2626',
+    accent: '#d97706',
+    bg: '#fdf6f6',
+    tint: '#fee2e2',
+    dot: '#dc2626',
+    isDark: false
+  },
+  espresso: {
+    label: 'Warm Espresso',
+    labelAr: 'إسبريسو ذهبي',
+    primary: '#5c2d16',
+    dark: '#3e1d0d',
+    light: '#92400e',
+    accent: '#d97706',
+    bg: '#faf7f2',
+    tint: '#fef3c7',
+    dot: '#78350f',
+    isDark: false
+  },
+  indigo: {
+    label: 'Indigo Rose',
+    labelAr: 'إنديجو عصري',
+    primary: '#4338ca',
+    dark: '#312e81',
+    light: '#6366f1',
+    accent: '#db2777',
+    bg: '#f5f6ff',
+    tint: '#e0e7ff',
+    dot: '#4f46e5',
+    isDark: false
+  },
+  obsidian: {
+    label: 'Obsidian Dark',
+    labelAr: 'ليلي كامل',
+    primary: '#4c1d95',
+    dark: '#1e1b4b',
+    light: '#7c3aed',
+    accent: '#e91e8c',
+    bg: '#0b0f19',
+    tint: '#1e1b4b',
+    dot: '#111827',
+    isDark: true
+  }
+};
+
+var CURRENT_FK360_THEME = 'purple';
+var FK360_THEME_LS_KEY = 'fk360_selected_theme_v1';
+var MOBILE_FILTERS_OPEN = false;
+
+function renderThemePaletteOptions() {
+  var grid = document.getElementById('theme-palette-grid');
+  if (!grid) return;
+  grid.innerHTML = Object.keys(FK360_THEMES).map(function (k) {
+    var t = FK360_THEMES[k];
+    var active = (k === CURRENT_FK360_THEME);
+    return '<button onclick="selectDashboardTheme(\'' + k + '\')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:2px solid ' +
+      (active ? t.primary : 'var(--border)') + ';background:' + (active ? t.tint : 'var(--gray-bg)') + ';cursor:pointer;text-align:right;transition:all .15s">' +
+      '<span style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,' + t.primary + ',' + t.accent + ');flex-shrink:0;border:1.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.2)"></span>' +
+      '<span style="display:flex;flex-direction:column;line-height:1.2;overflow:hidden">' +
+        '<span style="font-size:11px;font-weight:800;color:' + (active ? t.primary : 'var(--text-primary)') + ';white-space:nowrap">' + t.labelAr + '</span>' +
+        '<span style="font-size:9px;color:var(--text-muted)">' + t.label + '</span>' +
+      '</span>' +
+    '</button>';
+  }).join('');
+}
+
+function toggleThemePaletteMenu(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  var pop = document.getElementById('theme-palette-popover');
+  if (!pop) return;
+  var isOpen = pop.style.display === 'block';
+  pop.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderThemePaletteOptions();
+}
+
+function closeThemePaletteMenu() {
+  var pop = document.getElementById('theme-palette-popover');
+  if (pop) pop.style.display = 'none';
+}
+
+function selectDashboardTheme(themeKey, skipSave) {
+  var t = FK360_THEMES[themeKey] || FK360_THEMES.purple;
+  CURRENT_FK360_THEME = themeKey in FK360_THEMES ? themeKey : 'purple';
+
+  var root = document.documentElement;
+  root.style.setProperty('--we-purple', t.primary);
+  root.style.setProperty('--we-purple-dark', t.dark);
+  root.style.setProperty('--we-purple-light', t.light);
+  root.style.setProperty('--we-accent', t.accent);
+  root.style.setProperty('--theme-tint', t.tint);
+  root.style.setProperty('--theme-header-grad', 'linear-gradient(135deg, ' + t.dark + ' 0%, ' + t.primary + ' 55%, ' + t.light + ' 100%)');
+
+  if (t.isDark) {
+    root.classList.add('dark');
+    document.body.classList.add('dark');
+    root.style.setProperty('--gray-bg', '#0b0f19');
+    root.style.setProperty('--card-bg', '#111827');
+    root.style.setProperty('--text-primary', '#f3f4f6');
+    root.style.setProperty('--text-muted', '#9ca3af');
+    root.style.setProperty('--border', '#1f2937');
+  } else {
+    root.classList.remove('dark');
+    document.body.classList.remove('dark');
+    root.style.setProperty('--gray-bg', t.bg);
+    root.style.setProperty('--card-bg', '#ffffff');
+    root.style.setProperty('--text-primary', '#1a1a2e');
+    root.style.setProperty('--text-muted', '#6b7280');
+    root.style.setProperty('--border', '#e5e7eb');
+  }
+
+  // Update dynamic style overrides for inline-styled purple elements across all tabs
+  var dynStyle = document.getElementById('fk360-dynamic-theme-override');
+  if (!dynStyle) {
+    dynStyle = document.createElement('style');
+    dynStyle.id = 'fk360-dynamic-theme-override';
+    document.head.appendChild(dynStyle);
+  }
+  dynStyle.textContent =
+    '[style*="background:#5E2D91"], [style*="background: #5E2D91"] { background: ' + t.primary + ' !important; }' +
+    '[style*="background:#3b1d63"], [style*="background: #3b1d63"] { background: ' + t.dark + ' !important; }' +
+    '[style*="background:linear-gradient(135deg,#5E2D91,#7c3aed)"], [style*="background:linear-gradient(135deg,#5E2D91,#7b3dbf)"] { background: linear-gradient(135deg, ' + t.primary + ', ' + t.light + ') !important; }' +
+    '[style*="background:linear-gradient(135deg,#1e1b4b,#5E2D91)"], [style*="background:linear-gradient(135deg,#1a1a2e,#5E2D91)"] { background: linear-gradient(135deg, ' + t.dark + ', ' + t.primary + ') !important; }' +
+    '[style*="color:#5E2D91"], [style*="color: #5E2D91"] { color: ' + (t.isDark ? '#c4b5fd' : t.primary) + ' !important; }' +
+    '[style*="border-color:#5E2D91"], [style*="border:1.5px solid #5E2D91"], [style*="border:2px solid #5E2D91"] { border-color: ' + t.primary + ' !important; }';
+
+  var dot = document.getElementById('theme-active-dot');
+  if (dot) dot.style.background = t.accent;
+
+  if ( PRODUCTS && PRODUCTS[0] ) PRODUCTS[0].color = t.primary;
+  if ( typeof CHART_COLORS !== 'undefined' && CHART_COLORS.length ) CHART_COLORS[0] = t.primary;
+
+  renderThemePaletteOptions();
+  closeThemePaletteMenu();
+
+  if (!skipSave) {
+    try { localStorage.setItem(FK360_THEME_LS_KEY, CURRENT_FK360_THEME); } catch (e) {}
+  }
+
+  // Refresh active charts if already initialized
+  if (typeof appInitialized !== 'undefined' && appInitialized) {
+    try {
+      Object.values(charts || {}).forEach(function (c) { if (c && typeof c.update === 'function') c.update(); });
+    } catch (e) {}
+  }
+}
+
+// ── Mobile Filters Collapse/Expand & Mobile Bottom Nav ──
+function toggleMobileFiltersBody(forceState) {
+  var body = document.getElementById('filters-collapsible-body');
+  var chev = document.getElementById('mobile-filter-chevron');
+  if (!body) return;
+  MOBILE_FILTERS_OPEN = (forceState !== undefined) ? !!forceState : !MOBILE_FILTERS_OPEN;
+  if (MOBILE_FILTERS_OPEN) {
+    body.classList.remove('mobile-collapsed');
+    if (chev) chev.className = 'fas fa-chevron-up';
+  } else {
+    body.classList.add('mobile-collapsed');
+    if (chev) chev.className = 'fas fa-chevron-down';
+  }
+}
+
+function updateMobileFilterBadgeCount() {
+  var get = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  var cnt = [get('f-regMgr'), get('f-supervisor'), get('f-areaMgr'), get('f-accMgr'), get('f-partner'), get('f-month'), (typeof selectedStore !== 'undefined' ? selectedStore : '')].filter(Boolean).length + ((typeof activeClass !== 'undefined' && activeClass !== 'all') ? 1 : 0);
+  var pill = document.getElementById('mobile-filter-count-pill');
+  if (pill) {
+    pill.style.display = cnt > 0 ? 'inline-block' : 'none';
+    pill.textContent = String(cnt);
+  }
+}
+
+function mobileNavSwitchTab(tabName) {
+  switchTab(tabName);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function mobileNavToggleFilters() {
+  if (activeTab === 'mtd') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  toggleMobileFiltersBody(true);
+  var fb = document.getElementById('filters-bar');
+  if (fb) fb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function syncMobileBottomNav(tabName) {
+  ['overview', 'managers', 'mtd', 'rankings'].forEach(function (k) {
+    var b = document.getElementById('mnav-' + k);
+    if (b) b.classList.toggle('active', k === tabName);
+  });
+  // Also scroll active top tab button into center view on mobile
+  try {
+    var activeTopBtn = document.querySelector('.tabs-bar .tab-btn.active');
+    if (activeTopBtn && activeTopBtn.scrollIntoView) {
+      activeTopBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  } catch (e) {}
+}
+
+(function () {
+  // Collapse filters by default on mobile screens so content is immediately visible
+  if (window.innerWidth <= 768) {
+    var fBody = document.getElementById('filters-collapsible-body');
+    if (fBody) fBody.classList.add('mobile-collapsed');
+    MOBILE_FILTERS_OPEN = false;
+  }
+
+  // Restore saved theme from localStorage
+  try {
+    var savedTheme = localStorage.getItem(FK360_THEME_LS_KEY);
+    if (savedTheme && FK360_THEMES[savedTheme]) {
+      selectDashboardTheme(savedTheme, true);
+    }
+  } catch (e) {}
+
+  // Wire login screen drink icons to the theme engine too
+  var _origSelectDrink = typeof selectDrinkIcon === 'function' ? selectDrinkIcon : null;
+  if (_origSelectDrink) {
+    selectDrinkIcon = function (el) {
+      _origSelectDrink.apply(this, arguments);
+      var drink = el && el.getAttribute ? el.getAttribute('data-drink') : '';
+      var map = { coffee: 'espresso', mint: 'emerald', espresso: 'midnight', latte: 'indigo' };
+      if (map[drink]) selectDashboardTheme(map[drink]);
+    };
+  }
+
+  // Wire toggleDarkMode to toggle between obsidian dark and purple (or previous light theme)
+  var _lastLightTheme = 'purple';
+  toggleDarkMode = function () {
+    if (CURRENT_FK360_THEME === 'obsidian') {
+      selectDashboardTheme(_lastLightTheme || 'purple');
+    } else {
+      _lastLightTheme = CURRENT_FK360_THEME;
+      selectDashboardTheme('obsidian');
+    }
+  };
+
+  // Close theme popover when clicking outside
+  document.addEventListener('click', function (e) {
+    var wrap = document.getElementById('theme-palette-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      closeThemePaletteMenu();
+    }
+  });
+
+  // Hook switchTab & applyFilters to keep mobile nav & filter badge in sync
+  var _prevSwitchTab = switchTab;
+  switchTab = function (name) {
+    var r = _prevSwitchTab.apply(this, arguments);
+    syncMobileBottomNav(name);
+    return r;
+  };
+
+  var _prevApplyFilters = applyFilters;
+  applyFilters = function () {
+    var r = _prevApplyFilters.apply(this, arguments);
+    updateMobileFilterBadgeCount();
+    return r;
+  };
+
+  var _prevResetFilters = resetFilters;
+  resetFilters = function () {
+    var r = _prevResetFilters.apply(this, arguments);
+    updateMobileFilterBadgeCount();
+    return r;
   };
 })();
 </script>
