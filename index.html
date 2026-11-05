@@ -1068,6 +1068,31 @@ document.addEventListener('DOMContentLoaded', function() {
         <button onclick="refreshAllData()" id="refresh-data-btn" class="header-btn" title="تحديث البيانات (من غير خروج)"><i class="fas fa-sync-alt"></i></button>
         <span id="user-role-badge" class="user-badge admin" style="display:none"></span>
         <button onclick="doLogout()" id="logout-btn" class="header-btn" title="تسجيل خروج" style="display:none"><i class="fas fa-sign-out-alt"></i></button>
+        <!-- Smart Anomaly & Action Alerts Bell -->
+        <div style="position:relative;display:inline-flex;align-items:center" id="smart-alerts-wrap">
+          <button onclick="toggleSmartAlertsPopover(event)" id="smart-alerts-btn" class="header-btn" title="مركز التنبيهات الذكية والحالات الحرجة" style="position:relative;display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.14)">
+            <i class="fas fa-bell"></i><span style="font-size:10.5px;font-weight:800">تنبيهات</span>
+            <span id="smart-alerts-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:white;font-size:9.5px;font-weight:900;min-width:18px;height:18px;border-radius:9px;padding:0 4px;line-height:18px;text-align:center;border:1.5px solid white">0</span>
+          </button>
+          <div id="smart-alerts-popover" style="display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:9999;background:var(--card-bg);border:1px solid var(--border);border-radius:16px;width:360px;max-height:480px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.32)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:linear-gradient(135deg,var(--we-purple-dark),var(--we-purple));color:white">
+              <span style="font-size:12px;font-weight:800"><i class="fas fa-bolt mr-1.5" style="color:#fbbf24"></i>مركز التنبيهات الذكية (Smart Alerts)</span>
+              <span onclick="closeSmartAlertsPopover()" style="cursor:pointer;opacity:.85;font-size:13px;padding:2px 6px">✕</span>
+            </div>
+            <div id="smart-alerts-tabs" style="display:flex;gap:4px;padding:8px 10px;background:var(--gray-bg);border-bottom:1px solid var(--border);overflow-x:auto">
+              <button onclick="setSmartAlertFilter('all')" id="salert-tab-all" style="padding:4px 10px;border-radius:12px;border:none;background:var(--we-purple);color:white;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap">الكل</button>
+              <button onclick="setSmartAlertFilter('quickwin')" id="salert-tab-quickwin" style="padding:4px 10px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">🔥 قريب من 100%</button>
+              <button onclick="setSmartAlertFilter('drop')" id="salert-tab-drop" style="padding:4px 10px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">📉 تراجع شهري</button>
+              <button onclick="setSmartAlertFilter('critical')" id="salert-tab-critical" style="padding:4px 10px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">🛑 إنذارات وعجز</button>
+            </div>
+            <div id="smart-alerts-list" style="max-height:360px;overflow-y:auto;padding:10px"></div>
+          </div>
+        </div>
+        <!-- TV / Presentation Mode Button -->
+        <button onclick="openTVPresentationMode()" id="tv-mode-btn" class="header-btn" title="وضع العرض التلفزيوني والاجتماعات (TV Presentation Mode)" style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.14)">
+          <i class="fas fa-tv"></i>
+          <span style="font-size:10.5px;font-weight:800">TV</span>
+        </button>
         <!-- Theme Palette Picker -->
         <div style="position:relative;display:inline-flex;align-items:center" id="theme-palette-wrap">
           <button onclick="toggleThemePaletteMenu(event)" id="theme-palette-trigger" class="header-btn" title="تغيير ثيم وألوان الداشبورد" style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.16)">
@@ -1360,6 +1385,12 @@ document.addEventListener('DOMContentLoaded', function() {
               <button id="mgr-export-excel-btn" onclick="exportManagersPerfExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28)">
                 <i class="fas fa-file-excel"></i> Export Excel (تنسيق احترافي)
               </button>
+              <button onclick="openScorecardModal()" title="فتح كارت الأداء الشخصي (Scorecard) لأي مدير أو فرع ومشاركته كصورة أو ملخص واتساب" style="display:inline-flex;align-items:center;gap:6px;padding:6px 13px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.25)">
+                <i class="fas fa-id-card"></i> كارت أداء (Scorecard)
+              </button>
+              <button onclick="openWhatIfSimulatorModal()" title="محاكي التارجت والتقييم التفاعلي (What-If Simulator)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 13px;background:linear-gradient(135deg,#d97706,#b45309);color:white;border:none;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(217,119,6,0.25)">
+                <i class="fas fa-sliders-h"></i> محاكي التارجت (What-If)
+              </button>
               <button id="mgr-export-csv-btn" onclick="exportManagersPerfCSV()" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer">
                 <i class="fas fa-file-csv" style="color:#16a34a"></i> CSV
               </button>
@@ -1640,7 +1671,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Smart Insights Tab -->
     <div id="tab-insights" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-lightbulb mr-2" style="color:#e91e8c"></i>Smart Insights</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-lightbulb mr-2" style="color:#e91e8c"></i>Smart Insights & Executive Action Plan</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button onclick="openActionPlanBriefModal()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;border-radius:20px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28)">
+            <i class="fab fa-whatsapp" style="font-size:14px"></i> توليد خطة عمل وملخص WhatsApp
+          </button>
+          <button onclick="copyQuickActionPlanToClipboard()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:1.5px solid var(--we-purple);background:white;color:var(--we-purple);font-size:11.5px;font-weight:800;cursor:pointer">
+            <i class="fas fa-copy"></i> نسخ سريع للخطة
+          </button>
+        </div>
+      </div>
 
       <!-- Level Selector -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -14734,6 +14775,916 @@ function syncMobileBottomNav(tabName) {
     updateMobileFilterBadgeCount();
     return r;
   };
+})();
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     1. TV / PRESENTATION MODE FULLSCREEN OVERLAY
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="tv-presentation-overlay" style="display:none;position:fixed;inset:0;z-index:99990;background:radial-gradient(circle at top right,#1e1b4b 0%,#090d16 65%,#05070c 100%);color:white;flex-direction:column;font-family:'Inter','Cairo',sans-serif;overflow:hidden">
+  <!-- Top Bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.25);flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--we-purple),var(--we-accent));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;box-shadow:0 4px 16px rgba(233,30,140,0.35)">WE</div>
+      <div>
+        <div style="font-size:18px;font-weight:900;letter-spacing:.02em">FAKHARANY<sup style="font-size:10px;color:#f5a623">360</sup> · EXECUTIVE COMMAND CENTER</div>
+        <div id="tv-subtitle-scope" style="font-size:11.5px;color:#9ca3af;font-weight:600">Live Presentation Mode</div>
+      </div>
+    </div>
+    <!-- Slide Dots & Controls -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div id="tv-slide-dots" style="display:flex;gap:6px;margin-right:8px"></div>
+      <button onclick="tvPrevSlide()" style="padding:7px 13px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:12px;font-weight:700"><i class="fas fa-step-backward"></i></button>
+      <button onclick="toggleTVAutoPlay()" id="tv-play-pause-btn" style="padding:7px 14px;border-radius:10px;border:1px solid #22c55e;background:rgba(34,197,94,0.18);color:#4ade80;cursor:pointer;font-size:12px;font-weight:800"><i class="fas fa-pause mr-1"></i>تلقائي (12ث)</button>
+      <button onclick="tvNextSlide()" style="padding:7px 13px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;cursor:pointer;font-size:12px;font-weight:700"><i class="fas fa-step-forward"></i></button>
+      <span id="tv-clock-display" style="font-size:12px;font-weight:800;color:#cbd5e1;padding:0 8px;font-family:monospace"></span>
+      <button onclick="closeTVPresentationMode()" style="padding:7px 15px;border-radius:10px;border:1px solid #ef4444;background:rgba(239,68,68,0.2);color:#fca5a5;cursor:pointer;font-size:12px;font-weight:800"><i class="fas fa-times mr-1"></i>خروج</button>
+    </div>
+  </div>
+  <!-- Progress Bar -->
+  <div style="height:3px;width:100%;background:rgba(255,255,255,0.08)">
+    <div id="tv-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#e91e8c,#f5a623);transition:width 0.3s linear"></div>
+  </div>
+  <!-- Slide Body -->
+  <div id="tv-slide-stage" style="flex:1;overflow-y:auto;padding:28px 36px;display:flex;flex-direction:column;justify-content:center"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     2. ONE-CLICK MANAGER / STORE SCORECARD MODAL (BENTO CARD + PNG / WHATSAPP)
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="scorecard-modal-overlay" style="display:none;position:fixed;inset:0;z-index:99980;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
+  <div style="background:var(--card-bg);border-radius:20px;max-width:780px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.45);border:1px solid var(--border)">
+    <!-- Modal Toolbar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;background:var(--gray-bg);border-radius:20px 20px 0 0">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
+        <span style="font-size:13px;font-weight:900;color:var(--we-purple)"><i class="fas fa-id-card mr-1.5"></i>بطاقة الأداء التنفيذية (Scorecard)</span>
+        <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;font-weight:700;color:var(--text-primary);background:var(--card-bg);max-width:280px;outline:none"></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <button onclick="downloadScorecardAsImage(this)" style="padding:6px 13px;border-radius:14px;border:none;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-camera mr-1"></i>حفظ كصورة PNG</button>
+        <button onclick="copyScorecardWhatsAppBrief()" style="padding:6px 13px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>نسخ لـ WhatsApp</button>
+        <button onclick="openWhatIfFromScorecard()" style="padding:6px 12px;border-radius:14px;border:1.5px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-sliders-h mr-1"></i>محاكاة التارجت</button>
+        <button onclick="closeScorecardModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;padding:0 6px">&times;</button>
+      </div>
+    </div>
+    <!-- Capturable Bento Card Area -->
+    <div id="scorecard-capture-area" style="padding:22px;background:#ffffff;color:#1f2937;font-family:'Inter','Cairo',sans-serif"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     3. INTERACTIVE WHAT-IF TARGET & EVALUATION SIMULATOR MODAL
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="whatif-simulator-modal" style="display:none;position:fixed;inset:0;z-index:99985;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
+  <div style="background:var(--card-bg);border-radius:20px;max-width:680px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.45);border:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#78350f,#d97706);color:white;border-radius:20px 20px 0 0">
+      <div>
+        <div style="font-size:14px;font-weight:900"><i class="fas fa-sliders-h mr-2"></i>محاكي التارجت والتقييم التفاعلي (What-If Simulator)</div>
+        <div style="font-size:11px;opacity:.9">جرّب إضافة مبيعات متوقعة وشوف تأثيرها الفوري على نسبة التحقيق والـ Gap والتقييم الشهري</div>
+      </div>
+      <button onclick="closeWhatIfSimulatorModal()" style="background:none;border:none;font-size:22px;color:white;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:20px">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:11px;font-weight:800;color:var(--text-muted);margin-bottom:4px">اختر المدير / الفرع للمحاكاة:</label>
+        <select id="whatif-entity-select" onchange="loadWhatIfEntity(this.value)" style="width:100%;padding:9px 12px;border-radius:12px;border:1.5px solid var(--border);font-size:12.5px;font-weight:700;background:var(--gray-bg);color:var(--text-primary);outline:none"></select>
+      </div>
+      <!-- Sliders -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px">
+        <div style="background:var(--gray-bg);padding:12px 14px;border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;margin-bottom:6px">
+            <span>📱 خطوط موبايل إضافية متوقعة:</span>
+            <span id="whatif-add-mob-val" style="color:var(--we-purple);font-weight:900">+0 خط</span>
+          </div>
+          <input type="range" id="whatif-add-mob" min="0" max="500" step="5" value="0" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:var(--we-purple)" />
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);margin-top:2px"><span>+0</span><span>+100</span><span>+250</span><span>+500</span></div>
+        </div>
+        <div style="background:var(--gray-bg);padding:12px 14px;border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;margin-bottom:6px">
+            <span>📊 درجة الـ Sales Mix (من 30%):</span>
+            <span id="whatif-mix-val" style="color:#2563eb;font-weight:900">26.0 / 30</span>
+          </div>
+          <input type="range" id="whatif-mix" min="0" max="30" step="0.5" value="26" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:#2563eb" />
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);margin-top:2px"><span>0</span><span>15</span><span>25</span><span>30%</span></div>
+        </div>
+        <div style="background:var(--gray-bg);padding:12px 14px;border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;margin-bottom:6px">
+            <span>⭐ بنود الأداء الإداري (من 25%):</span>
+            <span id="whatif-perf-val" style="color:#0f766e;font-weight:900">23.0 / 25</span>
+          </div>
+          <input type="range" id="whatif-perf" min="0" max="25" step="0.5" value="23" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:#0f766e" />
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);margin-top:2px"><span>0</span><span>15</span><span>20</span><span>25%</span></div>
+        </div>
+        <div style="background:var(--gray-bg);padding:12px 14px;border-radius:12px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;margin-bottom:6px">
+            <span>📅 الأيام المتبقية لتنفيذ الخطة:</span>
+            <span id="whatif-days-val" style="color:#d97706;font-weight:900">10 أيام</span>
+          </div>
+          <input type="range" id="whatif-days" min="1" max="30" step="1" value="10" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:#d97706" />
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);margin-top:2px"><span>يوم واحد</span><span>10 أيام</span><span>20 يوم</span><span>30 يوم</span></div>
+        </div>
+      </div>
+      <!-- Live Comparison Output -->
+      <div id="whatif-results-box"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     5. EXECUTIVE ACTION PLAN & WHATSAPP BRIEF MODAL
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="action-plan-modal-overlay" style="display:none;position:fixed;inset:0;z-index:99985;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
+  <div style="background:var(--card-bg);border-radius:20px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.45);border:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#15803d,#16a34a);color:white;border-radius:20px 20px 0 0">
+      <div>
+        <div style="font-size:14px;font-weight:900"><i class="fab fa-whatsapp mr-2" style="font-size:16px"></i>خطة العمل والتوجيهات التنفيذية (WhatsApp Action Brief)</div>
+        <div style="font-size:11px;opacity:.9">ملخص جاهز للإرسال للتيم بأهم الفرص السريعة والفروع الحرجة والمطلوب لتقفيل الـ Gap</div>
+      </div>
+      <button onclick="closeActionPlanBriefModal()" style="background:none;border:none;font-size:22px;color:white;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:18px">
+      <textarea id="action-plan-textarea" rows="14" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-family:'Cairo','Inter',sans-serif;font-size:12.5px;line-height:1.65;outline:none" dir="rtl"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button onclick="copyActionPlanTextarea()" style="padding:8px 18px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:12px;font-weight:800;cursor:pointer"><i class="fas fa-copy mr-1.5"></i>نسخ النص بالكامل (Copy)</button>
+        <button onclick="closeActionPlanBriefModal()" style="padding:8px 16px;border-radius:14px;border:1px solid var(--border);background:var(--gray-bg);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer">إغلاق</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  5 HIGH-IMPACT EXECUTIVE FEATURES ENGINE (v5)
+//  1) Smart Anomaly & Action Alerts Center
+//  2) One-Click Manager / Store Scorecard Modal (with PNG & WhatsApp share)
+//  3) Interactive What-If Target & Evaluation Simulator
+//  4) TV / Presentation Fullscreen Auto-Cycling Mode
+//  5) Executive Action Plan & WhatsApp Brief Generator
+// ════════════════════════════════════════════════════════════════════════════
+
+var SMART_ALERTS_LIST = [];
+var SMART_ALERT_FILTER = 'all';
+var SCORECARD_CURRENT_KEY = '';
+var WHATIF_CURRENT_KEY = '';
+
+var TV_MODE_OPEN = false;
+var TV_SLIDE_INDEX = 0;
+var TV_TOTAL_SLIDES = 5;
+var TV_AUTOPLAY = true;
+var TV_TIMER = null;
+var TV_PROGRESS_TIMER = null;
+var TV_PROGRESS_PCT = 0;
+
+// ────────────────────────────────────────────────────────────────────────────
+// FEATURE 4: SMART ANOMALY & ACTION ALERTS CENTER
+// ────────────────────────────────────────────────────────────────────────────
+function buildSmartAlertsModel() {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.byManager || !model.byManager.length) {
+    SMART_ALERTS_LIST = [];
+    updateSmartAlertsBadge();
+    return [];
+  }
+  var alerts = [];
+
+  // 1. Quick Wins: Managers/Branches between 90% and 99.9% Mobile Ach (very close to 100% full score!)
+  model.byManager.forEach(function (mgr) {
+    var g = mgr.agg;
+    var pctVal = g.effMobPct || 0;
+    var netGap = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
+    if (pctVal >= 90 && pctVal < 100) {
+      var needed = Math.abs(netGap);
+      alerts.push({
+        type: 'quickwin',
+        icon: '🔥',
+        badgeBg: '#fef3c7',
+        badgeFg: '#b45309',
+        tag: 'فرصة سريعة (Quick Win)',
+        title: mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' [' + mgr.oracleId + ']' : ''),
+        desc: 'محقق ' + pctVal.toFixed(1) + '% في الموبايل (' + (mgr.uniqueBranchNames[mgr.uniqueBranchNames.length - 1] || '') + ')' +
+              (needed > 0 ? ' · Gap: -' + fmtN(needed) + ' خط للوصول لـ 100%!' : ''),
+        mgrKey: mgr.key,
+        priority: 100 - pctVal
+      });
+    }
+  });
+
+  // 2. Month-over-Month Drop Anomalies (>15% drop in last month vs previous month)
+  model.byManager.forEach(function (mgr) {
+    if (mgr.monthEntries.length >= 2) {
+      var entries = mgr.monthEntries.slice().sort(function (a, b) {
+        return MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month);
+      });
+      var last = entries[entries.length - 1];
+      var prev = entries[entries.length - 2];
+      var lastEv = last.agg.evalScore !== null ? last.agg.evalScore * 100 : last.agg.effMobPct;
+      var prevEv = prev.agg.evalScore !== null ? prev.agg.evalScore * 100 : prev.agg.effMobPct;
+      if (prevEv - lastEv >= 15) {
+        alerts.push({
+          type: 'drop',
+          icon: '📉',
+          badgeBg: '#ffedd5',
+          badgeFg: '#c2410c',
+          tag: 'تراجع شهري ملحوظ',
+          title: mgr.label,
+          desc: 'تراجع الأداء من ' + prevEv.toFixed(1) + '% في ' + prev.monthLabelAr + ' إلى ' + lastEv.toFixed(1) + '% في ' + last.monthLabelAr + ' (-' + (prevEv - lastEv).toFixed(1) + '%)',
+          mgrKey: mgr.key,
+          priority: prevEv - lastEv
+        });
+      }
+    }
+  });
+
+  // 3. Critical Warnings & Severe Deficit (<75% or Warning Mail = Yes)
+  model.byManager.forEach(function (mgr) {
+    var g = mgr.agg;
+    var evPct = g.evalScore !== null ? g.evalScore * 100 : g.effMobPct;
+    if (g.warnCount > 0 || (evPct > 0 && evPct < 75)) {
+      alerts.push({
+        type: 'critical',
+        icon: '🛑',
+        badgeBg: '#fee2e2',
+        badgeFg: '#b91c1c',
+        tag: g.warnCount > 0 ? ('إنذار رسمي (' + g.warnCount + ')') : 'أداء حرج (<75%)',
+        title: mgr.label,
+        desc: 'التقييم العام: ' + (evPct ? evPct.toFixed(1) + '%' : '—') +
+              (g.hasRawMob ? ' · Mobile Gap: ' + fmtSignedGapStr(g.mobileSubs, g.mobileTarget) : '') +
+              ' · الفرع: ' + (mgr.uniqueBranchNames[mgr.uniqueBranchNames.length - 1] || '—'),
+        mgrKey: mgr.key,
+        priority: 100
+      });
+    }
+  });
+
+  SMART_ALERTS_LIST = alerts.slice(0, 45);
+  updateSmartAlertsBadge();
+  return SMART_ALERTS_LIST;
+}
+
+function updateSmartAlertsBadge() {
+  var badge = document.getElementById('smart-alerts-badge');
+  if (!badge) return;
+  var cnt = SMART_ALERTS_LIST.length;
+  badge.style.display = cnt > 0 ? 'inline-block' : 'none';
+  badge.textContent = cnt > 99 ? '99+' : String(cnt);
+}
+
+function toggleSmartAlertsPopover(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  var pop = document.getElementById('smart-alerts-popover');
+  if (!pop) return;
+  var isOpen = pop.style.display === 'block';
+  if (isOpen) {
+    pop.style.display = 'none';
+  } else {
+    buildSmartAlertsModel();
+    renderSmartAlertsList();
+    pop.style.display = 'block';
+  }
+}
+
+function closeSmartAlertsPopover() {
+  var pop = document.getElementById('smart-alerts-popover');
+  if (pop) pop.style.display = 'none';
+}
+
+function setSmartAlertFilter(f) {
+  SMART_ALERT_FILTER = f;
+  ['all', 'quickwin', 'drop', 'critical'].forEach(function (k) {
+    var b = document.getElementById('salert-tab-' + k);
+    if (b) {
+      b.style.background = (k === f) ? 'var(--we-purple)' : 'transparent';
+      b.style.color = (k === f) ? 'white' : 'var(--text-muted)';
+      b.style.fontWeight = (k === f) ? '800' : '700';
+    }
+  });
+  renderSmartAlertsList();
+}
+
+function renderSmartAlertsList() {
+  var listEl = document.getElementById('smart-alerts-list');
+  if (!listEl) return;
+  var filtered = SMART_ALERTS_LIST.filter(function (a) {
+    return SMART_ALERT_FILTER === 'all' || a.type === SMART_ALERT_FILTER;
+  });
+  if (!filtered.length) {
+    listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:12px">✅ لا توجد تنبيهات في هذا التصنيف حالياً</div>';
+    return;
+  }
+  listEl.innerHTML = filtered.slice(0, 25).map(function (a) {
+    return '<div onclick="openScorecardModal(\'' + a.mgrKey.replace(/'/g, "\\'") + '\');closeSmartAlertsPopover();" style="cursor:pointer;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--gray-bg);margin-bottom:8px;transition:transform .15s">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+        '<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;background:' + a.badgeBg + ';color:' + a.badgeFg + '">' + a.icon + ' ' + mgrEsc(a.tag) + '</span>' +
+        '<span style="font-size:10px;color:var(--we-purple);font-weight:800">عرض الكارت ◂</span>' +
+      '</div>' +
+      '<div style="font-size:12px;font-weight:800;color:var(--text-primary)">' + mgrEsc(a.title) + '</div>' +
+      '<div dir="auto" style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">' + mgrEsc(a.desc) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// FEATURE 2: ONE-CLICK MANAGER / STORE SCORECARD MODAL (BENTO CARD)
+// ────────────────────────────────────────────────────────────────────────────
+function openScorecardModal(entityKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.byManager.length) {
+    mgrToast('⚠️ لا توجد بيانات حالية لعرض البطاقة', true);
+    return;
+  }
+  var overlay = document.getElementById('scorecard-modal-overlay');
+  var sel = document.getElementById('scorecard-entity-select');
+  if (sel) {
+    sel.innerHTML = model.byManager.map(function (m, i) {
+      return '<option value="' + mgrEsc(m.key) + '">#' + (i + 1) + ' — ' + mgrEsc(m.label) + (m.oracleId && m.oracleId !== '—' ? ' [' + mgrEsc(m.oracleId) + ']' : '') + '</option>';
+    }).join('');
+  }
+  var targetKey = entityKey || MGR_SELECTED_PERSON || (model.byManager[0] && model.byManager[0].key) || '';
+  if (sel && targetKey) sel.value = targetKey;
+  if (overlay) overlay.style.display = 'flex';
+  renderScorecardForEntity(targetKey);
+}
+
+function closeScorecardModal() {
+  var overlay = document.getElementById('scorecard-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function renderScorecardForEntity(entityKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var stage = document.getElementById('scorecard-capture-area');
+  if (!stage || !model) return;
+  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
+  if (idx < 0) idx = 0;
+  var mgr = model.byManager[idx];
+  if (!mgr) return;
+  SCORECARD_CURRENT_KEY = mgr.key;
+
+  var g = mgr.agg;
+  var s = mgr.sample || {};
+  var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
+  var mobPct = g.effMobPct ? g.effMobPct.toFixed(1) + '%' : '0.0%';
+  var mobNetGap = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
+  var dailyNeeded10 = mobNetGap < 0 ? Math.ceil(Math.abs(mobNetGap) / 10) : 0;
+
+  var prodCardsHTML = PRODUCTS.map(function (p) {
+    var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
+    var ap = t > 0 ? Math.round(a / t * 100) : 0;
+    var net = Math.round(a - t);
+    var sign = net > 0 ? '+' : '';
+    var gapClr = net >= 0 ? '#15803d' : '#dc2626';
+    var barW = Math.min(100, Math.max(0, ap));
+    return '<div style="border:1px solid #e5e7eb;border-top:3px solid ' + p.color + ';border-radius:12px;padding:10px 12px;background:#fafafa">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+        '<span style="font-size:11px;font-weight:800;color:#374151"><i class="fas ' + p.icon + ' mr-1" style="color:' + p.color + '"></i>' + p.label + '</span>' +
+        '<span style="font-size:12px;font-weight:900;color:' + p.color + '">' + (t > 0 ? ap + '%' : '—') + '</span>' +
+      '</div>' +
+      '<div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-bottom:6px">' +
+        '<div style="height:100%;width:' + barW + '%;background:' + p.color + '"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:#6b7280">' +
+        '<span>Ach: <strong style="color:#111827">' + fmtN(a) + '</strong> / ' + fmtN(t) + '</span>' +
+        '<span style="font-weight:800;color:' + gapClr + '">Gap: ' + sign + fmtN(net) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var monthBarsHTML = mgr.monthEntries.map(function (me) {
+    var mp = me.agg.evalScore !== null ? (me.agg.evalScore * 100) : me.agg.effMobPct;
+    var clr = mp >= 90 ? '#16a34a' : (mp >= 75 ? '#d97706' : '#dc2626');
+    var mGap = Math.round((me.agg.mobileSubs || 0) - (me.agg.mobileTarget || 0));
+    return '<div style="flex:1;min-width:68px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 6px;text-align:center">' +
+      '<div style="font-size:10px;font-weight:800;color:#475569">' + mgrEsc(me.monthLabelEn) + '</div>' +
+      '<div style="font-size:13px;font-weight:900;color:' + clr + ';margin:3px 0">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>' +
+      '<div dir="auto" style="font-size:9px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + mgrEsc(me.agg.sample.store || '') + '">' + mgrEsc(me.agg.sample.store || '') + '</div>' +
+      (model.hasRawProducts ? '<div style="font-size:8.5px;font-weight:800;color:' + (mGap >= 0 ? '#15803d' : '#dc2626') + '">Gap: ' + (mGap > 0 ? '+' : '') + fmtN(mGap) + '</div>' : '') +
+    '</div>';
+  }).join('');
+
+  stage.innerHTML =
+    '<!-- Header Banner -->' +
+    '<div style="background:linear-gradient(135deg,#1e1b4b,#5E2D91,#7c3aed);color:white;border-radius:16px;padding:18px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
+      '<div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:2px 9px;border-radius:8px">الترتيب #' + (idx + 1) + ' من ' + model.byManager.length + '</span>' +
+          (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:800;padding:2px 9px;border-radius:8px">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
+          '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:700;padding:2px 9px;border-radius:8px">📅 ' + mgr.monthEntries.length + ' شهور</span>' +
+        '</div>' +
+        '<div style="font-size:21px;font-weight:900;margin-top:6px">' + mgrEsc(mgr.label) + '</div>' +
+        '<div dir="auto" style="font-size:11.5px;color:#e9d5ff;margin-top:3px">🏪 الفروع: ' + mgrEsc(mgr.uniqueBranchNames.join(' ← ')) + '</div>' +
+        '<div style="font-size:10.5px;color:#cbd5e1;margin-top:2px">📍 Area Mgr: ' + mgrEsc(s.areaManager || '—') + ' · Supervisor: ' + mgrEsc(s.supervisor || '—') + ' · RM: ' + mgrEsc(s.regionalManager || '—') + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;text-align:center">' +
+        '<div style="background:rgba(255,255,255,0.14);padding:10px 14px;border-radius:12px;min-width:92px">' +
+          '<div style="font-size:10px;color:#e9d5ff;font-weight:700">متوسط التقييم</div>' +
+          '<div style="font-size:22px;font-weight:900;color:#4ade80">' + evPct + '</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,255,255,0.14);padding:10px 14px;border-radius:12px;min-width:92px">' +
+          '<div style="font-size:10px;color:#e9d5ff;font-weight:700">تحقيق الموبايل</div>' +
+          '<div style="font-size:22px;font-weight:900;color:#93c5fd">' + mobPct + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<!-- Daily Run-Rate Callout -->' +
+    '<div style="background:' + (mobNetGap >= 0 ? '#f0fdf4;border:1px solid #bbf7d0' : '#fef2f2;border:1px solid #fecaca') + ';border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+      '<div style="font-size:11.5px;font-weight:800;color:' + (mobNetGap >= 0 ? '#166534' : '#991b1b') + '">' +
+        (mobNetGap >= 0
+          ? ('✅ مغطي تارجت الموبايل بالكامل بفائض (Gap: +' + fmtN(mobNetGap) + ' خط)')
+          : ('🎯 إجمالي عجز الموبايل (Gap: ' + fmtN(mobNetGap) + ' خط) — يحتاج معدل يومي ' + fmtN(dailyNeeded10) + ' خط/يوم خلال 10 أيام لتغطية الـ 100%')) +
+      '</div>' +
+      '<div style="font-size:10.5px;font-weight:800;color:#4b5563">Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div>' +
+    '</div>' +
+    '<!-- 6 Products Grid -->' +
+    (model.hasRawProducts ? ('<div style="font-size:11px;font-weight:800;color:#374151;margin-bottom:6px">📦 أداء المنتجات والـ Gap (+ / -):</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
+    '<!-- Monthly Trajectory -->' +
+    '<div style="font-size:11px;font-weight:800;color:#374151;margin-bottom:6px">📅 مسار الأداء الشهري (Month-by-Month):</div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">' + monthBarsHTML + '</div>' +
+    '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:9.5px;color:#9ca3af">' +
+      '<span>FAKHARANY³⁶⁰ · Performance Intelligence Platform</span>' +
+      '<span>East Cairo Team · Mohamed Elfakharany</span>' +
+    '</div>';
+}
+
+async function downloadScorecardAsImage(btn) {
+  var el = document.getElementById('scorecard-capture-area');
+  if (!el || typeof html2canvas === 'undefined') {
+    mgrToast('⚠️ جاري تحميل مكتبة الصور، حاول بعد ثانية', true);
+    return;
+  }
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>جاري الحفظ...'; }
+  try {
+    var canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    var a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'FAKHARANY360_Scorecard_' + (SCORECARD_CURRENT_KEY || 'Manager').replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_') + '.png';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 1000);
+    mgrToast('✅ تم حفظ بطاقة الأداء كصورة PNG جاهزة للمشاركة!');
+  } catch (e) {
+    mgrToast('❌ تعذر حفظ الصورة: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+function copyScorecardWhatsAppBrief() {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model) return;
+  var mgr = model.byManager.find(function (m) { return m.key === SCORECARD_CURRENT_KEY; }) || model.byManager[0];
+  if (!mgr) return;
+  var idx = model.byManager.indexOf(mgr) + 1;
+  var g = mgr.agg;
+  var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
+  var lines = [
+    '📊 *بطاقة أداء — FAKHARANY³⁶⁰*',
+    '👤 *الاسم:* ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' (ID: ' + mgr.oracleId + ')' : ''),
+    '🏆 *الترتيب:* #' + idx + ' من ' + model.byManager.length + ' · *متوسط التقييم:* ' + evPct,
+    '🏪 *الفروع:* ' + mgr.uniqueBranchNames.join(' ← ') + ' (' + mgr.monthEntries.length + ' شهور)',
+    '──────────────────'
+  ];
+  if (model.hasRawProducts) {
+    PRODUCTS.forEach(function (p) {
+      var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
+      if (t > 0 || a > 0) {
+        var ap = t > 0 ? Math.round(a / t * 100) : 0;
+        var net = Math.round(a - t);
+        lines.push('• *' + p.label + ':* Ach ' + fmtN(a) + ' / Tgt ' + fmtN(t) + ' (*' + ap + '%* | Gap: ' + (net > 0 ? '+' : '') + fmtN(net) + ')');
+      }
+    });
+  }
+  if (g.evalScore !== null) {
+    lines.push('──────────────────');
+    lines.push('⭐ *تفاصيل التقييم:* Mob 35%: ' + (g.mob35 || 0).toFixed(1) + ' | Mix 30%: ' + (g.mix30 || 0).toFixed(1) + ' | Perf 25%: ' + (g.perf25 || 0).toFixed(1));
+  }
+  navigator.clipboard.writeText(lines.join('\n')).then(function () {
+    mgrToast('✅ تم نسخ ملخص بطاقة الأداء لـ WhatsApp!');
+  }).catch(function () {
+    mgrToast('⚠️ تعذر النسخ التلقائي', true);
+  });
+}
+
+function openWhatIfFromScorecard() {
+  var key = SCORECARD_CURRENT_KEY;
+  closeScorecardModal();
+  openWhatIfSimulatorModal(key);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// FEATURE 3: INTERACTIVE WHAT-IF TARGET & EVALUATION SIMULATOR
+// ────────────────────────────────────────────────────────────────────────────
+function openWhatIfSimulatorModal(entityKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.byManager.length) {
+    mgrToast('⚠️ لا توجد بيانات حالية للمحاكاة', true);
+    return;
+  }
+  var modal = document.getElementById('whatif-simulator-modal');
+  var sel = document.getElementById('whatif-entity-select');
+  if (sel) {
+    sel.innerHTML = model.byManager.map(function (m, i) {
+      return '<option value="' + mgrEsc(m.key) + '">#' + (i + 1) + ' — ' + mgrEsc(m.label) + ' (Eval: ' + (m.agg.evalScore !== null ? (m.agg.evalScore * 100).toFixed(1) + '%' : m.agg.effMobPct.toFixed(1) + '%') + ')</option>';
+    }).join('');
+  }
+  var k = entityKey || SCORECARD_CURRENT_KEY || MGR_SELECTED_PERSON || model.byManager[0].key;
+  if (sel) sel.value = k;
+  if (modal) modal.style.display = 'flex';
+  loadWhatIfEntity(k);
+}
+
+function closeWhatIfSimulatorModal() {
+  var modal = document.getElementById('whatif-simulator-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function loadWhatIfEntity(entityKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model) return;
+  var mgr = model.byManager.find(function (m) { return m.key === entityKey; }) || model.byManager[0];
+  if (!mgr) return;
+  WHATIF_CURRENT_KEY = mgr.key;
+  var g = mgr.agg;
+  var addMobEl = document.getElementById('whatif-add-mob');
+  var mixEl = document.getElementById('whatif-mix');
+  var perfEl = document.getElementById('whatif-perf');
+  var netGap = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
+  if (addMobEl) addMobEl.value = netGap < 0 ? Math.min(500, Math.abs(netGap)) : 25;
+  if (mixEl) mixEl.value = g.mix30 !== null ? Number(g.mix30).toFixed(1) : 26;
+  if (perfEl) perfEl.value = g.perf25 !== null ? Number(g.perf25).toFixed(1) : 23;
+  recalcWhatIfSimulator();
+}
+
+function recalcWhatIfSimulator() {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var box = document.getElementById('whatif-results-box');
+  if (!model || !box) return;
+  var mgr = model.byManager.find(function (m) { return m.key === WHATIF_CURRENT_KEY; }) || model.byManager[0];
+  if (!mgr) return;
+  var g = mgr.agg;
+
+  var addMob = Number((document.getElementById('whatif-add-mob') || {}).value) || 0;
+  var simMix = Number((document.getElementById('whatif-mix') || {}).value) || 0;
+  var simPerf = Number((document.getElementById('whatif-perf') || {}).value) || 0;
+  var remDays = Math.max(1, Number((document.getElementById('whatif-days') || {}).value) || 10);
+
+  document.getElementById('whatif-add-mob-val').textContent = '+' + fmtN(addMob) + ' خط';
+  document.getElementById('whatif-mix-val').textContent = simMix.toFixed(1) + ' / 30';
+  document.getElementById('whatif-perf-val').textContent = simPerf.toFixed(1) + ' / 25';
+  document.getElementById('whatif-days-val').textContent = remDays + ' يوم';
+
+  var curTgt = g.mobileTarget > 0 ? g.mobileTarget : 300;
+  var curAch = g.mobileSubs > 0 ? g.mobileSubs : Math.round((g.actPct || 0.85) * curTgt);
+  var curMobPct = curTgt > 0 ? (curAch / curTgt * 100) : 0;
+  var newAch = curAch + addMob;
+  var newMobPct = curTgt > 0 ? (newAch / curTgt * 100) : 0;
+  var curGap = Math.round(curAch - curTgt);
+  var newGap = Math.round(newAch - curTgt);
+
+  var curMob35 = g.mob35 !== null ? g.mob35 : Math.min(35, (curMobPct / 100) * 35);
+  var simMob35 = Math.min(35, (newMobPct / 100) * 35);
+  var tnpsPts = (g.tnps !== null ? g.tnps : 0.1) * 100; // 10 points
+
+  var curEvalPct = g.evalScore !== null ? (g.evalScore * 100) : (tnpsPts + curMob35 + (g.mix30 || 25) + (g.perf25 || 22));
+  var simEvalPct = Math.min(100, tnpsPts + simMob35 + simMix + simPerf);
+  var evalDelta = simEvalPct - curEvalPct;
+  var dailyRate = (addMob / remDays).toFixed(1);
+
+  box.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;background:linear-gradient(135deg,#1e1b4b,#312e81);color:white;padding:16px;border-radius:14px">' +
+      '<div style="text-align:center;padding:8px;background:rgba(255,255,255,0.08);border-radius:10px">' +
+        '<div style="font-size:10px;color:#cbd5e1">تحقيق الموبايل (الحالي ← المتوقع)</div>' +
+        '<div style="font-size:18px;font-weight:900;margin-top:4px">' + curMobPct.toFixed(1) + '% <span style="color:#4ade80">← ' + newMobPct.toFixed(1) + '%</span></div>' +
+        '<div style="font-size:10.5px;margin-top:3px;color:' + (newGap >= 0 ? '#86efac' : '#fca5a5') + '">Gap: ' + (curGap > 0 ? '+' : '') + fmtN(curGap) + ' ← <strong>' + (newGap > 0 ? '+' : '') + fmtN(newGap) + '</strong></div>' +
+      '</div>' +
+      '<div style="text-align:center;padding:8px;background:rgba(255,255,255,0.08);border-radius:10px">' +
+        '<div style="font-size:10px;color:#cbd5e1">التقييم الشهري (Evaluation %)</div>' +
+        '<div style="font-size:18px;font-weight:900;margin-top:4px">' + curEvalPct.toFixed(1) + '% <span style="color:#fbbf24">← ' + simEvalPct.toFixed(1) + '%</span></div>' +
+        '<div style="font-size:10.5px;margin-top:3px;color:#fde68a">الفرق: ' + (evalDelta >= 0 ? '+' : '') + evalDelta.toFixed(1) + '% (Mob: ' + simMob35.toFixed(1) + '/35)</div>' +
+      '</div>' +
+      '<div style="text-align:center;padding:8px;background:rgba(255,255,255,0.08);border-radius:10px">' +
+        '<div style="font-size:10px;color:#cbd5e1">المعدل اليومي المطلوب (Run-Rate)</div>' +
+        '<div style="font-size:20px;font-weight:900;color:#38bdf8;margin-top:4px">' + dailyRate + ' <span style="font-size:11px">خط/يوم</span></div>' +
+        '<div style="font-size:10px;margin-top:3px;color:#cbd5e1">لمدة ' + remDays + ' يوم (' + fmtN(addMob) + ' خط إضافي)</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// FEATURE 1: TV / PRESENTATION MODE (AUTO-CYCLING FULLSCREEN COMMAND CENTER)
+// ────────────────────────────────────────────────────────────────────────────
+function openTVPresentationMode() {
+  var ov = document.getElementById('tv-presentation-overlay');
+  if (!ov) return;
+  TV_MODE_OPEN = true;
+  TV_SLIDE_INDEX = 0;
+  TV_AUTOPLAY = true;
+  ov.style.display = 'flex';
+  renderTVSlide();
+  startTVTimers();
+}
+
+function closeTVPresentationMode() {
+  TV_MODE_OPEN = false;
+  stopTVTimers();
+  var ov = document.getElementById('tv-presentation-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function stopTVTimers() {
+  if (TV_TIMER) { clearInterval(TV_TIMER); TV_TIMER = null; }
+  if (TV_PROGRESS_TIMER) { clearInterval(TV_PROGRESS_TIMER); TV_PROGRESS_TIMER = null; }
+}
+
+function startTVTimers() {
+  stopTVTimers();
+  TV_PROGRESS_PCT = 0;
+  var bar = document.getElementById('tv-progress-bar');
+  if (bar) bar.style.width = '0%';
+  if (!TV_AUTOPLAY) return;
+
+  TV_PROGRESS_TIMER = setInterval(function () {
+    var clk = document.getElementById('tv-clock-display');
+    if (clk) clk.textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (!TV_AUTOPLAY) return;
+    TV_PROGRESS_PCT += (100 / 120);
+    if (bar) bar.style.width = Math.min(100, TV_PROGRESS_PCT) + '%';
+    if (TV_PROGRESS_PCT >= 100) {
+      TV_PROGRESS_PCT = 0;
+      tvNextSlide();
+    }
+  }, 100);
+}
+
+function toggleTVAutoPlay() {
+  TV_AUTOPLAY = !TV_AUTOPLAY;
+  var btn = document.getElementById('tv-play-pause-btn');
+  if (btn) {
+    btn.innerHTML = TV_AUTOPLAY ? '<i class="fas fa-pause mr-1"></i>تلقائي (12ث)' : '<i class="fas fa-play mr-1"></i>متوقف مؤقتاً';
+    btn.style.borderColor = TV_AUTOPLAY ? '#22c55e' : '#f59e0b';
+    btn.style.color = TV_AUTOPLAY ? '#4ade80' : '#fbbf24';
+  }
+}
+
+function tvNextSlide() {
+  TV_SLIDE_INDEX = (TV_SLIDE_INDEX + 1) % TV_TOTAL_SLIDES;
+  TV_PROGRESS_PCT = 0;
+  renderTVSlide();
+}
+
+function tvPrevSlide() {
+  TV_SLIDE_INDEX = (TV_SLIDE_INDEX - 1 + TV_TOTAL_SLIDES) % TV_TOTAL_SLIDES;
+  TV_PROGRESS_PCT = 0;
+  renderTVSlide();
+}
+
+function tvGoToSlide(idx) {
+  TV_SLIDE_INDEX = idx;
+  TV_PROGRESS_PCT = 0;
+  renderTVSlide();
+}
+
+function renderTVSlide() {
+  var stage = document.getElementById('tv-slide-stage');
+  var dots = document.getElementById('tv-slide-dots');
+  if (!stage) return;
+
+  var titles = ['1. النظرة التنفيذية الشاملة', '2. لوحة الشرف والأوائل', '3. صدارة تقييم المديرين', '4. التنبيهات والفرص السريعة', '5. الأداء الشهري التراكمي'];
+  if (dots) {
+    dots.innerHTML = titles.map(function (t, i) {
+      var active = (i === TV_SLIDE_INDEX);
+      return '<button onclick="tvGoToSlide(' + i + ')" style="padding:5px 11px;border-radius:14px;border:none;background:' + (active ? '#e91e8c' : 'rgba(255,255,255,0.12)') + ';color:white;font-size:10.5px;font-weight:' + (active ? '900' : '600') + ';cursor:pointer">' + t + '</button>';
+    }).join('');
+  }
+
+  var g = calcGroup(filteredData);
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var alerts = buildSmartAlertsModel();
+
+  if (TV_SLIDE_INDEX === 0) {
+    var netGap = g.gap || 0;
+    var prodBoxes = PRODUCTS.map(function (p) {
+      var t = g[p.tKey] || 0, a = g[p.aKey] || 0, ap = pct(a, t), pg = a - t;
+      return '<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-top:4px solid ' + p.color + ';border-radius:16px;padding:18px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+          '<span style="font-size:15px;font-weight:800"><i class="fas ' + p.icon + ' mr-2" style="color:' + p.color + '"></i>' + p.label + '</span>' +
+          '<span style="font-size:24px;font-weight:900;color:' + (ap >= 100 ? '#4ade80' : ap >= 80 ? '#fbbf24' : '#f87171') + '">' + ap + '%</span>' +
+        '</div>' +
+        '<div style="font-size:13px;color:#cbd5e1">Ach: <strong>' + fmtN(a) + '</strong> / Tgt: ' + fmtN(t) + '</div>' +
+        '<div style="font-size:12.5px;font-weight:800;margin-top:4px;color:' + (pg >= 0 ? '#4ade80' : '#f87171') + '">Gap: ' + (pg > 0 ? '+' : '') + fmtN(pg) + '</div>' +
+      '</div>';
+    }).join('');
+
+    stage.innerHTML =
+      '<div style="font-size:22px;font-weight:900;margin-bottom:18px;color:#f8fafc"><i class="fas fa-chart-pie mr-2" style="color:#e91e8c"></i>النظرة التنفيذية الشاملة — Executive Overview</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">' +
+        '<div style="background:rgba(255,255,255,0.08);padding:20px;border-radius:16px"><div style="font-size:12px;color:#94a3b8">TOTAL TARGET</div><div style="font-size:34px;font-weight:900;margin-top:4px">' + fmtN(g.totalTarget) + '</div></div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:20px;border-radius:16px"><div style="font-size:12px;color:#94a3b8">TOTAL ACHIEVEMENT</div><div style="font-size:34px;font-weight:900;color:#38bdf8;margin-top:4px">' + fmtN(g.totalAch) + '</div></div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:20px;border-radius:16px"><div style="font-size:12px;color:#94a3b8">ACHIEVEMENT %</div><div style="font-size:34px;font-weight:900;color:' + (g.pct >= 100 ? '#4ade80' : '#fbbf24') + ';margin-top:4px">' + g.pct + '%</div></div>' +
+        '<div style="background:rgba(255,255,255,0.08);padding:20px;border-radius:16px"><div style="font-size:12px;color:#94a3b8">OVERALL GAP</div><div style="font-size:34px;font-weight:900;color:' + (netGap >= 0 ? '#4ade80' : '#f87171') + ';margin-top:4px">' + (netGap > 0 ? '+' : '') + fmtN(netGap) + '</div></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">' + prodBoxes + '</div>';
+  } else if (TV_SLIDE_INDEX === 1) {
+    var bSv = getBestEntity(filteredData, 'supervisor');
+    var bAm = getBestEntity(filteredData, 'areaManager');
+    var bPt = getBestEntity(filteredData, 'partner');
+    var bSt = getBestEntity(filteredData, 'store');
+    function champCard(role, icon, obj, clr) {
+      return '<div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);border-left:5px solid ' + clr + ';border-radius:16px;padding:24px">' +
+        '<div style="font-size:12px;color:#94a3b8;font-weight:800;text-transform:uppercase"><i class="fas ' + icon + ' mr-1.5" style="color:' + clr + '"></i>' + role + '</div>' +
+        '<div dir="auto" style="font-size:24px;font-weight:900;margin:10px 0;color:white">' + mgrEsc(obj.name || '—') + '</div>' +
+        '<div style="font-size:30px;font-weight:900;color:' + clr + '">' + (obj.pct || 0) + '%</div>' +
+      '</div>';
+    }
+    stage.innerHTML =
+      '<div style="font-size:22px;font-weight:900;margin-bottom:20px;color:#fbbf24"><i class="fas fa-trophy mr-2"></i>لوحة الشرف وتصدر الأداء — Champions Podium</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">' +
+        champCard('Best Supervisor', 'fa-user-shield', bSv, '#a855f7') +
+        champCard('Best Area Manager', 'fa-user-tie', bAm, '#38bdf8') +
+        champCard('Best Partner', 'fa-handshake', bPt, '#4ade80') +
+        champCard('Best Store', 'fa-store', bSt, '#f59e0b') +
+      '</div>';
+  } else if (TV_SLIDE_INDEX === 2) {
+    var topMgrs = (model && model.byManager ? model.byManager.slice(0, 8) : []);
+    var cards = topMgrs.map(function (m, i) {
+      var ev = m.agg.evalScore !== null ? (m.agg.evalScore * 100).toFixed(1) + '%' : '—';
+      var mp = m.agg.effMobPct ? m.agg.effMobPct.toFixed(1) + '%' : '—';
+      var gapStr = fmtSignedGapStr(m.agg.mobileSubs, m.agg.mobileTarget);
+      return '<div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="background:#e91e8c;color:white;font-size:11px;font-weight:900;padding:2px 8px;border-radius:8px">#' + (i + 1) + '</span>' +
+          '<span style="font-size:20px;font-weight:900;color:#4ade80">' + ev + '</span>' +
+        '</div>' +
+        '<div style="font-size:15px;font-weight:800;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + mgrEsc(m.label) + '</div>' +
+        '<div dir="auto" style="font-size:11.5px;color:#cbd5e1;margin-top:3px">🏪 ' + mgrEsc(m.uniqueBranchNames[m.uniqueBranchNames.length - 1] || '') + '</div>' +
+        '<div style="font-size:11px;color:#93c5fd;margin-top:6px;font-weight:700">📱 Mobile: ' + mp + ' · Gap: ' + gapStr + '</div>' +
+      '</div>';
+    }).join('');
+    stage.innerHTML =
+      '<div style="font-size:22px;font-weight:900;margin-bottom:18px;color:#4ade80"><i class="fas fa-award mr-2"></i>صدارة تقييم وأداء المديرين — Top Managers Evaluation</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">' + (cards || '<div>لا توجد بيانات تقييم محمّلة حالياً</div>') + '</div>';
+  } else if (TV_SLIDE_INDEX === 3) {
+    var topAlerts = alerts.slice(0, 8).map(function (a) {
+      return '<div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px">' +
+        '<div style="font-size:11px;font-weight:800;color:#fbbf24;margin-bottom:4px">' + a.icon + ' ' + mgrEsc(a.tag) + '</div>' +
+        '<div style="font-size:14px;font-weight:800;color:white">' + mgrEsc(a.title) + '</div>' +
+        '<div dir="auto" style="font-size:11.5px;color:#cbd5e1;margin-top:4px">' + mgrEsc(a.desc) + '</div>' +
+      '</div>';
+    }).join('');
+    stage.innerHTML =
+      '<div style="font-size:22px;font-weight:900;margin-bottom:18px;color:#f87171"><i class="fas fa-bell mr-2"></i>مركز التنبيهات والفرص السريعة — Smart Action Alerts</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">' + (topAlerts || '<div>لا توجد تنبيهات حرجة حالياً</div>') + '</div>';
+  } else {
+    var mList = (model && model.byMonth ? model.byMonth : []);
+    var mCards = mList.map(function (mb) {
+      var tg = mb.totalAgg;
+      var ev = tg.evalScore !== null ? (tg.evalScore * 100).toFixed(1) + '%' : '—';
+      var mp = tg.effMobPct ? tg.effMobPct.toFixed(1) + '%' : '—';
+      var gapStr = fmtSignedGapStr(tg.mobileSubs, tg.mobileTarget);
+      return '<div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px">' +
+        '<div style="font-size:15px;font-weight:900;color:#c4b5fd">' + mgrEsc(mb.monthLabelEn) + ' — ' + mgrEsc(mb.monthLabelAr) + '</div>' +
+        '<div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px">' +
+          '<span>⭐ التقييم: <strong style="color:#4ade80">' + ev + '</strong></span>' +
+          '<span>📱 Mobile: <strong style="color:#38bdf8">' + mp + '</strong></span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#cbd5e1;margin-top:6px">👤 ' + mb.entities.length + ' مدير · 🏪 ' + tg.storeCount + ' فرع · Gap: <strong>' + gapStr + '</strong></div>' +
+      '</div>';
+    }).join('');
+    stage.innerHTML =
+      '<div style="font-size:22px;font-weight:900;margin-bottom:18px;color:#38bdf8"><i class="fas fa-calendar-alt mr-2"></i>تطور الأداء عبر الشهور — Monthly Trajectory</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">' + mCards + '</div>';
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// FEATURE 5: EXECUTIVE ACTION PLAN & WHATSAPP BRIEF GENERATOR
+// ────────────────────────────────────────────────────────────────────────────
+function generateExecutiveActionPlanText() {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var g = calcGroup(filteredData);
+  var netGap = g.gap || 0;
+
+  var lines = [
+    '📋 *تقرير وخطة العمل التنفيذية — FAKHARANY³⁶⁰*',
+    '📅 *النطاق الحالي:* ' + fmtN(filteredData.length) + ' سجل | *إجمالي التحقيق:* ' + g.pct + '% (Ach: ' + fmtN(g.totalAch) + ' / Tgt: ' + fmtN(g.totalTarget) + ' | Gap: ' + (netGap > 0 ? '+' : '') + fmtN(netGap) + ')',
+    '══════════════════════'
+  ];
+
+  // Product summary with +/- Gap
+  lines.push('📦 *ملخص المنتجات والـ Gap:*');
+  PRODUCTS.forEach(function (p) {
+    var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
+    if (t > 0 || a > 0) {
+      var ap = pct(a, t), pg = Math.round(a - t);
+      lines.push('• *' + p.label + ':* ' + ap + '% (Ach: ' + fmtN(a) + ' / Tgt: ' + fmtN(t) + ' | Gap: ' + (pg > 0 ? '+' : '') + fmtN(pg) + ')');
+    }
+  });
+
+  if (model && model.byManager && model.byManager.length) {
+    // Top 3 Quick Wins (90% - 99.9%)
+    var quickWins = model.byManager.filter(function (m) {
+      return m.agg.effMobPct >= 90 && m.agg.effMobPct < 100;
+    }).sort(function (a, b) { return b.agg.effMobPct - a.agg.effMobPct; }).slice(0, 4);
+
+    if (quickWins.length) {
+      lines.push('══════════════════════');
+      lines.push('🔥 *فرص سريعة لتقفيل 100% (Quick Wins):*');
+      quickWins.forEach(function (m) {
+        var mg = Math.round((m.agg.mobileSubs || 0) - (m.agg.mobileTarget || 0));
+        lines.push('• *' + m.label + '* (' + (m.uniqueBranchNames[m.uniqueBranchNames.length - 1] || '') + '): محقق ' + m.agg.effMobPct.toFixed(1) + '% | باقي له *' + Math.abs(mg) + ' خط* للوصول لـ 100%');
+      });
+    }
+
+    // Top 3 Critical Deficit Stores/Managers
+    var criticals = model.byManager.slice().sort(function (a, b) {
+      return (a.agg.mobileNetGap || 0) - (b.agg.mobileNetGap || 0);
+    }).filter(function (m) { return (m.agg.mobileNetGap || 0) < 0; }).slice(0, 4);
+
+    if (criticals.length) {
+      lines.push('══════════════════════');
+      lines.push('🛑 *أكبر فجوات مطلوبة للتغطية (Priority Gaps):*');
+      criticals.forEach(function (m) {
+        var mg = Math.round(m.agg.mobileNetGap || 0);
+        var perDay = Math.ceil(Math.abs(mg) / 10);
+        lines.push('• *' + m.label + '* (' + (m.uniqueBranchNames[m.uniqueBranchNames.length - 1] || '') + '): Gap ' + fmtN(mg) + ' خط | مطلوب *' + fmtN(perDay) + ' خط/يوم* خلال 10 أيام');
+      });
+    }
+
+    // Top 3 Champions
+    var champs = model.byManager.slice(0, 3);
+    if (champs.length) {
+      lines.push('══════════════════════');
+      lines.push('🏆 *أوائل الترتيب العام:*');
+      champs.forEach(function (m, idx) {
+        var ev = m.agg.evalScore !== null ? (m.agg.evalScore * 100).toFixed(1) + '%' : m.agg.effMobPct.toFixed(1) + '%';
+        lines.push((idx + 1) + '. *' + m.label + '* — التقييم: *' + ev + '*');
+      });
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function openActionPlanBriefModal() {
+  var modal = document.getElementById('action-plan-modal-overlay');
+  var ta = document.getElementById('action-plan-textarea');
+  if (ta) ta.value = generateExecutiveActionPlanText();
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeActionPlanBriefModal() {
+  var modal = document.getElementById('action-plan-modal-overlay');
+  if (modal) modal.style.display = 'none';
+}
+
+function copyActionPlanTextarea() {
+  var ta = document.getElementById('action-plan-textarea');
+  if (!ta) return;
+  navigator.clipboard.writeText(ta.value).then(function () {
+    mgrToast('✅ تم نسخ خطة العمل بالكامل! جاهزة للصق في WhatsApp');
+  }).catch(function () {
+    ta.select();
+    document.execCommand('copy');
+    mgrToast('✅ تم نسخ خطة العمل!');
+  });
+}
+
+function copyQuickActionPlanToClipboard() {
+  var txt = generateExecutiveActionPlanText();
+  navigator.clipboard.writeText(txt).then(function () {
+    mgrToast('✅ تم نسخ ملخص خطة العمل لـ WhatsApp مباشر!');
+  }).catch(function () {
+    openActionPlanBriefModal();
+  });
+}
+
+// ── Wire Alerts & Keyboard ESC into lifecycle ──
+(function () {
+  var _prevRenderAllExec = renderAll;
+  renderAll = function () {
+    var r = _prevRenderAllExec.apply(this, arguments);
+    try { buildSmartAlertsModel(); } catch (e) {}
+    return r;
+  };
+
+  document.addEventListener('click', function (e) {
+    var wrap = document.getElementById('smart-alerts-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      closeSmartAlertsPopover();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (TV_MODE_OPEN) closeTVPresentationMode();
+      closeScorecardModal();
+      closeWhatIfSimulatorModal();
+      closeActionPlanBriefModal();
+      closeSmartAlertsPopover();
+      closeThemePaletteMenu();
+    }
+  });
 })();
 </script>
 
