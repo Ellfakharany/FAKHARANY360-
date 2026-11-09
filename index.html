@@ -13537,21 +13537,45 @@ async function mgrExportAuthWithWarning() {
   return true;
 }
 
-// ── Well-Formatted Multi-Sheet Excel Export (Clean sheets + dedicated Product Gaps sheet) ──
-async function exportManagersPerfExcel(btn) {
-  var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model || !model.rows.length) {
-    alert('⚠️ مفيش بيانات في العرض الحالي للتصدير');
-    return;
-  }
-  if (!(await mgrExportAuthWithWarning())) return;
+// ── Helper: Build a single-manager scoped model for individual Excel attachment ──
+function buildSingleManagerExportModel(mgr, baseModel) {
+  var full = baseModel || MGR_LAST_MODEL || buildManagersModel();
+  var mMonths = mgr.monthEntries.map(function (me) { return me.month; });
+  var byMonthSingle = mgr.monthEntries.map(function (me) {
+    return {
+      key: 'MO|' + me.month,
+      month: me.month,
+      monthLabelEn: MONTH_EN_FULL[me.month] || me.monthLabelEn || me.month,
+      monthLabelAr: MONTH_AR_NAMES[me.month] || me.monthLabelAr || me.month,
+      entities: [{
+        key: mgr.key,
+        label: mgr.label,
+        oracleId: mgr.oracleId,
+        hiringDate: mgr.hiringDate,
+        month: me.month,
+        rows: me.rows,
+        agg: me.agg,
+        movedAcrossYear: mgr.movedAcrossYear,
+        transferredFrom: me.transferredFromCode
+      }],
+      totalAgg: me.agg
+    };
+  });
+  return {
+    rows: mgr.rows,
+    months: mMonths,
+    byMonth: byMonthSingle,
+    byManager: [mgr],
+    grandAgg: mgr.agg,
+    hasRawProducts: full ? full.hasRawProducts : true
+  };
+}
 
-  var oldHtml = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>جاري التصدير...'; }
-
-  try {
-    await mtdInsLoadExcelJS();
-    var wb = new ExcelJS.Workbook();
+// ── Reusable ExcelJS Multi-Sheet Workbook Buffer Builder (used by Export Excel AND Send Scorecard Email) ──
+async function buildManagersPerfExcelBuffer(customModel) {
+  var model = customModel || MGR_LAST_MODEL || buildManagersModel();
+  await mtdInsLoadExcelJS();
+  var wb = new ExcelJS.Workbook();
     wb.creator = 'FAKHARANY360';
     wb.created = new Date();
 
@@ -14076,7 +14100,23 @@ async function exportManagersPerfExcel(btn) {
     });
     ws4.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(1, r4 - 1), column: cols4.length } };
 
-    var buf = await wb.xlsx.writeBuffer();
+    return await wb.xlsx.writeBuffer();
+}
+
+// ── Well-Formatted Multi-Sheet Excel Export (Clean sheets + dedicated Product Gaps sheet) ──
+async function exportManagersPerfExcel(btn) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.rows.length) {
+    alert('⚠️ مفيش بيانات في العرض الحالي للتصدير');
+    return;
+  }
+  if (!(await mgrExportAuthWithWarning())) return;
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+
+  try {
+    var buf = await buildManagersPerfExcelBuffer(model);
     var now = new Date();
     var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
     var a = document.createElement('a');
@@ -14919,10 +14959,11 @@ function syncMobileBottomNav(tabName) {
         <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;font-weight:700;color:var(--text-primary);background:var(--card-bg);max-width:280px;outline:none"></select>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <button onclick="downloadScorecardAsImage(this)" style="padding:6px 13px;border-radius:14px;border:none;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-camera mr-1"></i>حفظ كصورة PNG</button>
-        <button onclick="copyScorecardWhatsAppBrief()" style="padding:6px 13px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>نسخ لـ WhatsApp</button>
-        <button onclick="sendCurrentScorecardEmail()" style="padding:6px 13px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-envelope mr-1"></i>إرسال ميل (Email)</button>
-        <button onclick="openWhatIfFromScorecard()" style="padding:6px 12px;border-radius:14px;border:1.5px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-sliders-h mr-1"></i>محاكاة التارجت</button>
+        <button onclick="sendCurrentScorecardEmail(this, false)" style="padding:6px 14px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.3)" title="تجهيز إيميل كامل بالـ الديباجة الإنجليزي + صورة الـ Scorecard في الـ Body + شيت الإكسيل مرفق (Attached)"><i class="fas fa-paper-plane mr-1"></i>Send Scorecard + Excel</button>
+        <button onclick="sendCurrentScorecardEmail(this, true)" style="padding:6px 11px;border-radius:14px;border:1.5px solid #2563eb;background:#eff6ff;color:#1d4ed8;font-size:10.5px;font-weight:800;cursor:pointer" title="مشاركة الصورة + شيت الإكسيل + الديباجة الإنجليزي عبر تطبيقات الموبايل (Gmail / Outlook)"><i class="fas fa-share-alt mr-1"></i>Share</button>
+        <button onclick="downloadScorecardAsImage(this)" style="padding:6px 12px;border-radius:14px;border:none;background:linear-gradient(135deg,#5E2D91,#7c3aed);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-camera mr-1"></i>Save PNG</button>
+        <button onclick="copyScorecardWhatsAppBrief()" style="padding:6px 12px;border-radius:14px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:11px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>
+        <button onclick="openWhatIfFromScorecard()" style="padding:6px 11px;border-radius:14px;border:1.5px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-sliders-h mr-1"></i>What-If</button>
         <button onclick="closeScorecardModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;padding:0 6px">&times;</button>
       </div>
     </div>
@@ -15085,8 +15126,12 @@ function syncMobileBottomNav(tabName) {
           <input id="mgr-email-search" type="text" placeholder="🔍 ابحث باسم المدير أو Oracle ID أو الفرع أو الإيميل..." oninput="renderManagerEmailCenterTable()" style="flex:1;max-width:340px;padding:7px 12px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;background:var(--gray-bg);color:var(--text-primary);outline:none">
           <span id="mgr-email-linked-count" style="font-size:11px;font-weight:800;color:#15803d;background:#dcfce7;padding:4px 10px;border-radius:12px"></span>
         </div>
-        <div style="font-size:10.5px;color:var(--text-muted)">
-          💡 زر <strong>فتح الميل</strong> يفتح برنامج البريد فوراً · زر <strong>Outlook .eml</strong> ينزل إيميل HTML منسق بالجداول والألوان جاهز للإرسال
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="font-size:11px;font-weight:800;color:var(--we-purple)">📎 الشيت المرفق في الميل (Attached Sheet):</label>
+          <select id="mgr-email-attach-scope" style="padding:5px 10px;border-radius:12px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">
+            <option value="single">شيت تقييم المدير نفسه بالشهور والـ Gaps (5 شيتات)</option>
+            <option value="all">شيت الـ Export الكامل للفلتر الحالي (كل المديرين)</option>
+          </select>
         </div>
       </div>
 
@@ -15294,16 +15339,7 @@ function closeScorecardModal() {
   if (overlay) overlay.style.display = 'none';
 }
 
-function renderScorecardForEntity(entityKey) {
-  var model = MGR_LAST_MODEL || buildManagersModel();
-  var stage = document.getElementById('scorecard-capture-area');
-  if (!stage || !model) return;
-  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
-  if (idx < 0) idx = 0;
-  var mgr = model.byManager[idx];
-  if (!mgr) return;
-  SCORECARD_CURRENT_KEY = mgr.key;
-
+function buildScorecardHTMLForManager(mgr, idx, model) {
   var g = mgr.agg;
   var s = mgr.sample || {};
   var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
@@ -15348,14 +15384,13 @@ function renderScorecardForEntity(entityKey) {
 
   var mgrEmail = getManagerEmailByOracleId(mgr.oracleId);
 
-  stage.innerHTML =
-    '<!-- Header Banner -->' +
+  return '<!-- Header Banner -->' +
     '<div style="background:linear-gradient(135deg,#1e1b4b,#5E2D91,#7c3aed);color:white;border-radius:16px;padding:18px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:Cairo,Inter,Arial,sans-serif">' +
       '<div style="flex:1;min-width:240px">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-          '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">الترتيب #' + (idx + 1) + ' من ' + model.byManager.length + '</span>' +
+          '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Rank #' + (idx + 1) + ' of ' + model.byManager.length + '</span>' +
           (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:800;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
-          '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:700;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">📅 ' + mgr.monthEntries.length + ' شهور</span>' +
+          '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:700;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">📅 ' + mgr.monthEntries.length + ' Months</span>' +
           (mgrEmail ? '<span style="background:rgba(34,197,94,0.25);color:#bbf7d0;font-size:10.5px;font-weight:700;padding:4px 10px 5px;border-radius:8px;line-height:1.5;display:inline-block">📧 ' + mgrEsc(mgrEmail) + '</span>' : '') +
         '</div>' +
         '<div style="font-size:21px;font-weight:900;margin-top:8px;line-height:1.4">' + mgrEsc(mgr.label) + '</div>' +
@@ -15364,11 +15399,11 @@ function renderScorecardForEntity(entityKey) {
       '</div>' +
       '<div style="display:flex;gap:10px;text-align:center">' +
         '<div style="background:rgba(255,255,255,0.14);padding:10px 14px;border-radius:12px;min-width:94px">' +
-          '<div style="font-size:10.5px;color:#e9d5ff;font-weight:700;line-height:1.5">متوسط التقييم</div>' +
+          '<div style="font-size:10.5px;color:#e9d5ff;font-weight:700;line-height:1.5">AVG EVAL %</div>' +
           '<div style="font-size:22px;font-weight:900;color:#4ade80;line-height:1.3;margin-top:2px">' + evPct + '</div>' +
         '</div>' +
         '<div style="background:rgba(255,255,255,0.14);padding:10px 14px;border-radius:12px;min-width:94px">' +
-          '<div style="font-size:10.5px;color:#e9d5ff;font-weight:700;line-height:1.5">تحقيق الموبايل</div>' +
+          '<div style="font-size:10.5px;color:#e9d5ff;font-weight:700;line-height:1.5">MOBILE ACH %</div>' +
           '<div style="font-size:22px;font-weight:900;color:#93c5fd;line-height:1.3;margin-top:2px">' + mobPct + '</div>' +
         '</div>' +
       '</div>' +
@@ -15380,7 +15415,7 @@ function renderScorecardForEntity(entityKey) {
           ? ('✅ مغطي تارجت الموبايل بالكامل بفائض (Gap: +' + fmtN(mobNetGap) + ' خط)')
           : ('🎯 إجمالي عجز الموبايل (Gap: ' + fmtN(mobNetGap) + ' خط) — يحتاج معدل يومي ' + fmtN(dailyNeeded10) + ' خط/يوم خلال 10 أيام لتغطية الـ 100%')) +
       '</div>' +
-      '<div style="font-size:11px;font-weight:800;color:#4b5563;line-height:1.5">TNPS: ' + (g.tnps !== null ? (g.tnps * 100).toFixed(0) + '%' : '—') + ' · Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div>' +
+      '<div style="font-size:11px;font-weight:800;color:#4b5563;line-height:1.5">Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div>' +
     '</div>' +
     '<!-- 6 Products Grid -->' +
     (model.hasRawProducts ? ('<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📦 أداء المنتجات والـ Gap (+ / -):</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
@@ -15393,24 +15428,28 @@ function renderScorecardForEntity(entityKey) {
     '</div>';
 }
 
-async function downloadScorecardAsImage(btn) {
-  var el = document.getElementById('scorecard-capture-area');
-  if (!el || typeof html2canvas === 'undefined') {
-    mgrToast('⚠️ جاري تحميل مكتبة الصور، حاول بعد ثانية', true);
-    return;
-  }
-  var old = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>جاري الحفظ...'; }
-  var cloneHost = null;
-  try {
-    if (document.fonts && document.fonts.ready) {
-      try { await document.fonts.ready; } catch (e) {}
-    }
-    cloneHost = document.createElement('div');
-    cloneHost.style.cssText = 'position:fixed;left:-10000px;top:0;width:880px;background:#ffffff;padding:26px;font-family:Cairo,Inter,Arial,sans-serif;line-height:1.55;z-index:-1';
-    cloneHost.innerHTML = el.innerHTML;
-    document.body.appendChild(cloneHost);
+function renderScorecardForEntity(entityKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var stage = document.getElementById('scorecard-capture-area');
+  if (!stage || !model) return;
+  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
+  if (idx < 0) idx = 0;
+  var mgr = model.byManager[idx];
+  if (!mgr) return;
+  SCORECARD_CURRENT_KEY = mgr.key;
+  stage.innerHTML = buildScorecardHTMLForManager(mgr, idx, model);
+}
 
+async function captureScorecardPngForManager(mgr, idx, model) {
+  await mtdBALoadH2C();
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (e) {}
+  }
+  var cloneHost = document.createElement('div');
+  cloneHost.style.cssText = 'position:fixed;left:-10000px;top:0;width:880px;background:#ffffff;padding:26px;font-family:Cairo,Inter,Arial,sans-serif;line-height:1.55;z-index:-1';
+  cloneHost.innerHTML = buildScorecardHTMLForManager(mgr, idx, model);
+  document.body.appendChild(cloneHost);
+  try {
     var canvas = await html2canvas(cloneHost, {
       scale: 2,
       width: 880,
@@ -15419,9 +15458,30 @@ async function downloadScorecardAsImage(btn) {
       useCORS: true,
       logging: false
     });
+    var dataUrl = canvas.toDataURL('image/png');
+    var b64Png = dataUrl.split(',')[1] || '';
+    var pngBlob = await new Promise(function (r) { canvas.toBlob(r, 'image/png'); });
+    return { dataUrl: dataUrl, base64: b64Png, blob: pngBlob };
+  } finally {
+    if (cloneHost && cloneHost.parentNode) cloneHost.parentNode.removeChild(cloneHost);
+  }
+}
+
+async function downloadScorecardAsImage(btn) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.byManager.length) return;
+  var idx = model.byManager.findIndex(function (m) { return m.key === SCORECARD_CURRENT_KEY; });
+  if (idx < 0) idx = 0;
+  var mgr = model.byManager[idx];
+  if (!mgr) return;
+
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Saving...'; }
+  try {
+    var cap = await captureScorecardPngForManager(mgr, idx, model);
     var a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = 'FAKHARANY360_Scorecard_' + (SCORECARD_CURRENT_KEY || 'Manager').replace(/[^a-zA-Z0-9_؀-ۿ]/g, '_') + '.png';
+    a.href = cap.dataUrl;
+    a.download = 'FAKHARANY360_Scorecard_' + (mgr.oracleId && mgr.oracleId !== '—' ? mgr.oracleId + '_' : '') + mgr.label.replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_') + '.png';
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { a.remove(); }, 1000);
@@ -15429,7 +15489,6 @@ async function downloadScorecardAsImage(btn) {
   } catch (e) {
     mgrToast('❌ تعذر حفظ الصورة: ' + e.message, true);
   } finally {
-    if (cloneHost && cloneHost.parentNode) cloneHost.parentNode.removeChild(cloneHost);
     if (btn) { btn.disabled = false; btn.innerHTML = old; }
   }
 }
@@ -16586,12 +16645,13 @@ function renderManagerEmailCenterTable() {
     var eKey = mgr.key.replace(/'/g, "\\'");
     return '<tr style="border-bottom:1px solid var(--border);background:' + (idx % 2 === 0 ? 'var(--card-bg)' : 'var(--gray-bg)') + '">' +
       '<td style="padding:8px 10px;font-size:11px;font-weight:800;color:#5E2D91">' + (oid || '—') + '</td>' +
-      '<td style="padding:8px 10px"><div style="font-size:11.5px;font-weight:800;color:var(--text-primary)">' + mgrEsc(mgr.label) + '</div><div dir="rtl" style="font-size:10px;color:var(--text-muted)">🏪 ' + mgrEsc(mgr.uniqueBranchNames.join(' ← ')) + ' (' + mgr.monthEntries.length + ' شهور)</div></td>' +
+      '<td style="padding:8px 10px"><div style="font-size:11.5px;font-weight:800;color:var(--text-primary)">' + mgrEsc(mgr.label) + '</div><div dir="rtl" style="font-size:10px;color:var(--text-muted)">🏪 ' + mgrEsc(mgr.uniqueBranchNames.join(' ← ')) + ' (' + mgr.monthEntries.length + ' Months)</div></td>' +
       '<td style="padding:8px 10px;text-align:center"><span style="font-size:11px;font-weight:900;color:#15803d">' + evTxt + '</span><div style="font-size:9.5px;font-weight:800;color:' + gapClr + '">Mob Gap: ' + (mobGap > 0 ? '+' : '') + fmtN(mobGap) + '</div></td>' +
-      '<td style="padding:8px 10px;min-width:210px"><input type="email" value="' + mgrEsc(em) + '" placeholder="name@te.eg" onchange="onSingleManagerEmailInput(\'' + mgrEsc(oid) + '\', this.value)" style="width:100%;padding:6px 10px;border-radius:10px;border:1px solid var(--border);font-size:11px;background:var(--card-bg);color:var(--text-primary)"></td>' +
+      '<td style="padding:8px 10px;min-width:200px"><input type="email" value="' + mgrEsc(em) + '" placeholder="name@te.eg" onchange="onSingleManagerEmailInput(\'' + mgrEsc(oid) + '\', this.value)" style="width:100%;padding:6px 10px;border-radius:10px;border:1px solid var(--border);font-size:11px;background:var(--card-bg);color:var(--text-primary)"></td>' +
       '<td style="padding:8px 10px;white-space:nowrap;text-align:center">' +
-        '<button onclick="sendManagerEvalMailto(\'' + eKey + '\')" style="padding:5px 10px;border-radius:10px;border:none;background:#16a34a;color:white;font-size:10.5px;font-weight:800;cursor:pointer;margin-right:4px" title="فتح تطبيق الإيميل مباشرة بالتقييم السنوي والـ Gap"><i class="fas fa-paper-plane mr-1"></i>فتح الميل</button>' +
-        '<button onclick="downloadManagerEvalEml(\'' + eKey + '\')" style="padding:5px 10px;border-radius:10px;border:none;background:#2563eb;color:white;font-size:10.5px;font-weight:800;cursor:pointer" title="تحميل ملف إيميل Outlook منسق بالكامل (.eml) جاهز للإرسال"><i class="fas fa-envelope mr-1"></i>Outlook .eml</button>' +
+        '<button onclick="sendScorecardWithExcelEmail(\'' + eKey + '\', this, false)" style="padding:5px 10px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:10.5px;font-weight:800;cursor:pointer;margin-right:4px" title="تحميل ملف إيميل Outlook (.eml) يحتوي على الديباجة الإنجليزي + صورة الـ Scorecard في الـ Body + شيت الإكسيل مرفق"><i class="fas fa-paper-plane mr-1"></i>Scorecard + Excel (.eml)</button>' +
+        '<button onclick="sendScorecardWithExcelEmail(\'' + eKey + '\', this, true)" style="padding:5px 9px;border-radius:10px;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:800;cursor:pointer;margin-right:4px" title="مشاركة الصورة + شيت الإكسيل + الديباجة الإنجليزي على الموبايل"><i class="fas fa-share-alt mr-1"></i>Share</button>' +
+        '<button onclick="sendManagerEvalMailto(\'' + eKey + '\')" style="padding:5px 9px;border-radius:10px;border:none;background:#16a34a;color:white;font-size:10px;font-weight:800;cursor:pointer" title="فتح تطبيق البريد النصي"><i class="fas fa-envelope"></i></button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -16601,156 +16661,175 @@ function renderManagerEmailCenterTable() {
       '<th style="padding:9px 10px">Oracle ID</th>' +
       '<th style="padding:9px 10px">Manager & Branches</th>' +
       '<th style="padding:9px 10px;text-align:center">Annual Eval & Gap</th>' +
-      '<th style="padding:9px 10px">Email (مربوط بـ Oracle ID)</th>' +
-      '<th style="padding:9px 10px;text-align:center">إرسال الإيميل</th>' +
+      '<th style="padding:9px 10px">Email (Linked by Oracle ID)</th>' +
+      '<th style="padding:9px 10px;text-align:center">Send Scorecard + Excel Email</th>' +
     '</tr></thead><tbody>' + rowsHTML + '</tbody></table>';
 }
 
-function buildManagerEmailSubjectAndPlainBody(mgr) {
-  var g = mgr.agg;
-  var s = mgr.sample || {};
-  var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
-  var subject = 'FAKHARANY360 | تقرير التقييم السنوي والـ Gap بالمنتجات — ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' (Oracle ID: ' + mgr.oracleId + ')' : '');
-  var lines = [
-    'Dear ' + mgr.label + ',',
-    '',
-    'تحية طيبة،',
-    'مرفق ملخص التقييم السنوي / التراكمي وأداء المنتجات والـ Gap المطلوب تغطيته من منصة FAKHARANY360:',
-    '',
-    '■ البيانات الأساسية:',
-    '• الاسم: ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' (Oracle ID: ' + mgr.oracleId + ')' : ''),
-    '• الفروع خلال السنة (' + mgr.monthEntries.length + ' شهور): ' + mgr.uniqueBranchNames.join(' <- '),
-    '• الإدارة: Area Mgr: ' + (s.areaManager || '—') + ' | Supervisor: ' + (s.supervisor || '—') + ' | RM: ' + (s.regionalManager || '—'),
-    '',
-    '■ ملخص التقييم العام (Annual / Cumulative Evaluation):',
-    '• متوسط التقييم الكلي: ' + evPct,
-    '• تفاصيل المحاور (100%): TNPS (10%): ' + (g.tnps !== null ? (g.tnps * 100).toFixed(0) + '%' : '—') +
-      ' | Mobile (35%): ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') +
-      ' | Sales Mix (30%): ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') +
-      ' | Performance (25%): ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—'),
-    '• عدد الإنذارات (Warning Mail): ' + (g.warnCount || 0),
-    '',
-    '■ ملخص أداء المنتجات والـ Gap على مدار السنة:'
-  ];
-
-  PRODUCTS.forEach(function (p) {
-    var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
-    if (t > 0 || a > 0) {
-      var ap = t > 0 ? (a / t * 100).toFixed(1) + '%' : '—';
-      var net = Math.round(a - t);
-      lines.push('• ' + p.label + ': Target = ' + fmtN(t) + ' | Actual = ' + fmtN(a) + ' | Ach% = ' + ap + ' | Gap = ' + (net > 0 ? '+' : '') + fmtN(net));
-    }
+function getManagerMonthRangeEn(mgr) {
+  var entries = (mgr.monthEntries || []).slice().sort(function (a, b) {
+    return MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month);
   });
-
-  lines.push('', '■ تفصيل التقييم والأداء شهر بشهر (Month-by-Month):');
-  mgr.monthEntries.forEach(function (me) {
-    var mg = me.agg;
-    var ms = mg.sample || {};
-    var mev = mg.evalScore !== null ? (mg.evalScore * 100).toFixed(1) + '%' : '—';
-    var mmob = Math.round((mg.mobileSubs || 0) - (mg.mobileTarget || 0));
-    lines.push('• ' + me.monthLabelEn + ' (' + (ms.store || '—') + '): Eval = ' + mev +
-      ' | Mobile Ach = ' + fmtN(mg.mobileSubs || 0) + '/' + fmtN(mg.mobileTarget || 0) +
-      ' (Gap: ' + (mmob > 0 ? '+' : '') + fmtN(mmob) + ')' +
-      (mg.warn === 'Yes' ? ' [⚠️ Warning Mail]' : ''));
-  });
-
-  lines.push('', 'Best Regards,', 'East Cairo Team — Mohamed Elfakharany', 'FAKHARANY360 Performance Intelligence Platform');
-  return { subject: subject, body: lines.join('\r\n') };
+  var firstM = entries.length ? entries[0].month : '01-2026';
+  var lastM = entries.length ? entries[entries.length - 1].month : '09-2026';
+  return {
+    fromMonth: MONTH_EN_FULL[firstM] || firstM,
+    toMonth: MONTH_EN_FULL[lastM] || lastM
+  };
 }
 
-function buildManagerEmailHTMLDoc(mgr) {
-  var g = mgr.agg;
-  var s = mgr.sample || {};
-  var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
-  var mobPct = g.effMobPct ? g.effMobPct.toFixed(1) + '%' : '0.0%';
+function buildManagerEmailSubjectAndPlainBody(mgr) {
+  var range = getManagerMonthRangeEn(mgr);
+  var subject = 'Performance & Evaluation Scorecard (' + range.fromMonth + ' To ' + range.toMonth + ') - ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' [Oracle ID: ' + mgr.oracleId + ']' : '');
+  var lines = [
+    'Dear ' + mgr.label + ',',
+    '               Find the performance and Gaps over all year from ' + range.fromMonth + ' To ' + range.toMonth + '.',
+    '',
+    '[Scorecard Image Attached / Embedded]',
+    '',
+    'And find all evaluation details in attached sheet.',
+    '',
+    'Best Regards,',
+    'East Cairo Team — Mohamed Elfakharany',
+    'FAKHARANY360 Performance Intelligence Platform'
+  ];
+  return { subject: subject, body: lines.join('\r\n'), fromMonth: range.fromMonth, toMonth: range.toMonth };
+}
 
-  var prodRows = PRODUCTS.map(function (p) {
-    var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
-    var ap = t > 0 ? (a / t * 100).toFixed(1) + '%' : '—';
-    var net = Math.round(a - t);
-    var gapBg = net >= 0 ? '#dcfce7' : '#fee2e2';
-    var gapFg = net >= 0 ? '#15803d' : '#b91c1c';
-    return '<tr>' +
-      '<td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:bold;color:#1e293b">' + mgrEsc(p.label) + '</td>' +
-      '<td style="padding:8px 12px;border:1px solid #e2e8f0;text-align:center">' + fmtN(t) + '</td>' +
-      '<td style="padding:8px 12px;border:1px solid #e2e8f0;text-align:center;font-weight:bold">' + fmtN(a) + '</td>' +
-      '<td style="padding:8px 12px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:#5E2D91">' + ap + '</td>' +
-      '<td bgcolor="' + gapBg + '" style="padding:8px 12px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;background:' + gapBg + ';color:' + gapFg + '">Gap: ' + (net > 0 ? '+' : '') + fmtN(net) + '</td>' +
-    '</tr>';
-  }).join('');
-
-  var monthRows = mgr.monthEntries.map(function (me) {
-    var mg = me.agg;
-    var ms = mg.sample || {};
-    var mev = mg.evalScore !== null ? (mg.evalScore * 100).toFixed(1) + '%' : '—';
-    var mact = mg.actPct !== null ? (mg.actPct * 100).toFixed(1) + '%' : '—';
-    var mtnps = mg.tnps !== null ? (mg.tnps * 100).toFixed(0) + '%' : '—';
-    var mmobGap = Math.round((mg.mobileSubs || 0) - (mg.mobileTarget || 0));
-    var gClr = mmobGap >= 0 ? '#15803d' : '#b91c1c';
-    return '<tr>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:bold;color:#5E2D91">' + mgrEsc(me.monthLabelEn) + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:bold">' + mgrEsc(ms.store || '—') + ' <span style="color:#64748b;font-size:11px">(' + mgrEsc(ms.storeCode || '') + ')</span></td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + fmtN(mg.mobileTarget || 0) + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:bold">' + fmtN(mg.mobileSubs || 0) + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:' + gClr + '">Gap: ' + (mmobGap > 0 ? '+' : '') + fmtN(mmobGap) + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + mact + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + mtnps + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + (mg.mob35 !== null ? mg.mob35.toFixed(1) : '—') + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + (mg.mix30 !== null ? mg.mix30.toFixed(1) : '—') + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">' + (mg.perf25 !== null ? mg.perf25.toFixed(1) : '—') + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:' + (mg.warn === 'Yes' ? '#b91c1c' : '#15803d') + '">' + (mg.warn || 'No') + '</td>' +
-      '<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;background:#f0fdf4;color:#15803d">' + mev + '</td>' +
-    '</tr>';
-  }).join('');
-
-  return '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"></head>' +
-    '<body style="font-family:Cairo,Segoe UI,Tahoma,Arial,sans-serif;color:#1f2937;background:#f8fafc;padding:20px;direction:rtl">' +
-      '<div style="max-width:860px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">' +
-        '<div style="background:#5E2D91;color:#ffffff;padding:18px 24px">' +
-          '<div style="font-size:12px;color:#e9d5ff;font-weight:bold">FAKHARANY³⁶⁰ · PERFORMANCE INTELLIGENCE PLATFORM</div>' +
-          '<div style="font-size:20px;font-weight:bold;margin-top:4px">تقرير التقييم السنوي وأداء المنتجات والـ Gap — ' + mgrEsc(mgr.label) + '</div>' +
-          '<div style="font-size:13px;color:#f3e8ff;margin-top:4px">Oracle ID: <strong>' + mgrEsc(mgr.oracleId || '—') + '</strong> · عدد الشهور: <strong>' + mgr.monthEntries.length + ' شهور</strong> · الفروع: <strong>' + mgrEsc(mgr.uniqueBranchNames.join(' ← ')) + '</strong></div>' +
-        '</div>' +
-        '<div style="padding:20px 24px">' +
-          '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:18px">' +
-            '<tr>' +
-              '<td width="25%" style="padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;text-align:center"><div style="font-size:11px;color:#166534;font-weight:bold">متوسط التقييم السنوي</div><div style="font-size:22px;font-weight:bold;color:#15803d">' + evPct + '</div></td>' +
-              '<td width="25%" style="padding:12px;background:#eff6ff;border:1px solid #bfdbfe;text-align:center"><div style="font-size:11px;color:#1e40af;font-weight:bold">تحقيق الموبايل العام</div><div style="font-size:22px;font-weight:bold;color:#1d4ed8">' + mobPct + '</div></td>' +
-              '<td width="25%" style="padding:12px;background:#faf5ff;border:1px solid #e9d5ff;text-align:center"><div style="font-size:11px;color:#5E2D91;font-weight:bold">تفصيل التقييم (100%)</div><div style="font-size:12px;font-weight:bold;color:#3b0764;margin-top:4px">TNPS: ' + (g.tnps !== null ? (g.tnps * 100).toFixed(0) + '%' : '—') + ' | Mob: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + '<br>Mix: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' | Perf: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div></td>' +
-              '<td width="25%" style="padding:12px;background:' + (g.warnCount > 0 ? '#fef2f2;border:1px solid #fecaca' : '#f8fafc;border:1px solid #e2e8f0') + ';text-align:center"><div style="font-size:11px;color:#475569;font-weight:bold">الإنذارات (Warning Mail)</div><div style="font-size:20px;font-weight:bold;color:' + (g.warnCount > 0 ? '#dc2626' : '#16a34a') + '">' + (g.warnCount || 0) + '</div></td>' +
-            '</tr>' +
-          '</table>' +
-          '<h3 style="font-size:14px;color:#5E2D91;margin:16px 0 8px">1. جدول أداء المنتجات والـ Gap التراكمي على مدار السنة:</h3>' +
-          '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:12.5px;margin-bottom:20px">' +
-            '<thead><tr bgcolor="#1e1b4b" style="background:#1e1b4b;color:#ffffff">' +
-              '<th style="padding:9px 12px;border:1px solid #1e1b4b;text-align:right">المنتج (Product)</th>' +
-              '<th style="padding:9px 12px;border:1px solid #1e1b4b;text-align:center">Target</th>' +
-              '<th style="padding:9px 12px;border:1px solid #1e1b4b;text-align:center">Actual</th>' +
-              '<th style="padding:9px 12px;border:1px solid #1e1b4b;text-align:center">Ach %</th>' +
-              '<th style="padding:9px 12px;border:1px solid #1e1b4b;text-align:center">Gap (+ / -)</th>' +
-            '</tr></thead><tbody>' + prodRows + '</tbody>' +
-          '</table>' +
-          '<h3 style="font-size:14px;color:#5E2D91;margin:16px 0 8px">2. تفصيل الأداء والتقييم الشهري بالشهور (Month-by-Month):</h3>' +
-          '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:11.5px">' +
-            '<thead><tr bgcolor="#5E2D91" style="background:#5E2D91;color:#ffffff">' +
-              '<th style="padding:8px;border:1px solid #5E2D91">الشهر</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">الفرع والكود</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Mob Tgt</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Mob Ach</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Mob Gap</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Act %</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">TNPS 10%</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Mob 35%</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Mix 30%</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Perf 25%</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Warning</th>' +
-              '<th style="padding:8px;border:1px solid #5E2D91">Eval %</th>' +
-            '</tr></thead><tbody>' + monthRows + '</tbody>' +
-          '</table>' +
-          '<p style="font-size:11.5px;color:#64748b;margin-top:18px;border-top:1px solid #e2e8f0;padding-top:10px">تم توليد هذا التقرير تلقائياً من منصة <strong>FAKHARANY³⁶⁰</strong> · East Cairo Team — Mohamed Elfakharany</p>' +
-        '</div>' +
+function buildScorecardEmailHTMLWithCid(mgr, fromMonth, toMonth, cidName) {
+  var f = 'font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1f2937;line-height:1.6';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"></head>' +
+    '<body style="' + f + ';background:#ffffff;padding:20px;margin:0;direction:ltr;text-align:left">' +
+      '<p style="' + f + ';font-size:15.5px;margin:0 0 10px">Dear <strong>' + mgrEsc(mgr.label) + '</strong>,</p>' +
+      '<p style="' + f + ';font-size:14.5px;margin:0 0 18px;padding-left:36px">' +
+        'Find the performance and Gaps over all year from <strong>' + mgrEsc(fromMonth) + '</strong> To <strong>' + mgrEsc(toMonth) + '</strong>:' +
+      '</p>' +
+      '<div style="margin:16px 0 20px">' +
+        '<img src="cid:' + cidName + '" alt="Scorecard - ' + mgrEsc(mgr.label) + '" width="820" style="display:block;max-width:100%;width:820px;height:auto;border:1px solid #e2e8f0;border-radius:14px" />' +
       '</div>' +
+      '<p style="' + f + ';font-size:15px;font-weight:bold;color:#5E2D91;margin:18px 0">' +
+        'And find all evaluation details in attached sheet.' +
+      '</p>' +
+      '<p style="' + f + ';font-size:13px;color:#4b5563;margin-top:22px;border-top:1px solid #e5e7eb;padding-top:12px">' +
+        'Best Regards,<br>' +
+        '<strong>East Cairo Team — Mohamed Elfakharany</strong><br>' +
+        '<span style="font-size:11.5px;color:#6b7280">FAKHARANY³⁶⁰ · Performance Intelligence Platform</span>' +
+      '</p>' +
     '</body></html>';
+}
+
+function buildScorecardAndExcelMimeEml(toEmail, subject, htmlBody, pngName, pngBase64, cidName, xlsxName, xlsxBuffer) {
+  function b64Utf8(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function wrap76(x) { return String(x || '').replace(/.{1,76}/g, '$&\r\n'); }
+
+  var mixedBd = '----=_FK360_MIXED_' + Date.now().toString(36);
+  var relBd   = '----=_FK360_REL_' + Date.now().toString(36);
+
+  var headers = 'X-Unsent: 1\r\n' +
+    (toEmail ? 'To: ' + toEmail + '\r\n' : '') +
+    'Subject: =?UTF-8?B?' + b64Utf8(subject) + '?=\r\n' +
+    'MIME-Version: 1.0\r\n' +
+    'Content-Type: multipart/mixed; boundary="' + mixedBd + '"\r\n\r\n';
+
+  var partRelatedStart = '--' + mixedBd + '\r\n' +
+    'Content-Type: multipart/related; type="text/html"; boundary="' + relBd + '"\r\n\r\n';
+
+  var partHtml = '--' + relBd + '\r\n' +
+    'Content-Type: text/html; charset=UTF-8\r\n' +
+    'Content-Transfer-Encoding: base64\r\n\r\n' +
+    wrap76(b64Utf8(htmlBody)) + '\r\n';
+
+  var partInlineImg = '--' + relBd + '\r\n' +
+    'Content-Type: image/png; name="' + pngName + '"\r\n' +
+    'Content-Transfer-Encoding: base64\r\n' +
+    'Content-ID: <' + cidName + '>\r\n' +
+    'Content-Disposition: inline; filename="' + pngName + '"\r\n\r\n' +
+    wrap76(pngBase64) + '\r\n' +
+    '--' + relBd + '--\r\n';
+
+  var xlsxB64 = mtdBABytesB64(xlsxBuffer);
+  var partExcelAttach = '--' + mixedBd + '\r\n' +
+    'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + xlsxName + '"\r\n' +
+    'Content-Transfer-Encoding: base64\r\n' +
+    'Content-Disposition: attachment; filename="' + xlsxName + '"\r\n\r\n' +
+    wrap76(xlsxB64) + '\r\n' +
+    '--' + mixedBd + '--\r\n';
+
+  return headers + partRelatedStart + partHtml + partInlineImg + partExcelAttach;
+}
+
+async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  if (!model || !model.byManager.length) {
+    mgrToast('⚠️ لا توجد بيانات مديرين حالية', true);
+    return;
+  }
+  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
+  if (idx < 0) idx = 0;
+  var mgr = model.byManager[idx];
+  if (!mgr) return;
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Preparing...'; }
+
+  try {
+    var toEmail = getManagerEmailByOracleId(mgr.oracleId);
+    var msg = buildManagerEmailSubjectAndPlainBody(mgr);
+    var cleanName = (mgr.oracleId && mgr.oracleId !== '—' ? mgr.oracleId + '_' : '') + mgr.label.replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_');
+    var pngName = 'Scorecard_' + cleanName + '.png';
+    var xlsxName = 'Evaluation_Details_' + cleanName + '.xlsx';
+
+    // 1. Capture Scorecard PNG Image
+    var cap = await captureScorecardPngForManager(mgr, idx, model);
+
+    // 2. Generate Attached Excel Workbook (.xlsx)
+    var scopeSel = document.getElementById('mgr-email-attach-scope');
+    var attachScope = (scopeSel && scopeSel.value) || 'single';
+    var exportModel = attachScope === 'all' ? model : buildSingleManagerExportModel(mgr, model);
+    var xlsxBuf = await buildManagersPerfExcelBuffer(exportModel);
+
+    // 3. If Mobile Share requested and supported, share PNG + Excel + English Text directly
+    if (useMobileShare && navigator.share && navigator.canShare) {
+      var pngFile = new File([cap.blob], pngName, { type: 'image/png' });
+      var xlsxFile = new File([xlsxBuf], xlsxName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      var sharePayload = null;
+      if (navigator.canShare({ files: [pngFile, xlsxFile] })) {
+        sharePayload = { title: msg.subject, text: msg.body, files: [pngFile, xlsxFile] };
+      } else if (navigator.canShare({ files: [pngFile] })) {
+        sharePayload = { title: msg.subject, text: msg.body, files: [pngFile] };
+        // Also trigger download of the Excel file so the user has both
+        var ax = document.createElement('a');
+        ax.href = URL.createObjectURL(new Blob([xlsxBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        ax.download = xlsxName;
+        document.body.appendChild(ax); ax.click();
+        setTimeout(function () { URL.revokeObjectURL(ax.href); ax.remove(); }, 1500);
+      }
+      if (sharePayload) {
+        await navigator.share(sharePayload);
+        mgrToast('✅ تم فتح مشاركة الإيميل شاملة صورة الـ Scorecard وشيت التقييم!');
+        return;
+      }
+    }
+
+    // 4. Build and download the .eml file (Outlook Draft with inline Scorecard Image in body + Attached Excel Sheet)
+    var cidName = 'scorecard_img_' + Date.now();
+    var htmlBody = buildScorecardEmailHTMLWithCid(mgr, msg.fromMonth, msg.toMonth, cidName);
+    var emlStr = buildScorecardAndExcelMimeEml(toEmail, msg.subject, htmlBody, pngName, cap.base64, cidName, xlsxName, xlsxBuf);
+
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([emlStr], { type: 'message/rfc822' }));
+    a.download = 'FAKHARANY360_Scorecard_Email_' + cleanName + '.eml';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    mgrToast('✅ تم تجهيز وتحميل الإيميل (.eml) بصورة الـ Scorecard في الـ Body وشيت الإكسيل مرفق (Attached)!');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    console.error('[Scorecard Email]', err);
+    mgrToast('❌ تعذر تجهيز الإيميل: ' + (err.message || err), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+  }
 }
 
 function sendManagerEvalMailto(entityKey) {
@@ -16766,47 +16845,18 @@ function sendManagerEvalMailto(entityKey) {
   window.location.href = mailtoUrl;
 }
 
-function downloadManagerEvalEml(entityKey) {
-  var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model) return;
-  var mgr = model.byManager.find(function (m) { return m.key === entityKey; }) || model.byManager[0];
-  if (!mgr) return;
-  var toEmail = getManagerEmailByOracleId(mgr.oracleId);
-  var msg = buildManagerEmailSubjectAndPlainBody(mgr);
-  var htmlDoc = buildManagerEmailHTMLDoc(mgr);
-
-  function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
-  function wrap76(x) { return x.replace(/.{1,76}/g, '$&\r\n'); }
-  var eml = 'X-Unsent: 1\r\n' +
-    (toEmail ? 'To: ' + toEmail + '\r\n' : '') +
-    'Subject: =?UTF-8?B?' + b64(msg.subject) + '?=\r\n' +
-    'MIME-Version: 1.0\r\n' +
-    'Content-Type: text/html; charset=UTF-8\r\n' +
-    'Content-Transfer-Encoding: base64\r\n\r\n' +
-    wrap76(b64(htmlDoc));
-
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([eml], { type: 'message/rfc822' }));
-  var cleanName = (mgr.oracleId && mgr.oracleId !== '—' ? mgr.oracleId + '_' : '') + mgr.label.replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_');
-  a.download = 'FAKHARANY360_Eval_' + cleanName + '.eml';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1200);
-  mgrToast('✅ تم تحميل ملف إيميل Outlook (.eml) المنسق لـ ' + mgr.label);
+function downloadManagerEvalEml(entityKey, btn) {
+  return sendScorecardWithExcelEmail(entityKey, btn, false);
 }
 
-function sendCurrentScorecardEmail() {
+function sendCurrentScorecardEmail(btn, useMobileShare) {
   var key = SCORECARD_CURRENT_KEY;
-  if (!key) return;
-  var model = MGR_LAST_MODEL || buildManagersModel();
-  var mgr = model && model.byManager.find(function (m) { return m.key === key; });
-  if (!mgr) return;
-  var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  if (isMobile) {
-    sendManagerEvalMailto(key);
-  } else {
-    downloadManagerEvalEml(key);
+  if (!key) {
+    var model = MGR_LAST_MODEL || buildManagersModel();
+    key = model && model.byManager[0] ? model.byManager[0].key : '';
   }
+  if (!key) return;
+  sendScorecardWithExcelEmail(key, btn, !!useMobileShare);
 }
 
 async function downloadAllLinkedManagersEmlBatch(btn) {
@@ -16818,11 +16868,18 @@ async function downloadAllLinkedManagersEmlBatch(btn) {
     mgrToast('⚠️ لا يوجد مديرين مربوط ليهم إيميل حالياً — ارفع شيت الإيميلات أو أضف إيميل أولاً', true);
     return;
   }
-  for (var i = 0; i < linkedMgrs.length; i++) {
-    downloadManagerEvalEml(linkedMgrs[i].key);
-    await new Promise(function (r) { setTimeout(r, 280); });
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; }
+  try {
+    for (var i = 0; i < linkedMgrs.length; i++) {
+      if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>(' + (i + 1) + '/' + linkedMgrs.length + ')...';
+      await sendScorecardWithExcelEmail(linkedMgrs[i].key, null, false);
+      await new Promise(function (r) { setTimeout(r, 350); });
+    }
+    mgrToast('✅ تم تحميل ' + linkedMgrs.length + ' ملف إيميل (.eml) بصورة الـ Scorecard وشيت الإكسيل مرفق!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
   }
-  mgrToast('✅ تم تحميل ' + linkedMgrs.length + ' ملف إيميل Outlook (.eml) جاهز للإرسال!');
 }
 
 // ── Wire Alerts & Keyboard ESC into lifecycle ──
