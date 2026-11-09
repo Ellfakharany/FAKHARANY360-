@@ -1530,6 +1530,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
               <!-- Right-side Quick Toggles -->
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <button id="mgr-pending-toggle-btn" onclick="toggleMgrPendingEvalMonths()" style="padding:6px 12px;border-radius:16px;border:1.5px solid #d97706;background:#fffbeb;color:#b45309;font-size:10.5px;font-weight:800;cursor:pointer" title="إظهار أو إخفاء شهور الداشبورد الجديدة التي لم يُرفع لها شيت تقييم بعد (مثل شهر 10)">
+                  <i class="fas fa-hourglass-half mr-1"></i><span id="mgr-pending-label">Pending Eval: Included</span>
+                </button>
                 <button id="mgr-scope-toggle-btn" onclick="toggleMgrDataScope()" style="padding:6px 12px;border-radius:16px;border:1.5px solid #5E2D91;background:#f5f3ff;color:#5E2D91;font-size:10.5px;font-weight:800;cursor:pointer" title="التبديل بين فروع الداشبورد أو كل فروع شيت الـ Evaluation">
                   <i class="fas fa-database mr-1"></i><span id="mgr-scope-label">Scope: Dashboard</span>
                 </button>
@@ -11983,6 +11986,7 @@ var MGR_LEVEL = 'storeManager';     // 'storeManager' | 'areaManager' | 'supervi
 var MGR_METRIC_MODE = 'combined';   // 'combined' | 'products_detail' | 'eval_detail'
 var MGR_DATA_MODE = 'sales';        // 'sales' | 'activation' (independent for Managers tab)
 var MGR_DATA_SCOPE = 'dashboard';   // 'dashboard' | 'all_eval'
+var MGR_INCLUDE_PENDING_EVAL = true; // true: include closure months whose Eval sheet is not uploaded yet (e.g. Month 10)
 var MGR_MONTH_ASC = true;           // true: Jan -> Sep, false: Sep -> Jan
 var MGR_SHOW_ALL_ROWS = false;      // false: paginate (25 rows per table), true: show all
 var MGR_PAGE_SIZE = 25;
@@ -12184,14 +12188,36 @@ function updateEvalStatusBadge() {
   var idx = buildEvalIndex();
   var count = idx.allRecords.length;
   var mCount = idx.months.length;
+  var pendingMonths = [];
+  if (Array.isArray(RAW_DATA) && RAW_DATA.length && idx.monthsSet) {
+    var rawMos = Array.from(new Set(RAW_DATA.map(function (r) { return r.month; }).filter(Boolean)));
+    pendingMonths = MONTH_ORDER.filter(function (m) { return rawMos.indexOf(m) >= 0 && !idx.monthsSet[m]; });
+  }
+  var pBtn = document.getElementById('mgr-pending-toggle-btn');
+  var pLbl = document.getElementById('mgr-pending-label');
+  if (pBtn && pLbl) {
+    if (pendingMonths.length > 0) {
+      pBtn.style.display = 'inline-flex';
+      var pmNames = pendingMonths.map(function (m) { return MONTH_LABELS[m] || m; }).join(', ');
+      pLbl.textContent = MGR_INCLUDE_PENDING_EVAL ? ('⏳ ' + pmNames + ' (Pending Eval): Included') : ('⏳ ' + pmNames + ' (Pending Eval): Hidden');
+      pBtn.style.background = MGR_INCLUDE_PENDING_EVAL ? '#fffbeb' : '#f3f4f6';
+      pBtn.style.color = MGR_INCLUDE_PENDING_EVAL ? '#b45309' : '#6b7280';
+      pBtn.style.borderColor = MGR_INCLUDE_PENDING_EVAL ? '#f59e0b' : '#d1d5db';
+    } else {
+      pBtn.style.display = 'none';
+    }
+  }
   if (count > 0) {
     var firstM = idx.months[0] ? (MONTH_LABELS[idx.months[0]] || idx.months[0]) : '';
     var lastM = idx.months[mCount - 1] ? (MONTH_LABELS[idx.months[mCount - 1]] || idx.months[mCount - 1]) + ' ' + (idx.months[mCount - 1].split('-')[1] || '') : '';
-    var rangeTxt = (firstM && lastM) ? (firstM + ' – ' + lastM) : (mCount + ' شهور');
+    var rangeTxt = (firstM && lastM) ? (firstM + ' – ' + lastM) : (mCount + ' Months');
+    var pendChip = pendingMonths.length
+      ? ' · <span style="background:#fef3c7;color:#b45309;padding:1px 7px;border-radius:10px;border:1px solid #fde68a"><i class="fas fa-hourglass-half mr-1"></i>' + pendingMonths.map(function (m) { return (MONTH_LABELS[m] || m) + ' ' + (m.split('-')[1] || ''); }).join(', ') + ': Performance & Gap Active (Pending Eval)</span>'
+      : '';
     badge.style.background = '#dcfce7';
     badge.style.color = '#15803d';
     badge.style.borderColor = '#86efac';
-    badge.innerHTML = '<i class="fas fa-link mr-1"></i>Linked by Store Code & Month (' + rangeTxt + ')';
+    badge.innerHTML = '<i class="fas fa-link mr-1"></i>Eval Linked (' + rangeTxt + ')' + pendChip;
   } else {
     badge.style.background = '#fef3c7';
     badge.style.color = '#b45309';
@@ -12241,12 +12267,15 @@ function buildEvalIndex() {
     if (months.indexOf(m) < 0) months.push(m);
   });
 
+  var latestEvalMonth = months.length ? months[months.length - 1] : null;
   EVAL_INDEX_CACHE = {
     byCodeMonth: byCodeMonth,
     byNameMonth: byNameMonth,
     latestByCode: latestByCode,
     allRecords: allRecords,
-    months: months
+    months: months,
+    monthsSet: monthsSet,
+    latestEvalMonth: latestEvalMonth
   };
   return EVAL_INDEX_CACHE;
 }
@@ -12359,7 +12388,9 @@ function getManagersLinkedRecords() {
       classification: cls,
       region: reg,
       hasRawProducts: !!rawRow,
-      hasEval: !!evRec,
+      hasEval: !!(evRec && !evRec.isPendingEval),
+      isPendingEval: !!(evRec && evRec.isPendingEval),
+      pendingFromMonth: (evRec && evRec.pendingFromMonth) || null,
       mobileTarget: rawRow ? (Number(rawRow.mobileTarget) || 0) : 0,
       mobileSubs:   rawRow ? (Number(MGR_DATA_MODE === 'activation' ? (rawRow._actMobile !== undefined ? rawRow._actMobile : rawRow.mobileSubs) : (rawRow._salesMobile !== undefined ? rawRow._salesMobile : rawRow.mobileSubs)) || 0) : 0,
       goldTarget:   rawRow ? (Number(rawRow.goldTarget) || 0)   : 0,
@@ -12387,15 +12418,45 @@ function getManagersLinkedRecords() {
     };
   }
 
+  function resolvePendingEvalForUnevaluatedMonth(rawRow, code, m) {
+    // Only applies when month m has NO evaluation sheet uploaded at all yet (e.g., Month 10 before EV Oct is uploaded)
+    if (!MGR_INCLUDE_PENDING_EVAL || !m || !idx.latestEvalMonth || (idx.monthsSet && idx.monthsSet[m])) return null;
+    var refEv = (code && idx.byCodeMonth[code + '|' + idx.latestEvalMonth]) || null;
+    if (!refEv) return null;
+    return {
+      month: m,
+      storeCode: code,
+      oracleId: refEv.oracleId,
+      managerName: refEv.managerName,
+      hiringDate: refEv.hiringDate,
+      evalStoreName: (rawRow && rawRow.store) || refEv.evalStoreName,
+      evalRegion: (rawRow && rawRow.region) || refEv.evalRegion,
+      evalRM: (rawRow && rawRow.regionalManager) || refEv.evalRM,
+      evalAM: (rawRow && rawRow.areaManager) || refEv.evalAM,
+      company: (rawRow && rawRow.partner) || refEv.company,
+      tnps: null,
+      actPct: null,
+      mob35: null,
+      mix30: null,
+      info5: null, eff5: null, app5: null, att5: null, mgm5: null,
+      perf25: null,
+      warn: 'No',
+      evalScore: null,
+      isPendingEval: true,
+      pendingFromMonth: idx.latestEvalMonth
+    };
+  }
+
   if (!useEvalUniverse && hasRaw) {
     RAW_DATA.forEach(function (r) {
       var code = mgrNormCode(r.storeCode);
       var m = String(r.month || '').trim();
-      var ev = (code && m && idx.byCodeMonth[code + '|' + m])
-            || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
-            || null;
+      var isEvaluatedMonth = !!(idx.monthsSet && idx.monthsSet[m]);
+      var ev = isEvaluatedMonth
+        ? ((code && m && idx.byCodeMonth[code + '|' + m]) || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m]) || null)
+        : resolvePendingEvalForUnevaluatedMonth(r, code, m);
       if (MGR_LEVEL === 'storeManager' && idx.allRecords.length > 0 && !ev) {
-        return; // Do not attach vacant/un-evaluated store-month rows to managers
+        return; // In evaluated months (1-9), skip vacant branches; in unevaluated months (10), skip if not in Pending mode
       }
       var k = (code || r.store) + '|' + m;
       seenKey[k] = true;
@@ -12408,14 +12469,16 @@ function getManagersLinkedRecords() {
       var rawRow = rawByCodeMonth[k] || null;
       combinedRows.push(makeUnifiedRow(rawRow, ev));
     });
-    if (hasRaw && MGR_LEVEL !== 'storeManager') {
+    if (hasRaw) {
       RAW_DATA.forEach(function (r) {
         var code = mgrNormCode(r.storeCode);
         var m = String(r.month || '').trim();
         var k = (code || r.store) + '|' + m;
         if (!seenKey[k]) {
+          var pendEv = resolvePendingEvalForUnevaluatedMonth(r, code, m);
+          if (MGR_LEVEL === 'storeManager' && !pendEv) return;
           seenKey[k] = true;
-          combinedRows.push(makeUnifiedRow(r, null));
+          combinedRows.push(makeUnifiedRow(r, pendEv));
         }
       });
     }
@@ -12605,9 +12668,16 @@ function calcMgrGroup(rows) {
   var hasRawMob = g.mobileTarget > 0;
   var effMobPct = hasRawMob ? (g.mobileSubs / g.mobileTarget * 100) : (actPctAvg !== null ? actPctAvg * 100 : 0);
 
+  var pendingRows = rows.filter(function (r) { return r.isPendingEval; });
+  var isPendingEvalOnly = rows.length > 0 && evRows.length === 0 && pendingRows.length > 0;
+  var pendingMonthsCount = Array.from(new Set(pendingRows.map(function (r) { return r.month; }).filter(Boolean))).length;
+
   return Object.assign({}, g, {
     rowCount: rows.length,
     evalCount: evRows.length,
+    pendingCount: pendingRows.length,
+    pendingMonthsCount: pendingMonthsCount,
+    isPendingEvalOnly: isPendingEvalOnly,
     evalScore: evalAvg,
     actPct: actPctAvg,
     mob35: mob35Avg,
@@ -12720,6 +12790,11 @@ function resetMgrFiltersOnly() {
   });
   var sortEl = document.getElementById('mgr-sort-by');
   if (sortEl) sortEl.value = 'eval_desc';
+  renderManagersPerf();
+}
+
+function toggleMgrPendingEvalMonths() {
+  MGR_INCLUDE_PENDING_EVAL = !MGR_INCLUDE_PENDING_EVAL;
   renderManagersPerf();
 }
 
@@ -13063,7 +13138,7 @@ function mgrRenderKPIs(model) {
   }
 
   el.innerHTML =
-    card('TOTAL MANAGERS', fmtN(mgrCount) + ' <span style="font-size:11px;font-weight:700;color:#6b7280">' + roleEn + '</span>', monthsCount + ' Months · ' + fmtN(g.rowCount) + ' Records', 'fa-user-tie', '#5E2D91', '#5E2D91') +
+    card('TOTAL MANAGERS', fmtN(mgrCount) + ' <span style="font-size:11px;font-weight:700;color:#6b7280">' + roleEn + '</span>', monthsCount + ' Months' + (g.pendingMonthsCount > 0 ? ' (' + (monthsCount - g.pendingMonthsCount) + ' Eval + ' + g.pendingMonthsCount + ' Pending)' : '') + ' · ' + fmtN(g.rowCount) + ' Records', 'fa-user-tie', '#5E2D91', '#5E2D91') +
     card('AVG EVALUATION %', evalPct, 'Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—'), 'fa-star', '#16a34a', '#15803d') +
     card('MOBILE ACHIEVEMENT', mobPct, mobSubHTML, 'fa-mobile-alt', '#2563eb', '#1d4ed8') +
     card('TOP PERFORMER', topMgr ? mgrEsc(topMgr.label) : '—', topMgr ? ('Eval: ' + topEval + (topMgr.oracleId && topMgr.oracleId !== '—' ? ' · ID: ' + mgrEsc(topMgr.oracleId) : '')) : '—', 'fa-trophy', '#f5a623', '#b45309') +
@@ -13189,16 +13264,20 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
     }).join('');
 
     var evalPctVal = agg.evalScore !== null ? agg.evalScore * 100 : null;
-    var actPctVal = agg.actPct !== null ? agg.actPct * 100 : null;
+    var actPctVal = agg.actPct !== null ? agg.actPct * 100 : (agg.isPendingEvalOnly && agg.hasRawMob ? agg.effMobPct : null);
     var warnChip = agg.warn === 'Yes'
       ? '<span style="display:inline-block;margin-left:4px;padding:1px 5px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:9px;font-weight:800">⚠️' + (agg.warnCount > 1 ? agg.warnCount : '') + '</span>'
       : '';
+    var pendingBadgeHTML = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;background:#fef3c7;color:#b45309;border:1px solid #fde68a" title="الأداء والـ Gap الفعلي متاح — في انتظار رفع شيت التقييم لهذا الشهر">⏳ Pending Eval</span>';
+    var evalCellContent = agg.isPendingEvalOnly
+      ? pendingBadgeHTML
+      : (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip;
 
     if (prodDetails) {
       return prodCells +
         '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mix30, 1) + '</td>' +
         '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#0f766e') + '">' + fmtScore(agg.perf25, 1) + '</td>' +
-        '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
+        '<td style="' + tdBase + '">' + evalCellContent + '</td>';
     }
 
     return prodCells +
@@ -13206,7 +13285,7 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#5E2D91') + '">' + fmtScore(agg.mob35, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mix30, 1) + '</td>' +
       '<td style="' + tdBase + ';font-weight:700;color:' + (isTotalRow ? 'white' : '#0f766e') + '">' + fmtScore(agg.perf25, 1) + '</td>' +
-      '<td style="' + tdBase + '">' + (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip + '</td>';
+      '<td style="' + tdBase + '">' + evalCellContent + '</td>';
   }
 
   // Evaluation breakdown mode (exact v1 columns + inline +/- Gap inside the Mobile % cell)
@@ -15484,13 +15563,21 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
   }).join('');
 
   var monthBarsHTML = mgr.monthEntries.map(function (me) {
+    var isPend = !!me.agg.isPendingEvalOnly;
     var mp = me.agg.evalScore !== null ? (me.agg.evalScore * 100) : me.agg.effMobPct;
     var clr = mp >= 90 ? '#16a34a' : (mp >= 75 ? '#d97706' : '#dc2626');
     var mGap = Math.round((me.agg.mobileSubs || 0) - (me.agg.mobileTarget || 0));
     var bName = me.agg.sample.store || '';
-    return '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:92px">' +
-      '<div style="font-size:10.5px;font-weight:800;color:#475569;line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
-      '<div style="font-size:14px;font-weight:900;color:' + clr + ';margin:3px 0;line-height:1.3">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>' +
+    var boxStyle = isPend
+      ? 'background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px'
+      : 'background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px';
+    var scoreLine = isPend
+      ? '<div style="font-size:9.5px;font-weight:900;color:#b45309;background:#fef3c7;border-radius:6px;padding:1px 5px;margin:2px auto;line-height:1.4">⏳ Pending Eval</div>' +
+        '<div style="font-size:11.5px;font-weight:900;color:' + (mp >= 100 ? '#15803d' : '#1d4ed8') + ';line-height:1.3">Mob: ' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>'
+      : '<div style="font-size:14px;font-weight:900;color:' + clr + ';margin:3px 0;line-height:1.3">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>';
+    return '<div style="' + boxStyle + '">' +
+      '<div style="font-size:10.5px;font-weight:800;color:' + (isPend ? '#92400e' : '#475569') + ';line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
+      scoreLine +
       '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:10.5px;font-weight:700;color:#1e293b;line-height:1.55;padding:3px 2px;margin:2px 0;word-break:break-word;overflow:visible">' + mgrEsc(bName) + '</div>' +
       (model.hasRawProducts ? '<div style="font-size:9.5px;font-weight:800;color:' + (mGap >= 0 ? '#15803d' : '#dc2626') + ';line-height:1.4;margin-top:2px">Gap: ' + (mGap > 0 ? '+' : '') + fmtN(mGap) + '</div>' : '') +
     '</div>';
