@@ -12928,11 +12928,73 @@ function buildManagersModel() {
   });
   sortMgrAggList(byManager);
 
+  // Compute outer-filter scope ranking (from dataObj.baseRows, before person/search drill) so Rank stays fixed according to outer filters
+  var scopeMgrMap = {};
+  (dataObj.baseRows || rows).forEach(function (r) {
+    var k = getMgrEntityKey(r);
+    if (!scopeMgrMap[k]) scopeMgrMap[k] = [];
+    scopeMgrMap[k].push(r);
+  });
+  var scopeByManager = Object.keys(scopeMgrMap).map(function (k) {
+    var mRows = scopeMgrMap[k];
+    var totalAgg = calcMgrGroup(mRows);
+    var mMonths = MONTH_ORDER.filter(function (m) { return mRows.some(function (r) { return r.month === m; }); });
+    if (!MGR_MONTH_ASC) mMonths = mMonths.slice().reverse();
+    var prevCode = null;
+    var chronoMap = {};
+    MONTH_ORDER.forEach(function (cm) {
+      var cr = mRows.filter(function (r) { return r.month === cm; });
+      if (cr.length) {
+        var cCode = cr[0].storeCode;
+        chronoMap[cm] = (prevCode && cCode && prevCode !== cCode) ? prevCode : null;
+        prevCode = cCode;
+      }
+    });
+    var monthEntries = mMonths.map(function (m) {
+      var mr = mRows.filter(function (r) { return r.month === m; });
+      return {
+        month: m,
+        monthLabelEn: (MONTH_LABELS[m] || m) + ' ' + (m.split('-')[1] || ''),
+        monthLabelAr: MONTH_AR_NAMES[m] || m,
+        rows: mr,
+        agg: calcMgrGroup(mr),
+        transferredFromCode: chronoMap[m] || null
+      };
+    });
+    var uniqueBranchNames = Array.from(new Set(mRows.map(function (r) { return r.store; }).filter(Boolean)));
+    var latestSample = mRows[mRows.length - 1] || {};
+    return {
+      key: k,
+      label: getMgrEntityLabel(latestSample),
+      oracleId: MGR_LEVEL === 'storeManager' ? latestSample.oracleId : '',
+      hiringDate: MGR_LEVEL === 'storeManager' ? latestSample.hiringDate : '',
+      sample: latestSample,
+      rows: mRows,
+      agg: totalAgg,
+      monthEntries: monthEntries,
+      uniqueBranchNames: uniqueBranchNames,
+      movedAcrossYear: uniqueBranchNames.length > 1
+    };
+  });
+  sortMgrAggList(scopeByManager);
+  var scopeRankMap = {};
+  var scopeTotalCount = scopeByManager.length;
+  scopeByManager.forEach(function (m, i) {
+    m.scopeRank = i + 1;
+    m.scopeTotal = scopeTotalCount;
+    scopeRankMap[m.key] = i + 1;
+  });
+  byManager.forEach(function (m, i) {
+    m.scopeRank = scopeRankMap[m.key] || (i + 1);
+    m.scopeTotal = scopeTotalCount || byManager.length;
+  });
+
   return {
     rows: rows,
     months: months,
     byMonth: byMonth,
     byManager: byManager,
+    scopeByManager: scopeByManager,
     grandAgg: calcMgrGroup(rows),
     hasRawProducts: hasRawProducts
   };
@@ -13331,7 +13393,7 @@ function renderMgrByManagerStackedHTML(model, effMode) {
 
     var headerBar = '<div onclick="toggleMgrBlockCollapse(\'' + mgr.key.replace(/'/g, "\\'") + '\')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:linear-gradient(135deg,#1e1b4b,#5E2D91);color:white;padding:11px 16px;border-radius:' + (isCollapsed ? '12px' : '12px 12px 0 0') + '">' +
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
-        '<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:8px;font-size:11px;font-weight:900">#' + (mIdx + 1) + '</span>' +
+        '<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:8px;font-size:11px;font-weight:900">#' + (mgr.scopeRank || (mIdx + 1)) + '</span>' +
         '<span style="font-size:14px;font-weight:900"><i class="fas fa-user-tie mr-1.5"></i>' + mgrEsc(mgr.label) + '</span>' +
         (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:#f3e8ff;color:#5E2D91;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
         '<span style="background:rgba(255,255,255,0.15);padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700">📅 ' + mgr.monthEntries.length + ' شهور</span>' +
@@ -14955,8 +15017,12 @@ function syncMobileBottomNav(tabName) {
     <!-- Modal Toolbar -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;background:var(--gray-bg);border-radius:20px 20px 0 0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
-        <span style="font-size:13px;font-weight:900;color:var(--we-purple)"><i class="fas fa-id-card mr-1.5"></i>بطاقة الأداء التنفيذية (Scorecard)</span>
-        <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;font-weight:700;color:var(--text-primary);background:var(--card-bg);max-width:280px;outline:none"></select>
+        <span style="font-size:13px;font-weight:900;color:var(--we-purple);white-space:nowrap"><i class="fas fa-id-card mr-1.5"></i>Scorecard</span>
+        <div style="position:relative;min-width:185px;max-width:240px;flex:1">
+          <input id="scorecard-search-input" type="text" placeholder="🔍 ابحث بالاسم أو ID أو الفرع..." oninput="onScorecardSearchInput(this.value)" style="width:100%;padding:6px 26px 6px 10px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;font-weight:700;color:var(--text-primary);background:var(--card-bg);outline:none" />
+          <span onclick="clearScorecardSearch()" style="position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-muted);font-size:11px" title="مسح البحث">✕</span>
+        </div>
+        <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--we-purple);font-size:11.5px;font-weight:800;color:var(--text-primary);background:var(--card-bg);min-width:230px;max-width:360px;flex:1.3;outline:none"></select>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <button onclick="sendCurrentScorecardEmail(this, false)" style="padding:6px 14px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.3)" title="تجهيز إيميل كامل بالـ الديباجة الإنجليزي + صورة الـ Scorecard في الـ Body + شيت الإكسيل مرفق (Attached)"><i class="fas fa-paper-plane mr-1"></i>Send Scorecard + Excel</button>
@@ -15018,9 +15084,9 @@ function syncMobileBottomNav(tabName) {
         <div style="background:var(--gray-bg);padding:12px 14px;border-radius:12px;border:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;margin-bottom:6px">
             <span>📅 الأيام المتبقية لتنفيذ الخطة:</span>
-            <span id="whatif-days-val" style="color:#d97706;font-weight:900">10 أيام</span>
+            <span id="whatif-days-val" style="color:#d97706;font-weight:900">30 يوم</span>
           </div>
-          <input type="range" id="whatif-days" min="1" max="30" step="1" value="10" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:#d97706" />
+          <input type="range" id="whatif-days" min="1" max="30" step="1" value="30" oninput="recalcWhatIfSimulator()" style="width:100%;accent-color:#d97706" />
           <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);margin-top:2px"><span>يوم واحد</span><span>10 أيام</span><span>20 يوم</span><span>30 يوم</span></div>
         </div>
       </div>
@@ -15315,23 +15381,69 @@ function renderSmartAlertsList() {
 // ────────────────────────────────────────────────────────────────────────────
 // FEATURE 2: ONE-CLICK MANAGER / STORE SCORECARD MODAL (BENTO CARD)
 // ────────────────────────────────────────────────────────────────────────────
+function getScorecardPool(model) {
+  var m = model || MGR_LAST_MODEL || buildManagersModel();
+  if (!m) return [];
+  return (m.scopeByManager && m.scopeByManager.length) ? m.scopeByManager : (m.byManager || []);
+}
+
+function populateScorecardSelectOptions(searchQuery, preferredKey) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var pool = getScorecardPool(model);
+  var sel = document.getElementById('scorecard-entity-select');
+  if (!sel) return '';
+  var q = String(searchQuery || '').trim().toLowerCase();
+  var filteredPool = q ? pool.filter(function (m) {
+    var hay = (m.label + ' ' + (m.oracleId || '') + ' ' + (m.uniqueBranchNames || []).join(' ')).toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }) : pool;
+
+  if (!filteredPool.length) {
+    sel.innerHTML = '<option value="">🔍 لا يوجد مدير مطابق للبحث</option>';
+    return '';
+  }
+
+  sel.innerHTML = filteredPool.map(function (m) {
+    var rnk = m.scopeRank || 1;
+    var brTxt = (m.uniqueBranchNames && m.uniqueBranchNames.length) ? (' — ' + m.uniqueBranchNames[m.uniqueBranchNames.length - 1]) : '';
+    return '<option value="' + mgrEsc(m.key) + '">#' + rnk + ' — ' + mgrEsc(m.label) + (m.oracleId && m.oracleId !== '—' ? ' [' + mgrEsc(m.oracleId) + ']' : '') + mgrEsc(brTxt) + '</option>';
+  }).join('');
+
+  var chosen = (preferredKey && filteredPool.some(function (m) { return m.key === preferredKey; }))
+    ? preferredKey
+    : filteredPool[0].key;
+  sel.value = chosen;
+  return chosen;
+}
+
+function onScorecardSearchInput(val) {
+  var chosen = populateScorecardSelectOptions(val, SCORECARD_CURRENT_KEY);
+  if (chosen) {
+    renderScorecardForEntity(chosen);
+  }
+}
+
+function clearScorecardSearch() {
+  var inp = document.getElementById('scorecard-search-input');
+  if (inp) inp.value = '';
+  var chosen = populateScorecardSelectOptions('', SCORECARD_CURRENT_KEY);
+  if (chosen) renderScorecardForEntity(chosen);
+}
+
 function openScorecardModal(entityKey) {
   var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model || !model.byManager.length) {
+  var pool = getScorecardPool(model);
+  if (!pool.length) {
     mgrToast('⚠️ لا توجد بيانات حالية لعرض البطاقة', true);
     return;
   }
+  var inp = document.getElementById('scorecard-search-input');
+  if (inp) inp.value = '';
+  var targetKey = entityKey || MGR_SELECTED_PERSON || (model.byManager[0] && model.byManager[0].key) || pool[0].key;
+  var chosen = populateScorecardSelectOptions('', targetKey);
   var overlay = document.getElementById('scorecard-modal-overlay');
-  var sel = document.getElementById('scorecard-entity-select');
-  if (sel) {
-    sel.innerHTML = model.byManager.map(function (m, i) {
-      return '<option value="' + mgrEsc(m.key) + '">#' + (i + 1) + ' — ' + mgrEsc(m.label) + (m.oracleId && m.oracleId !== '—' ? ' [' + mgrEsc(m.oracleId) + ']' : '') + '</option>';
-    }).join('');
-  }
-  var targetKey = entityKey || MGR_SELECTED_PERSON || (model.byManager[0] && model.byManager[0].key) || '';
-  if (sel && targetKey) sel.value = targetKey;
   if (overlay) overlay.style.display = 'flex';
-  renderScorecardForEntity(targetKey);
+  renderScorecardForEntity(chosen || targetKey);
 }
 
 function closeScorecardModal() {
@@ -15345,7 +15457,9 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
   var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
   var mobPct = g.effMobPct ? g.effMobPct.toFixed(1) + '%' : '0.0%';
   var mobNetGap = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
-  var dailyNeeded10 = mobNetGap < 0 ? Math.ceil(Math.abs(mobNetGap) / 10) : 0;
+  var dailyNeeded30 = mobNetGap < 0 ? Math.ceil(Math.abs(mobNetGap) / 30) : 0;
+  var trueRank = mgr.scopeRank || (idx + 1);
+  var trueTotal = mgr.scopeTotal || (model.scopeByManager ? model.scopeByManager.length : model.byManager.length);
 
   var prodCardsHTML = PRODUCTS.map(function (p) {
     var t = g[p.tKey] || 0, a = g[p.aKey] || 0;
@@ -15413,7 +15527,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
       '<div dir="rtl" style="font-size:12px;font-weight:800;color:' + (mobNetGap >= 0 ? '#166534' : '#991b1b') + ';line-height:1.6">' +
         (mobNetGap >= 0
           ? ('✅ مغطي تارجت الموبايل بالكامل بفائض (Gap: +' + fmtN(mobNetGap) + ' خط)')
-          : ('🎯 إجمالي عجز الموبايل (Gap: ' + fmtN(mobNetGap) + ' خط) — يحتاج معدل يومي ' + fmtN(dailyNeeded10) + ' خط/يوم خلال 10 أيام لتغطية الـ 100%')) +
+          : ('🎯 إجمالي عجز الموبايل (Gap: ' + fmtN(mobNetGap) + ' خط) — يحتاج معدل يومي ' + fmtN(dailyNeeded30) + ' خط/يوم خلال 30 يوم لتغطية الـ 100%')) +
       '</div>' +
       '<div style="font-size:11px;font-weight:800;color:#4b5563;line-height:1.5">Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div>' +
     '</div>' +
@@ -15432,9 +15546,10 @@ function renderScorecardForEntity(entityKey) {
   var model = MGR_LAST_MODEL || buildManagersModel();
   var stage = document.getElementById('scorecard-capture-area');
   if (!stage || !model) return;
-  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
+  var pool = getScorecardPool(model);
+  var idx = pool.findIndex(function (m) { return m.key === entityKey; });
   if (idx < 0) idx = 0;
-  var mgr = model.byManager[idx];
+  var mgr = pool[idx];
   if (!mgr) return;
   SCORECARD_CURRENT_KEY = mgr.key;
   stage.innerHTML = buildScorecardHTMLForManager(mgr, idx, model);
@@ -15469,10 +15584,11 @@ async function captureScorecardPngForManager(mgr, idx, model) {
 
 async function downloadScorecardAsImage(btn) {
   var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model || !model.byManager.length) return;
-  var idx = model.byManager.findIndex(function (m) { return m.key === SCORECARD_CURRENT_KEY; });
+  var pool = getScorecardPool(model);
+  if (!pool.length) return;
+  var idx = pool.findIndex(function (m) { return m.key === SCORECARD_CURRENT_KEY; });
   if (idx < 0) idx = 0;
-  var mgr = model.byManager[idx];
+  var mgr = pool[idx];
   if (!mgr) return;
 
   var old = btn ? btn.innerHTML : '';
@@ -15495,16 +15611,17 @@ async function downloadScorecardAsImage(btn) {
 
 function copyScorecardWhatsAppBrief() {
   var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model) return;
-  var mgr = model.byManager.find(function (m) { return m.key === SCORECARD_CURRENT_KEY; }) || model.byManager[0];
+  var pool = getScorecardPool(model);
+  if (!pool.length) return;
+  var mgr = pool.find(function (m) { return m.key === SCORECARD_CURRENT_KEY; }) || pool[0];
   if (!mgr) return;
-  var idx = model.byManager.indexOf(mgr) + 1;
+  var idx = mgr.scopeRank || (pool.indexOf(mgr) + 1);
   var g = mgr.agg;
   var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
   var lines = [
     '📊 *بطاقة أداء — FAKHARANY³⁶⁰*',
     '👤 *الاسم:* ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' (ID: ' + mgr.oracleId + ')' : ''),
-    '🏆 *الترتيب:* #' + idx + ' من ' + model.byManager.length + ' · *متوسط التقييم:* ' + evPct,
+    '🏆 *الترتيب:* #' + idx + ' من ' + (mgr.scopeTotal || pool.length) + ' · *متوسط التقييم:* ' + evPct,
     '🏪 *الفروع:* ' + mgr.uniqueBranchNames.join(' ← ') + ' (' + mgr.monthEntries.length + ' شهور)',
     '──────────────────'
   ];
@@ -16760,13 +16877,14 @@ function buildScorecardAndExcelMimeEml(toEmail, subject, htmlBody, pngName, pngB
 
 async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare) {
   var model = MGR_LAST_MODEL || buildManagersModel();
-  if (!model || !model.byManager.length) {
+  var pool = getScorecardPool(model);
+  if (!pool.length) {
     mgrToast('⚠️ لا توجد بيانات مديرين حالية', true);
     return;
   }
-  var idx = model.byManager.findIndex(function (m) { return m.key === entityKey; });
+  var idx = pool.findIndex(function (m) { return m.key === entityKey; });
   if (idx < 0) idx = 0;
-  var mgr = model.byManager[idx];
+  var mgr = pool[idx];
   if (!mgr) return;
 
   var oldHtml = btn ? btn.innerHTML : '';
