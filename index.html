@@ -856,8 +856,9 @@ async function fetchAllMonthsData() {
     data.forEach(function (r) {
       var row = r.row;
       if (row && row._isEvalMeta) {
-        if (row.evalMonth === "EMAILS_MAP" && row.emailsMap) {
-          window.EVAL_SUPABASE_EMAILS_MAP = row.emailsMap;
+        if (row.evalMonth === "EMAILS_MAP") {
+          if (row.emailsMap) window.EVAL_SUPABASE_EMAILS_MAP = row.emailsMap;
+          if (row.noEvalReasonsMap) window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP = row.noEvalReasonsMap;
         } else if (Array.isArray(row.records)) {
           window.EVAL_SUPABASE_RAW_ROWS.push({ month: row.evalMonth, records: row.records, updatedAt: row.updatedAt });
         }
@@ -12277,9 +12278,105 @@ function buildEvalIndex() {
   });
 
   var latestEvalMonth = months.length ? months[months.length - 1] : null;
+
+  // Infer No-Evaluation months for Store Managers:
+  // When a manager has NO evaluation in an evaluated month m (01..09), check their branch in month m:
+  // - If another manager was coded & evaluated on that branch in month m (or between their last eval month and m), the branch transferred to another manager.
+  // - If NO other manager was evaluated on that branch in month m, the branch is STILL with the same manager (e.g. Sick Leave / Maternity Leave / Excused Leave):
+  //   keep the branch's Achievement & Target with this manager and mark the month as isNoEvalMonth = true.
+  var inferredNoEvalByCodeMonth = {};
+  var inferredNoEvalByNameMonth = {};
+  var inferredNoEvalRecords = [];
+  var byMgrGroup = {};
+  allRecords.forEach(function (rec) {
+    var mk = (rec.oracleId && rec.oracleId !== '—') ? ('OID|' + rec.oracleId) : ('SM|' + (rec.managerName || '').toLowerCase());
+    if (!byMgrGroup[mk]) byMgrGroup[mk] = [];
+    byMgrGroup[mk].push(rec);
+  });
+
+  Object.keys(byMgrGroup).forEach(function (mk) {
+    var mRecs = byMgrGroup[mk].slice().sort(function (a, b) {
+      return MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month);
+    });
+    var mgrMoMap = {};
+    mRecs.forEach(function (r) { mgrMoMap[r.month] = r; });
+
+    months.forEach(function (m) {
+      if (mgrMoMap[m]) return; // Manager already has an evaluation in month m
+      var mPos = MONTH_ORDER.indexOf(m);
+      var prevRecs = mRecs.filter(function (x) { return MONTH_ORDER.indexOf(x.month) < mPos; });
+      var nextRecs = mRecs.filter(function (x) { return MONTH_ORDER.indexOf(x.month) > mPos; });
+      var ref = null;
+
+      if (prevRecs.length > 0) {
+        var candPrev = prevRecs[prevRecs.length - 1];
+        var bcodePrev = candPrev.storeCode;
+        var prevPos = MONTH_ORDER.indexOf(candPrev.month);
+        var someoneElseTookBranch = months.some(function (cm) {
+          var cPos = MONTH_ORDER.indexOf(cm);
+          return cPos > prevPos && cPos <= mPos && !!byCodeMonth[bcodePrev + '|' + cm];
+        });
+        if (!someoneElseTookBranch) {
+          ref = candPrev;
+        }
+      } else if (nextRecs.length > 0) {
+        var candNext = nextRecs[0];
+        var bcodeNext = candNext.storeCode;
+        var nextPos = MONTH_ORDER.indexOf(candNext.month);
+        var someoneElseHadBranchBefore = months.some(function (cm) {
+          var cPos = MONTH_ORDER.indexOf(cm);
+          return cPos < nextPos && !!byCodeMonth[bcodeNext + '|' + cm];
+        });
+        var hiredAfterM = false;
+        if (candNext.hiringDate && /^2026-\d{2}/.test(candNext.hiringDate)) {
+          var hMo = candNext.hiringDate.slice(5, 7) + '-2026';
+          if (MONTH_ORDER.indexOf(hMo) > mPos) hiredAfterM = true;
+        }
+        if (!someoneElseHadBranchBefore && !hiredAfterM) {
+          ref = candNext;
+        }
+      }
+
+      if (ref && ref.storeCode) {
+        var infKey = ref.storeCode + '|' + m;
+        if (!byCodeMonth[infKey] && !inferredNoEvalByCodeMonth[infKey]) {
+          var infRec = {
+            month: m,
+            storeCode: ref.storeCode,
+            oracleId: ref.oracleId,
+            managerName: ref.managerName,
+            hiringDate: ref.hiringDate,
+            evalStoreName: ref.evalStoreName,
+            evalRegion: ref.evalRegion,
+            tnps: null,
+            actPct: null,
+            mob35: null,
+            mix30: null,
+            info5: null, eff5: null, app5: null, att5: null, mgm5: null,
+            perf25: null,
+            warn: 'No',
+            evalScore: null,
+            company: ref.company,
+            evalRM: ref.evalRM,
+            evalAM: ref.evalAM,
+            isNoEvalMonth: true
+          };
+          inferredNoEvalByCodeMonth[infKey] = infRec;
+          if (ref.evalStoreName) {
+            inferredNoEvalByNameMonth[ref.evalStoreName.toLowerCase() + '|' + m] = infRec;
+          }
+          inferredNoEvalRecords.push(infRec);
+        }
+      }
+    });
+  });
+
   EVAL_INDEX_CACHE = {
     byCodeMonth: byCodeMonth,
     byNameMonth: byNameMonth,
+    inferredNoEvalByCodeMonth: inferredNoEvalByCodeMonth,
+    inferredNoEvalByNameMonth: inferredNoEvalByNameMonth,
+    inferredNoEvalRecords: inferredNoEvalRecords,
     latestByCode: latestByCode,
     allRecords: allRecords,
     months: months,
@@ -12299,6 +12396,8 @@ function enrichRawDataWithEvaluation(rows) {
     var m = String(r.month || '').trim();
     var ev = (code && m && idx.byCodeMonth[code + '|' + m])
           || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
+          || (code && m && idx.inferredNoEvalByCodeMonth && idx.inferredNoEvalByCodeMonth[code + '|' + m])
+          || (!code && r.store && m && idx.inferredNoEvalByNameMonth && idx.inferredNoEvalByNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
           || null;
     var h = (code && hierMap[code]) || null;
     if (ev) {
@@ -12397,7 +12496,8 @@ function getManagersLinkedRecords() {
       classification: cls,
       region: reg,
       hasRawProducts: !!rawRow,
-      hasEval: !!(evRec && !evRec.isPendingEval),
+      hasEval: !!(evRec && !evRec.isPendingEval && !evRec.isNoEvalMonth),
+      isNoEvalMonth: !!(evRec && evRec.isNoEvalMonth),
       isPendingEval: !!(evRec && evRec.isPendingEval),
       pendingFromMonth: (evRec && evRec.pendingFromMonth) || null,
       mobileTarget: rawRow ? (Number(rawRow.mobileTarget) || 0) : 0,
@@ -12439,18 +12539,23 @@ function getManagersLinkedRecords() {
       var m = String(r.month || '').trim();
       var isEvaluatedMonth = !!(idx.monthsSet && idx.monthsSet[m]);
       var ev = isEvaluatedMonth
-        ? ((code && m && idx.byCodeMonth[code + '|' + m]) || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m]) || null)
+        ? ((code && m && idx.byCodeMonth[code + '|' + m])
+           || (!code && r.store && m && idx.byNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
+           || (code && m && idx.inferredNoEvalByCodeMonth && idx.inferredNoEvalByCodeMonth[code + '|' + m])
+           || (!code && r.store && m && idx.inferredNoEvalByNameMonth && idx.inferredNoEvalByNameMonth[mgrNormName(r.store).toLowerCase() + '|' + m])
+           || null)
         : resolvePendingEvalForUnevaluatedMonth(r, code, m);
       if (MGR_LEVEL === 'storeManager' && idx.allRecords.length > 0 && !ev) {
-        return; // In evaluated months (1-9), skip vacant branches; in unevaluated months (10), skip if not in Pending mode
+        return; // Skip branches that had neither an evaluated manager nor an inferred same-manager no-eval record
       }
       var k = (code || r.store) + '|' + m;
       seenKey[k] = true;
       combinedRows.push(makeUnifiedRow(r, ev));
     });
   } else {
-    idx.allRecords.forEach(function (ev) {
+    idx.allRecords.concat(idx.inferredNoEvalRecords || []).forEach(function (ev) {
       var k = ev.storeCode + '|' + ev.month;
+      if (seenKey[k]) return;
       seenKey[k] = true;
       var rawRow = rawByCodeMonth[k] || null;
       combinedRows.push(makeUnifiedRow(rawRow, ev));
@@ -12654,6 +12759,10 @@ function calcMgrGroup(rows) {
   var hasRawMob = g.mobileTarget > 0;
   var effMobPct = hasRawMob ? (g.mobileSubs / g.mobileTarget * 100) : (actPctAvg !== null ? actPctAvg * 100 : 0);
 
+  var noEvalRows = rows.filter(function (r) { return r.isNoEvalMonth; });
+  var isNoEvalOnly = rows.length > 0 && evRows.length === 0 && noEvalRows.length > 0;
+  var noEvalMonthsList = Array.from(new Set(noEvalRows.map(function (r) { return r.month; }).filter(Boolean)));
+
   var pendingRows = rows.filter(function (r) { return r.isPendingEval; });
   var isPendingEvalOnly = rows.length > 0 && evRows.length === 0 && pendingRows.length > 0;
   var pendingMonthsCount = Array.from(new Set(pendingRows.map(function (r) { return r.month; }).filter(Boolean))).length;
@@ -12661,6 +12770,9 @@ function calcMgrGroup(rows) {
   return Object.assign({}, g, {
     rowCount: rows.length,
     evalCount: evRows.length,
+    noEvalCount: noEvalRows.length,
+    noEvalMonthsList: noEvalMonthsList,
+    isNoEvalOnly: isNoEvalOnly,
     pendingCount: pendingRows.length,
     pendingMonthsCount: pendingMonthsCount,
     isPendingEvalOnly: isPendingEvalOnly,
@@ -13260,9 +13372,21 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
       ? '<span style="display:inline-block;margin-left:4px;padding:1px 5px;border-radius:6px;background:#fee2e2;color:#b91c1c;font-size:9px;font-weight:800">⚠️' + (agg.warnCount > 1 ? agg.warnCount : '') + '</span>'
       : '';
     var pendingBadgeHTML = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;background:#fef3c7;color:#b45309;border:1px solid #fde68a" title="الأداء والـ Gap الفعلي متاح — في انتظار رفع شيت التقييم لهذا الشهر">⏳ Pending Eval</span>';
-    var evalCellContent = agg.isPendingEvalOnly
-      ? pendingBadgeHTML
-      : (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip;
+    var noEvalBadgeHTML = '';
+    if (agg.isNoEvalOnly) {
+      var sRow = agg.sample || {};
+      var rsn = (typeof getManagerNoEvalReason === 'function') ? getManagerNoEvalReason(sRow.oracleId, sRow.storeManager, sRow.month) : '';
+      var mgrKeyForClick = getMgrEntityKey(sRow).replace(/'/g, "\\'");
+      noEvalBadgeHTML = '<div onclick="event.stopPropagation();openNoEvalReasonModalForManager(\'' + mgrKeyForClick + '\')" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:2px">' +
+        '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;background:#ffedd5;color:#c2410c;border:1px solid #fed7aa" title="الفرع مستمر مع نفس المدير وتم احتساب الـ Ach والـ Gap — اضغط لإضافة أو تعديل سبب عدم التقييم">📋 بدون تقييم (No Eval) ✏️</span>' +
+        (rsn ? '<span style="font-size:9px;font-weight:800;color:#9a3412;background:#fff7ed;padding:1px 6px;border-radius:6px;border:1px solid #ffedd5">📝 ' + mgrEsc(rsn) + '</span>' : '') +
+      '</div>';
+    }
+    var evalCellContent = agg.isNoEvalOnly
+      ? noEvalBadgeHTML
+      : (agg.isPendingEvalOnly
+          ? pendingBadgeHTML
+          : (isTotalRow ? (evalPctVal !== null ? evalPctVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evalPctVal, true)) + warnChip);
 
     if (prodDetails) {
       return prodCells +
@@ -13310,7 +13434,9 @@ function buildMgrMetricCellsHTML(agg, effMode, hasRawProducts, isTotalRow) {
     '<td style="' + tdBase + ';color:' + (isTotalRow ? 'white' : '#374151') + '">' + fmtScore(agg.mgm5, 1) + '</td>' +
     '<td style="' + tdBase + ';font-weight:800;color:' + (isTotalRow ? '#99f6e4' : '#0f766e') + ';background:' + (isTotalRow ? 'transparent' : '#f0fdfa') + '">' + fmtScore(agg.perf25, 1) + ' <span style="font-size:9px;opacity:.7">/25</span></td>' +
     '<td style="' + tdBase + '">' + warnBadge + '</td>' +
-    '<td style="' + tdBase + '">' + (isTotalRow ? (evVal !== null ? evVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evVal, true)) + '</td>';
+    '<td style="' + tdBase + '">' + (agg.isNoEvalOnly
+      ? ('<span onclick="event.stopPropagation();openNoEvalReasonModalForManager(\'' + getMgrEntityKey(agg.sample || {}).replace(/'/g, "\\'") + '\')" style="cursor:pointer;display:inline-block;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:800;background:#ffedd5;color:#c2410c;border:1px solid #fed7aa">📋 بدون تقييم' + ((typeof getManagerNoEvalReason === 'function' && getManagerNoEvalReason((agg.sample||{}).oracleId, (agg.sample||{}).storeManager, (agg.sample||{}).month)) ? ' (' + mgrEsc(getManagerNoEvalReason((agg.sample||{}).oracleId, (agg.sample||{}).storeManager, (agg.sample||{}).month)) + ')' : ' ✏️') + '</span>')
+      : (isTotalRow ? (evVal !== null ? evVal.toFixed(1) + '%' : '—') : mgrScoreBadge(evVal, true))) + '</td>';
 }
 
 // ── Main Renderer ──
@@ -13873,6 +13999,9 @@ async function buildManagersPerfExcelBuffer(customModel) {
       if (evR !== null) {
         var evClr = isTotal ? { bg: '#15803D', fg: '#FFFFFF' } : pctColors(evR, true);
         put(evR, { numFmt: '0.0%', b: true, bg: evClr.bg, fg: evClr.fg });
+      } else if (!isTotal && agg.isNoEvalOnly) {
+        var rsnEx = (typeof getManagerNoEvalReason === 'function') ? getManagerNoEvalReason(s.oracleId, s.storeManager, s.month) : '';
+        put('No Evaluation' + (rsnEx ? ' (' + rsnEx + ')' : ''), { b: true, bg: '#FFEDD5', fg: '#C2410C' });
       } else { put('—', {}); }
 
       ws.getRow(rIdx).height = isTotal ? 22 : 19;
@@ -14215,6 +14344,9 @@ async function buildManagersPerfExcelBuffer(customModel) {
         if (ma2 && ma2.evalScore !== null) {
           var mec = pctColors(ma2.evalScore, true);
           put3(ma2.evalScore, { numFmt: '0.0%', b: true, bg: mec.bg, fg: mec.fg });
+        } else if (ma2 && ma2.isNoEvalOnly) {
+          var rsnM = (typeof getManagerNoEvalReason === 'function') ? getManagerNoEvalReason(mgr.oracleId, mgr.label, m) : '';
+          put3('No Eval' + (rsnM ? ' (' + rsnM + ')' : ''), { b: true, bg: '#FFEDD5', fg: '#C2410C' });
         } else {
           put3('—', { fg: '#9CA3AF' });
         }
@@ -15331,6 +15463,40 @@ function syncMobileBottomNav(tabName) {
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════════
+     7. PRE-EXPORT ALERT & MANUAL REASON MODAL FOR MONTHS WITHOUT EVALUATION
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="no-eval-reason-modal-overlay" style="display:none;position:fixed;inset:0;z-index:99995;background:rgba(15,23,42,0.78);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
+  <div style="background:var(--card-bg);border-radius:20px;max-width:680px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.52);border:1.5px solid #f59e0b;font-family:'Cairo','Inter',sans-serif" dir="rtl">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 20px;background:linear-gradient(135deg,#9a3412,#d97706,#f59e0b);color:white;border-radius:18px 18px 0 0;gap:10px">
+      <div>
+        <div style="font-size:15px;font-weight:900"><i class="fas fa-exclamation-triangle ml-2" style="color:#fef08a"></i>تنبيه: يوجد شهور بدون تقييم لهذا المدير (No Evaluation Months)</div>
+        <div id="no-eval-modal-subtitle" style="font-size:11.5px;opacity:.95;margin-top:2px">الفرع مستمر مع نفس المدير وتم احتساب الـ Ach والـ Gap — يمكنك إضافة سبب عدم التقييم يدوياً ليظهر في الكارت والإيميل والشيت</div>
+      </div>
+      <button onclick="closeNoEvalReasonModal()" style="background:none;border:none;font-size:22px;color:white;cursor:pointer">&times;</button>
+    </div>
+
+    <div style="padding:18px">
+      <div id="no-eval-modal-alert-box" style="background:#fff7ed;border:1px solid #fed7aa;border-right:4px solid #ea580c;border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:#9a3412;line-height:1.65"></div>
+
+      <div id="no-eval-modal-months-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
+        <button onclick="closeNoEvalReasonModal()" style="padding:8px 14px;border-radius:12px;border:1px solid var(--border);background:var(--gray-bg);color:var(--text-muted);font-size:11.5px;font-weight:800;cursor:pointer">إلغاء</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button id="no-eval-skip-export-btn" onclick="confirmNoEvalReasonsAndProceed(true)" style="padding:8px 14px;border-radius:12px;border:1.5px solid #d97706;background:#fffbeb;color:#b45309;font-size:11.5px;font-weight:800;cursor:pointer">
+            تصدير بدون كتابة سبب
+          </button>
+          <button id="no-eval-save-export-btn" onclick="confirmNoEvalReasonsAndProceed(false)" style="padding:8px 18px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.3)">
+            <i class="fas fa-check-circle ml-1"></i>حفظ السبب ومتابعة تصدير الإيميل
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════════════════════════════════
 //  5 HIGH-IMPACT EXECUTIVE FEATURES ENGINE (v5)
@@ -15608,10 +15774,25 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
   }).join('');
 
   var monthBarsHTML = mgr.monthEntries.map(function (me) {
+    var isNoEv = !!me.agg.isNoEvalOnly;
     var mp = me.agg.evalScore !== null ? (me.agg.evalScore * 100) : me.agg.effMobPct;
     var clr = mp >= 90 ? '#16a34a' : (mp >= 75 ? '#d97706' : '#dc2626');
     var mGap = Math.round((me.agg.mobileSubs || 0) - (me.agg.mobileTarget || 0));
     var bName = me.agg.sample.store || '';
+    if (isNoEv) {
+      var rsn = getManagerNoEvalReason(mgr.oracleId, mgr.label, me.month);
+      var mobAchTxt = (model.hasRawProducts && me.agg.mobileTarget > 0)
+        ? ('<div style="font-size:10.5px;font-weight:900;color:' + (me.agg.effMobPct >= 100 ? '#15803d' : '#1d4ed8') + ';line-height:1.3">Mob: ' + me.agg.effMobPct.toFixed(1) + '% (' + fmtN(me.agg.mobileSubs) + ')</div>')
+        : '';
+      return '<div style="background:#fff7ed;border:1.5px dashed #ea580c;border-radius:10px;padding:9px 7px 10px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px">' +
+        '<div style="font-size:10.5px;font-weight:900;color:#9a3412;line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
+        '<div style="font-size:9px;font-weight:900;color:#c2410c;background:#ffedd5;border:1px solid #fed7aa;border-radius:6px;padding:2px 5px;margin:2px auto;line-height:1.35">📋 بدون تقييم (No Eval)</div>' +
+        mobAchTxt +
+        (rsn ? '<div dir="auto" style="font-family:Cairo,Arial,sans-serif;font-size:8.5px;font-weight:800;color:#7c2d12;background:#fef3c7;border-radius:5px;padding:1px 4px;margin:2px 0;line-height:1.35">📝 ' + mgrEsc(rsn) + '</div>' : '') +
+        '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:10px;font-weight:700;color:#1e293b;line-height:1.5;padding:2px 2px;word-break:break-word;overflow:visible">' + mgrEsc(bName) + '</div>' +
+        (model.hasRawProducts ? '<div style="font-size:9.5px;font-weight:800;color:' + (mGap >= 0 ? '#15803d' : '#dc2626') + ';line-height:1.4;margin-top:1px">Gap: ' + (mGap > 0 ? '+' : '') + fmtN(mGap) + '</div>' : '') +
+      '</div>';
+    }
     return '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px">' +
       '<div style="font-size:10.5px;font-weight:800;color:#475569;line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
       '<div style="font-size:14px;font-weight:900;color:' + clr + ';margin:3px 0;line-height:1.3">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>' +
@@ -15631,12 +15812,27 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
     '</div>';
   }).join('');
 
-  var pendingNoteCardHTML = pendingMonthsForCard.length
+  var noEvalDetails = getManagerNoEvalMonthsDetails(mgr);
+  var noEvalCardNoteHTML = noEvalDetails.length
+    ? '<div style="margin-top:10px;background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:10px;padding:9px 12px;font-size:10.5px;color:#9a3412;line-height:1.55;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<div style="flex:1;min-width:240px">' +
+          '<div><strong>📋 Un-evaluated Month(s) (Branch Still with Manager — Ach Included):</strong> ' +
+            noEvalDetails.map(function (d) {
+              return '<strong>' + mgrEsc(d.monthLabelEn) + '</strong> (' + mgrEsc(d.branchName) + (d.reason ? ' — <em>Reason: ' + mgrEsc(d.reason) + '</em>' : ' — <em>No Evaluation</em>') + ')';
+            }).join(' · ') +
+          '</div>' +
+          '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;margin-top:2px;font-weight:700">ملاحظة: الشهور الموضحة أعلاه لم ينزل للمدير تقييم فيها مع استمرار الفرع على اسمه (تم احتساب الـ Ach والـ Gap في الإجمالي دون التأثير على متوسط التقييم).</div>' +
+        '</div>' +
+        '<button onclick="openNoEvalReasonModalForManager(\'' + mgr.key.replace(/'/g, "\\'") + '\')" style="padding:5px 11px;border-radius:10px;border:1px solid #ea580c;background:#ffedd5;color:#9a3412;font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap">✏️ إضافة / تعديل السبب</button>' +
+      '</div>'
+    : '';
+
+  var pendingNoteCardHTML = noEvalCardNoteHTML + (pendingMonthsForCard.length
     ? '<div style="margin-top:10px;background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:10px;padding:9px 12px;font-size:10.5px;color:#92400e;line-height:1.55">' +
         '<div><strong>📌 Note:</strong> October 2026 is currently <strong>Pending Evaluation</strong> (not included in the cumulative total or branch list above) — an updated report will be sent once the <strong>Oct Evaluation</strong> is received.</div>' +
         '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;margin-top:2px;font-weight:700">ملاحظة: شهر أكتوبر (Oct 2026) يظهر Pending Evaluation بدون أرقام أو اسم فرع ولا يُضاف للمجموع نظراً لتنقلات المديرين، وسيتم إرسال Update فور استلام تقييم شهر أكتوبر.</div>' +
       '</div>'
-    : '';
+    : '');
 
   var mgrEmail = getManagerEmailByOracleId(mgr.oracleId);
 
@@ -16688,6 +16884,184 @@ function copyQuickActionPlanToClipboard(sourceMode) {
 // ────────────────────────────────────────────────────────────────────────────
 var MGR_EMAILS_LS_KEY = 'fk360_mgr_emails_by_oid_v1';
 var MGR_EMAILS_MAP = {}; // oracleId -> email
+var MGR_NO_EVAL_REASONS_LS_KEY = 'fk360_mgr_no_eval_reasons_v1';
+var MGR_NO_EVAL_REASONS_MAP = {}; // (oracleId|month) -> reason string
+var PENDING_NO_EVAL_EXPORT_ACTION = null; // callback when user clicks Save/Skip in the pre-export alert modal
+
+function loadNoEvalReasonsMap() {
+  var merged = {};
+  try {
+    var local = JSON.parse(localStorage.getItem(MGR_NO_EVAL_REASONS_LS_KEY) || '{}');
+    if (local && typeof local === 'object') Object.assign(merged, local);
+  } catch (e) {}
+  if (window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP && typeof window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP === 'object') {
+    Object.assign(merged, window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP);
+  }
+  MGR_NO_EVAL_REASONS_MAP = merged;
+  return MGR_NO_EVAL_REASONS_MAP;
+}
+
+function getNoEvalReasonStorageKey(oid, mgrLabel, month) {
+  var idPart = (oid && oid !== '—') ? String(oid).replace(/\.0$/, '').trim() : mgrNormName(mgrLabel || '');
+  return idPart + '|' + String(month || '').trim();
+}
+
+function getManagerNoEvalReason(oid, mgrLabel, month) {
+  if (!month) return '';
+  loadNoEvalReasonsMap();
+  var k = getNoEvalReasonStorageKey(oid, mgrLabel, month);
+  return MGR_NO_EVAL_REASONS_MAP[k] || '';
+}
+
+async function saveNoEvalReasonsPatch(patchMap) {
+  loadNoEvalReasonsMap();
+  Object.keys(patchMap || {}).forEach(function (k) {
+    var val = String(patchMap[k] || '').trim();
+    if (val) MGR_NO_EVAL_REASONS_MAP[k] = val;
+    else delete MGR_NO_EVAL_REASONS_MAP[k];
+  });
+  window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP = MGR_NO_EVAL_REASONS_MAP;
+  try {
+    localStorage.setItem(MGR_NO_EVAL_REASONS_LS_KEY, JSON.stringify(MGR_NO_EVAL_REASONS_MAP));
+  } catch (e) {}
+  // Also sync to Supabase alongside EMAILS_MAP
+  await saveManagerEmailsMapToSupabaseAndLocal({});
+}
+
+function getManagerNoEvalMonthsDetails(mgr) {
+  if (!mgr || !Array.isArray(mgr.monthEntries)) return [];
+  var list = [];
+  mgr.monthEntries.forEach(function (me) {
+    var hasNoEv = !!(me.agg && me.agg.isNoEvalOnly) || (Array.isArray(me.rows) && me.rows.some(function (r) { return r.isNoEvalMonth; }));
+    if (hasNoEv) {
+      var s = (me.agg && me.agg.sample) || (me.rows && me.rows[0]) || {};
+      list.push({
+        month: me.month,
+        monthLabelEn: MONTH_EN_FULL[me.month] || me.monthLabelEn || me.month,
+        monthLabelAr: MONTH_AR_NAMES[me.month] || me.monthLabelAr || me.month,
+        branchName: s.store || '—',
+        storeCode: s.storeCode || '',
+        mobileAch: me.agg ? (me.agg.mobileSubs || 0) : 0,
+        mobileTgt: me.agg ? (me.agg.mobileTarget || 0) : 0,
+        mobilePct: me.agg ? (me.agg.effMobPct || 0) : 0,
+        reason: getManagerNoEvalReason(mgr.oracleId, mgr.label, me.month)
+      });
+    }
+  });
+  return list;
+}
+
+function openNoEvalReasonModalForManager(entityKey, onCompleteCallback) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var pool = getScorecardPool(model);
+  var mgr = pool.find(function (m) { return m.key === entityKey; }) || (model.byManager || []).find(function (m) { return m.key === entityKey; });
+  if (!mgr) return;
+  var noEvalList = getManagerNoEvalMonthsDetails(mgr);
+  if (!noEvalList.length) {
+    mgrToast('ℹ️ هذا المدير لديه تقييم مسجل في جميع شهوره الحالية');
+    if (typeof onCompleteCallback === 'function') onCompleteCallback();
+    return;
+  }
+
+  PENDING_NO_EVAL_EXPORT_ACTION = {
+    mgr: mgr,
+    noEvalList: noEvalList,
+    callback: onCompleteCallback || null
+  };
+
+  var alertBox = document.getElementById('no-eval-modal-alert-box');
+  if (alertBox) {
+    alertBox.innerHTML = '👤 المدير <strong>' + mgrEsc(mgr.label) + '</strong>' +
+      (mgr.oracleId && mgr.oracleId !== '—' ? ' (Oracle ID: <strong>' + mgrEsc(mgr.oracleId) + '</strong>)' : '') +
+      ' لديه <strong>(' + noEvalList.length + ') شهر بدون تقييم</strong> في شيت الـ Evaluation، وبمراجعة الفرع تبيّن عدم تكويد مدير آخر عليه في ذلك الشهر؛ لذلك تم إبقاء الفرع على اسم المدير وإدراج الـ <strong>Ach</strong> والـ <strong>Gap</strong> الخاص به.<br>' +
+      '✍️ <strong>حدد أو اكتب سبب عدم التقييم يدوياً</strong> (مثل: <code>Sick Leave</code> أو <code>Maternity Leave / إجازة وضع</code> أو <code>إجازة مسببة</code>) ليتم إضافته في الإيميل والكارت والشيت:';
+  }
+
+  var skipBtn = document.getElementById('no-eval-skip-export-btn');
+  var saveBtn = document.getElementById('no-eval-save-export-btn');
+  if (skipBtn) skipBtn.style.display = onCompleteCallback ? 'inline-block' : 'none';
+  if (saveBtn) {
+    saveBtn.innerHTML = onCompleteCallback
+      ? '<i class="fas fa-paper-plane ml-1"></i>حفظ السبب ومتابعة تصدير الإيميل'
+      : '<i class="fas fa-save ml-1"></i>حفظ سبب عدم التقييم';
+  }
+
+  var presets = [
+    'Sick Leave (إجازة مرضية)',
+    'Maternity Leave (إجازة وضع)',
+    'Excused Leave (إجازة مسببة)',
+    'Annual Leave (إجازة سنوية)',
+    'Unpaid Leave (إجازة بدون مرتب)'
+  ];
+
+  var listEl = document.getElementById('no-eval-modal-months-list');
+  if (listEl) {
+    listEl.innerHTML = noEvalList.map(function (item, i) {
+      var inputId = 'no-eval-reason-inp-' + i;
+      var presetBtns = presets.map(function (pr) {
+        return '<button type="button" onclick="document.getElementById(\'' + inputId + '\').value=\'' + pr.replace(/'/g, "\\'") + '\'" style="padding:3px 9px;border-radius:10px;border:1px solid #fdba74;background:#fff7ed;color:#9a3412;font-size:10.5px;font-weight:700;cursor:pointer">' + mgrEsc(pr) + '</button>';
+      }).join('');
+      var achInfo = item.mobileTgt > 0
+        ? (' · Mobile Ach: <strong>' + fmtN(item.mobileAch) + '</strong> / ' + fmtN(item.mobileTgt) + ' (' + item.mobilePct.toFixed(1) + '%)')
+        : '';
+      return '<div style="background:var(--gray-bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+          '<span style="font-size:12.5px;font-weight:900;color:#c2410c">📅 ' + mgrEsc(item.monthLabelEn) + ' (' + mgrEsc(item.monthLabelAr) + ')</span>' +
+          '<span style="font-size:11px;font-weight:700;color:var(--text-primary)">🏪 الفرع: <strong>' + mgrEsc(item.branchName) + '</strong> (' + mgrEsc(item.storeCode) + ')' + achInfo + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">' +
+          '<span style="font-size:10.5px;color:var(--text-muted);font-weight:700;align-self:center">اختيار سريع:</span>' +
+          presetBtns +
+        '</div>' +
+        '<input id="' + inputId + '" data-month="' + mgrEsc(item.month) + '" type="text" value="' + mgrEsc(item.reason || '') + '" placeholder="اكتب السبب يدوياً هنا (مثال: Sick Leave / إجازة وضع / إجازة مسببة)..." style="width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid #f59e0b;font-size:12px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none" />' +
+      '</div>';
+    }).join('');
+  }
+
+  var ov = document.getElementById('no-eval-reason-modal-overlay');
+  if (ov) ov.style.display = 'flex';
+}
+
+function closeNoEvalReasonModal() {
+  var ov = document.getElementById('no-eval-reason-modal-overlay');
+  if (ov) ov.style.display = 'none';
+  PENDING_NO_EVAL_EXPORT_ACTION = null;
+}
+
+async function confirmNoEvalReasonsAndProceed(skipSavingInputs) {
+  var act = PENDING_NO_EVAL_EXPORT_ACTION;
+  if (!act || !act.mgr) {
+    closeNoEvalReasonModal();
+    return;
+  }
+  var mgr = act.mgr;
+  var cb = act.callback;
+
+  if (!skipSavingInputs) {
+    var patch = {};
+    (act.noEvalList || []).forEach(function (item, i) {
+      var inp = document.getElementById('no-eval-reason-inp-' + i);
+      if (inp) {
+        var key = getNoEvalReasonStorageKey(mgr.oracleId, mgr.label, item.month);
+        patch[key] = inp.value.trim();
+      }
+    });
+    await saveNoEvalReasonsPatch(patch);
+    mgrToast('✅ تم حفظ سبب عدم التقييم بنجاح');
+  }
+
+  closeNoEvalReasonModal();
+  try {
+    renderManagersPerf();
+    if (SCORECARD_CURRENT_KEY) renderScorecardForEntity(SCORECARD_CURRENT_KEY);
+    var emOv = document.getElementById('mgr-email-modal-overlay');
+    if (emOv && emOv.style.display !== 'none') renderManagerEmailCenterTable();
+  } catch (e) {}
+
+  if (typeof cb === 'function') {
+    cb();
+  }
+}
 
 function loadManagerEmailsMap() {
   var merged = {};
@@ -16734,7 +17108,8 @@ async function saveManagerEmailsMapToSupabaseAndLocal(newMap) {
           _isEvalMeta: true,
           evalMonth: 'EMAILS_MAP',
           updatedAt: new Date().toISOString(),
-          emailsMap: MGR_EMAILS_MAP
+          emailsMap: MGR_EMAILS_MAP,
+          noEvalReasonsMap: MGR_NO_EVAL_REASONS_MAP
         },
         updated_at: new Date().toISOString()
       }], { onConflict: 'month,store_code' });
@@ -16979,6 +17354,7 @@ function getManagerEmailPerformanceTierInfo(mgr) {
 function buildManagerEmailSubjectAndPlainBody(mgr) {
   var range = getManagerMonthRangeEn(mgr);
   var tierObj = getManagerEmailPerformanceTierInfo(mgr);
+  var noEvalList = getManagerNoEvalMonthsDetails(mgr);
   var subject = 'Performance & Evaluation Scorecard (' + range.fromMonth + ' To ' + range.toMonth + ') - ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' [Oracle ID: ' + mgr.oracleId + ']' : '');
   var lines = [
     'Dear ' + mgr.label + ',',
@@ -16987,20 +17363,44 @@ function buildManagerEmailSubjectAndPlainBody(mgr) {
     '',
     '[Scorecard Image Attached / Embedded]',
     '',
-    'And find all evaluation details in attached sheet.',
+    'And find all evaluation details in attached sheet.'
+  ];
+  if (noEvalList.length > 0) {
+    lines.push('');
+    var noEvStr = noEvalList.map(function (d) {
+      return d.monthLabelEn + ' (Branch: ' + d.branchName + ' - No Evaluation' + (d.reason ? ' | Reason: ' + d.reason : '') + ')';
+    }).join('; ');
+    lines.push('Note on Un-evaluated Month(s): ' + noEvStr + '. Branch achievement and Gaps are included in the cumulative performance above, while the evaluation average is calculated across evaluated months only.');
+  }
+  lines.push(
     '',
     'Note: October 2026 is currently Pending Evaluation (not included in the totals or branch assignment above due to October branch transfers) — an updated report will be sent once the Oct Evaluation is received.',
     '',
     'Best Regards,',
     'East Cairo Team — Mohamed Elfakharany',
     'FAKHARANY360 Performance Intelligence Platform'
-  ];
-  return { subject: subject, body: lines.join('\r\n'), fromMonth: range.fromMonth, toMonth: range.toMonth, tierObj: tierObj };
+  );
+  return { subject: subject, body: lines.join('\r\n'), fromMonth: range.fromMonth, toMonth: range.toMonth, tierObj: tierObj, noEvalList: noEvalList };
 }
 
 function buildScorecardEmailHTMLWithCid(mgr, fromMonth, toMonth, cidName) {
   var f = 'font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1f2937;line-height:1.6';
   var tierObj = getManagerEmailPerformanceTierInfo(mgr);
+  var noEvalList = getManagerNoEvalMonthsDetails(mgr);
+  var noEvalHtmlBlock = '';
+  if (noEvalList.length > 0) {
+    var itemsHtml = noEvalList.map(function (d) {
+      return '<li><strong>' + mgrEsc(d.monthLabelEn) + '</strong> — Branch: <strong>' + mgrEsc(d.branchName) + '</strong>: <em>No Evaluation recorded</em>' +
+        (d.reason ? ' (<strong>Reason: ' + mgrEsc(d.reason) + '</strong>)' : '') +
+        (d.mobileTgt > 0 ? ' · Mobile Ach: ' + fmtN(d.mobileAch) + ' / ' + fmtN(d.mobileTgt) + ' (' + d.mobilePct.toFixed(1) + '%)' : '') +
+      '</li>';
+    }).join('');
+    noEvalHtmlBlock = '<div style="' + f + ';background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:8px;padding:10px 14px;margin:12px 0;max-width:820px;font-size:13px;color:#9a3412">' +
+      '<strong>📋 Note on Un-evaluated Month(s) (Branch Achievement Included):</strong>' +
+      '<ul style="margin:6px 0 4px 18px;padding:0">' + itemsHtml + '</ul>' +
+      '<div style="font-size:12px;color:#7c2d12">Branch achievement and Gaps for the month(s) above are included in your cumulative performance, while your evaluation average is calculated across evaluated months only.</div>' +
+    '</div>';
+  }
   return '<!DOCTYPE html><html><head><meta charset="utf-8"></head>' +
     '<body style="' + f + ';background:#ffffff;padding:20px;margin:0;direction:ltr;text-align:left">' +
       '<p style="' + f + ';font-size:15.5px;margin:0 0 10px">Dear <strong>' + mgrEsc(mgr.label) + '</strong>,</p>' +
@@ -17016,6 +17416,7 @@ function buildScorecardEmailHTMLWithCid(mgr, fromMonth, toMonth, cidName) {
       '<p style="' + f + ';font-size:15px;font-weight:bold;color:#5E2D91;margin:18px 0 12px">' +
         'And find all evaluation details in attached sheet.' +
       '</p>' +
+      noEvalHtmlBlock +
       '<div style="' + f + ';background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 14px;margin:12px 0 18px;max-width:820px;font-size:13px;color:#92400e">' +
         '<strong>📌 Note (October 2026 — Pending Evaluation):</strong> October 2026 performance and branch assignment are currently <strong>Pending Evaluation</strong> and are not counted in the cumulative totals above due to October branch transfers. An updated report will be sent once the <strong>Oct Evaluation</strong> is received.' +
       '</div>' +
@@ -17067,7 +17468,7 @@ function buildScorecardAndExcelMimeEml(toEmail, subject, htmlBody, pngName, pngB
   return headers + partRelatedStart + partHtml + partInlineImg + partExcelAttach;
 }
 
-async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare) {
+async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare, skipReasonPrompt) {
   var model = MGR_LAST_MODEL || buildManagersModel();
   var pool = getScorecardPool(model);
   if (!pool.length) {
@@ -17078,6 +17479,15 @@ async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare) {
   if (idx < 0) idx = 0;
   var mgr = pool[idx];
   if (!mgr) return;
+
+  // Check if this manager has any un-evaluated months (where branch remained with them) and alert the user to enter/confirm manual reason first
+  var noEvalCheck = getManagerNoEvalMonthsDetails(mgr);
+  if (noEvalCheck.length > 0 && !skipReasonPrompt) {
+    openNoEvalReasonModalForManager(mgr.key, function () {
+      sendScorecardWithExcelEmail(entityKey, btn, useMobileShare, true);
+    });
+    return;
+  }
 
   var oldHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Preparing...'; }
@@ -17142,11 +17552,18 @@ async function sendScorecardWithExcelEmail(entityKey, btn, useMobileShare) {
   }
 }
 
-function sendManagerEvalMailto(entityKey) {
+function sendManagerEvalMailto(entityKey, skipReasonPrompt) {
   var model = MGR_LAST_MODEL || buildManagersModel();
   if (!model) return;
   var mgr = model.byManager.find(function (m) { return m.key === entityKey; }) || model.byManager[0];
   if (!mgr) return;
+  var noEvalCheck = getManagerNoEvalMonthsDetails(mgr);
+  if (noEvalCheck.length > 0 && !skipReasonPrompt) {
+    openNoEvalReasonModalForManager(mgr.key, function () {
+      sendManagerEvalMailto(entityKey, true);
+    });
+    return;
+  }
   var toEmail = getManagerEmailByOracleId(mgr.oracleId);
   var msg = buildManagerEmailSubjectAndPlainBody(mgr);
   var mailtoUrl = 'mailto:' + encodeURIComponent(toEmail || '') +
@@ -17183,7 +17600,7 @@ async function downloadAllLinkedManagersEmlBatch(btn) {
   try {
     for (var i = 0; i < linkedMgrs.length; i++) {
       if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>(' + (i + 1) + '/' + linkedMgrs.length + ')...';
-      await sendScorecardWithExcelEmail(linkedMgrs[i].key, null, false);
+      await sendScorecardWithExcelEmail(linkedMgrs[i].key, null, false, true);
       await new Promise(function (r) { setTimeout(r, 350); });
     }
     mgrToast('✅ تم تحميل ' + linkedMgrs.length + ' ملف إيميل (.eml) بصورة الـ Scorecard وشيت الإكسيل مرفق!');
@@ -17215,6 +17632,7 @@ async function downloadAllLinkedManagersEmlBatch(btn) {
       closeWhatIfSimulatorModal();
       closeActionPlanBriefModal();
       closeManagerEmailCenterModal();
+      closeNoEvalReasonModal();
       closeSmartAlertsPopover();
       closeThemePaletteMenu();
     }
