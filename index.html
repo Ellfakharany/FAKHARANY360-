@@ -12182,24 +12182,33 @@ function syncEvalFromSupabaseRows() {
   updateEvalStatusBadge();
 }
 
+function getPendingEvalMonthsList(idxObj) {
+  var idx = idxObj || buildEvalIndex();
+  var pending = [];
+  if (Array.isArray(RAW_DATA) && RAW_DATA.length && idx.monthsSet) {
+    var rawMos = Array.from(new Set(RAW_DATA.map(function (r) { return r.month; }).filter(Boolean)));
+    pending = MONTH_ORDER.filter(function (m) { return rawMos.indexOf(m) >= 0 && !idx.monthsSet[m]; });
+  }
+  if (idx.monthsSet && !idx.monthsSet['10-2026'] && idx.monthsSet['09-2026'] && pending.indexOf('10-2026') < 0) {
+    pending.push('10-2026');
+  }
+  return pending;
+}
+
 function updateEvalStatusBadge() {
   var badge = document.getElementById('mgr-eval-status-badge');
   if (!badge) return;
   var idx = buildEvalIndex();
   var count = idx.allRecords.length;
   var mCount = idx.months.length;
-  var pendingMonths = [];
-  if (Array.isArray(RAW_DATA) && RAW_DATA.length && idx.monthsSet) {
-    var rawMos = Array.from(new Set(RAW_DATA.map(function (r) { return r.month; }).filter(Boolean)));
-    pendingMonths = MONTH_ORDER.filter(function (m) { return rawMos.indexOf(m) >= 0 && !idx.monthsSet[m]; });
-  }
+  var pendingMonths = getPendingEvalMonthsList(idx);
   var pBtn = document.getElementById('mgr-pending-toggle-btn');
   var pLbl = document.getElementById('mgr-pending-label');
   if (pBtn && pLbl) {
     if (pendingMonths.length > 0) {
       pBtn.style.display = 'inline-flex';
       var pmNames = pendingMonths.map(function (m) { return MONTH_LABELS[m] || m; }).join(', ');
-      pLbl.textContent = MGR_INCLUDE_PENDING_EVAL ? ('⏳ ' + pmNames + ' (Pending Eval): Included') : ('⏳ ' + pmNames + ' (Pending Eval): Hidden');
+      pLbl.textContent = MGR_INCLUDE_PENDING_EVAL ? ('⏳ ' + pmNames + ': Pending Evaluation (Shown)') : ('⏳ ' + pmNames + ': Pending Evaluation (Hidden)');
       pBtn.style.background = MGR_INCLUDE_PENDING_EVAL ? '#fffbeb' : '#f3f4f6';
       pBtn.style.color = MGR_INCLUDE_PENDING_EVAL ? '#b45309' : '#6b7280';
       pBtn.style.borderColor = MGR_INCLUDE_PENDING_EVAL ? '#f59e0b' : '#d1d5db';
@@ -12212,7 +12221,7 @@ function updateEvalStatusBadge() {
     var lastM = idx.months[mCount - 1] ? (MONTH_LABELS[idx.months[mCount - 1]] || idx.months[mCount - 1]) + ' ' + (idx.months[mCount - 1].split('-')[1] || '') : '';
     var rangeTxt = (firstM && lastM) ? (firstM + ' – ' + lastM) : (mCount + ' Months');
     var pendChip = pendingMonths.length
-      ? ' · <span style="background:#fef3c7;color:#b45309;padding:1px 7px;border-radius:10px;border:1px solid #fde68a"><i class="fas fa-hourglass-half mr-1"></i>' + pendingMonths.map(function (m) { return (MONTH_LABELS[m] || m) + ' ' + (m.split('-')[1] || ''); }).join(', ') + ': Performance & Gap Active (Pending Eval)</span>'
+      ? ' · <span style="background:#fef3c7;color:#b45309;padding:1px 7px;border-radius:10px;border:1px solid #fde68a"><i class="fas fa-hourglass-half mr-1"></i>' + pendingMonths.map(function (m) { return (MONTH_LABELS[m] || m) + ' ' + (m.split('-')[1] || ''); }).join(', ') + ': Pending Evaluation (Update will be sent once Oct Eval is received)</span>'
       : '';
     badge.style.background = '#dcfce7';
     badge.style.color = '#15803d';
@@ -12419,32 +12428,9 @@ function getManagersLinkedRecords() {
   }
 
   function resolvePendingEvalForUnevaluatedMonth(rawRow, code, m) {
-    // Only applies when month m has NO evaluation sheet uploaded at all yet (e.g., Month 10 before EV Oct is uploaded)
-    if (!MGR_INCLUDE_PENDING_EVAL || !m || !idx.latestEvalMonth || (idx.monthsSet && idx.monthsSet[m])) return null;
-    var refEv = (code && idx.byCodeMonth[code + '|' + idx.latestEvalMonth]) || null;
-    if (!refEv) return null;
-    return {
-      month: m,
-      storeCode: code,
-      oracleId: refEv.oracleId,
-      managerName: refEv.managerName,
-      hiringDate: refEv.hiringDate,
-      evalStoreName: (rawRow && rawRow.store) || refEv.evalStoreName,
-      evalRegion: (rawRow && rawRow.region) || refEv.evalRegion,
-      evalRM: (rawRow && rawRow.regionalManager) || refEv.evalRM,
-      evalAM: (rawRow && rawRow.areaManager) || refEv.evalAM,
-      company: (rawRow && rawRow.partner) || refEv.company,
-      tnps: null,
-      actPct: null,
-      mob35: null,
-      mix30: null,
-      info5: null, eff5: null, app5: null, att5: null, mgm5: null,
-      perf25: null,
-      warn: 'No',
-      evalScore: null,
-      isPendingEval: true,
-      pendingFromMonth: idx.latestEvalMonth
-    };
+    // IMPORTANT: Because many Store Managers transferred branches in Month 10 and the Oct Evaluation sheet has not been sent yet,
+    // we NEVER assign Month 10's old branch or numbers to Store Managers, nor count them in totals.
+    return null;
   }
 
   if (!useEvalUniverse && hasRaw) {
@@ -13064,9 +13050,14 @@ function buildManagersModel() {
     m.scopeTotal = scopeTotalCount || byManager.length;
   });
 
+  var evalIdxNow = buildEvalIndex();
+  var fMoSel = (document.getElementById('mgr-select-month') || {}).value || '';
+  var pendingEvalMonths = (MGR_INCLUDE_PENDING_EVAL && !fMoSel) ? getPendingEvalMonthsList(evalIdxNow) : [];
+
   return {
     rows: rows,
     months: months,
+    pendingEvalMonths: pendingEvalMonths,
     byMonth: byMonth,
     byManager: byManager,
     scopeByManager: scopeByManager,
@@ -13368,11 +13359,22 @@ function renderManagersPerf() {
 }
 
 // ── VIEW 1: Stacked Monthly Tables ("ك table تحت بعض بالشهور" — Restored v1 layout + warnings + inline Gap) ──
+function renderPendingOctNoteBannerHTML(model) {
+  if (!model || !model.pendingEvalMonths || !model.pendingEvalMonths.length) return '';
+  var pmTxt = model.pendingEvalMonths.map(function (m) { return (MONTH_EN_FULL[m] || m) + ' (' + (MONTH_AR_NAMES[m] || m) + ')'; }).join(' ، ');
+  return '<div dir="rtl" style="margin-bottom:14px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:Cairo,Inter,sans-serif">' +
+    '<div style="font-size:12px;font-weight:800;color:#92400e"><i class="fas fa-hourglass-half ml-1.5" style="color:#d97706"></i>' +
+      '<strong>' + mgrEsc(pmTxt) + ' — Pending Evaluation:</strong> لم يتم إدراج أرقام أو أسماء فروع شهر 10 ولا احتسابها في المجموع نظراً لحركة تنقلات المديرين بين الفروع، وسيتم إرسال <strong>Update</strong> فور استلام شيت <strong>Oct Evaluation</strong> من الأوبريشن.' +
+    '</div>' +
+    '<span style="background:#fef3c7;color:#b45309;font-size:10.5px;font-weight:900;padding:3px 10px;border-radius:8px;border:1px solid #fde68a">⏳ Pending Evaluation</span>' +
+  '</div>';
+}
+
 function renderMgrByMonthStackedHTML(model, effMode) {
   var hasRaw = model.hasRawProducts;
   var thead = buildMgrTableTheadHTML('Store Manager', 'Branch & Code', effMode, hasRaw);
 
-  return model.byMonth.map(function (mBlock) {
+  return renderPendingOctNoteBannerHTML(model) + model.byMonth.map(function (mBlock) {
     var isCollapsed = !!MGR_BLOCK_COLLAPSED[mBlock.key];
     var totalEntities = mBlock.entities.length;
     var visibleEntities = MGR_SHOW_ALL_ROWS ? mBlock.entities : mBlock.entities.slice(0, MGR_PAGE_SIZE);
@@ -13519,8 +13521,28 @@ function renderMgrByManagerStackedHTML(model, effMode) {
       '</tr>';
     }).join('');
 
-    var totalRowHTML = '<tr style="background:#3b1d63;color:white;border-top:2px solid #1a1a2e">' +
-      '<td colspan="2" style="padding:8px 12px;font-size:11.5px;font-weight:900;color:white">الإجمالي / المتوسط (' + mgr.monthEntries.length + ' شهور)</td>' +
+    var pendColsSpan = (hasRaw && (effMode === 'combined' || effMode === 'products_detail'))
+      ? (effMode === 'products_detail' ? (PRODUCTS.length * 3 + 3) : (PRODUCTS.length + 5))
+      : (hasRaw ? 15 : 12);
+    var pendingRowsHTML = (model.pendingEvalMonths || []).map(function (pm, pIdx) {
+      var pmEn = (MONTH_LABELS[pm] || pm) + ' ' + (pm.split('-')[1] || '');
+      var pmAr = MONTH_AR_NAMES[pm] || pm;
+      return '<tr style="background:#fffbeb;border-bottom:1px dashed #f59e0b">' +
+        '<td style="padding:7px 6px;text-align:center;font-size:10.5px;font-weight:800;color:#b45309">⏳</td>' +
+        '<td style="padding:7px 10px;white-space:nowrap">' +
+          '<div style="font-size:12px;font-weight:900;color:#b45309">' + mgrEsc(pmEn) + '</div>' +
+          '<div style="font-size:9.5px;color:#92400e">' + mgrEsc(pmAr) + '</div>' +
+        '</td>' +
+        '<td style="padding:7px 10px;font-size:11px;font-weight:800;color:#b45309">— <span style="font-size:9.5px;background:#fef3c7;padding:2px 7px;border-radius:6px;border:1px solid #fde68a">Pending Evaluation (بدون فرع)</span></td>' +
+        '<td style="padding:7px 10px;font-size:10.5px;color:#92400e">—</td>' +
+        '<td colspan="' + pendColsSpan + '" style="padding:8px 12px;text-align:center;font-size:11px;font-weight:800;color:#92400e;background:#fef3c7">' +
+          '⏳ <strong>Pending Evaluation</strong> — لا يتم احتساب أرقام أو كتابة اسم الفرع في المجموع نظراً لتنقلات المديرين، وسيتم إرسال Update فور استلام <strong>Oct Evaluation</strong> من الأوبريشن' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    var totalRowHTML = pendingRowsHTML + '<tr style="background:#3b1d63;color:white;border-top:2px solid #1a1a2e">' +
+      '<td colspan="2" style="padding:8px 12px;font-size:11.5px;font-weight:900;color:white">الإجمالي / المتوسط (' + mgr.monthEntries.length + ' شهور — بدون شهر 10 Pending Eval)</td>' +
       '<td dir="auto" style="padding:8px 10px;font-size:10.5px;font-weight:800;color:#e9d5ff">' + mgrEsc(branchesSummary) + '</td>' +
       '<td style="padding:8px 10px;font-size:10px;color:#c4b5fd">' + mgrEsc(s.areaManager || '—') + '</td>' +
       buildMgrMetricCellsHTML(tg, effMode, hasRaw, true) +
@@ -13541,7 +13563,7 @@ function renderMgrByManagerStackedHTML(model, effMode) {
       '</div>'
     : '';
 
-  return cardsHTML + moreFooter;
+  return renderPendingOctNoteBannerHTML(model) + cardsHTML + moreFooter;
 }
 
 // ── VIEW 3: Consolidated Summary & Ranking Table (with Click-to-Expand Monthly History) ──
@@ -13607,7 +13629,7 @@ function renderMgrSummaryTableHTML(model, effMode) {
       '</div>'
     : '';
 
-  return '<div style="background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
+  return renderPendingOctNoteBannerHTML(model) + '<div style="background:white;border-radius:12px;box-shadow:0 3px 12px rgba(0,0,0,0.07);border:1px solid #e5e7eb;overflow:hidden">' +
     '<div style="background:linear-gradient(135deg,#1a1a2e,#5E2D91);color:white;padding:10px 16px;font-size:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center">' +
       '<span><i class="fas fa-trophy mr-2" style="color:#fbbf24"></i>MANAGERS OVERALL RANKING & SUMMARY (Click any manager to expand monthly rows)</span>' +
       '<span style="font-size:11px;opacity:.85">' + fmtN(totalMgrs) + ' مدير · ' + model.months.length + ' شهور</span>' +
@@ -13705,6 +13727,7 @@ function buildSingleManagerExportModel(mgr, baseModel) {
   return {
     rows: mgr.rows,
     months: mMonths,
+    pendingEvalMonths: (full && full.pendingEvalMonths) ? full.pendingEvalMonths : ['10-2026'],
     byMonth: byMonthSingle,
     byManager: [mgr],
     grandAgg: mgr.agg,
@@ -13855,9 +13878,12 @@ async function buildManagersPerfExcelBuffer(customModel) {
       ws.getRow(rIdx).height = isTotal ? 22 : 19;
     }
 
+    var isSingleManagerExport = (model.byManager && model.byManager.length === 1);
+
     // ════════════════════════════════════════════════════════════
-    // SHEET 1: Stacked By Month (جداول الشهور تحت بعض)
+    // SHEET 1: Stacked By Month (جداول الشهور تحت بعض) — Omitted for single manager export
     // ════════════════════════════════════════════════════════════
+    if (!isSingleManagerExport) {
     var ws1 = wb.addWorksheet('By Month (بالشهور تحت بعض)');
     ws1.views = [{ showGridLines: false }];
     ws1.properties.tabColor = { argb: 'FF5E2D91' };
@@ -13900,6 +13926,7 @@ async function buildManagersPerfExcelBuffer(customModel) {
       writeEntityRowToSheet(ws1, r1++, 0, 'إجمالي / متوسط ' + mBlock.monthLabelAr + ' (' + mBlock.entities.length + ' مدير)', '', tg.storeCount + ' فرع', '', tg, true);
       r1 += 2;
     });
+    } // end if (!isSingleManagerExport) for Sheet 1
 
     // ════════════════════════════════════════════════════════════
     // SHEET 2: Stacked By Manager (شهور كل مدير تحت بعض)
@@ -13945,7 +13972,23 @@ async function buildManagersPerfExcelBuffer(customModel) {
         writeEntityRowToSheet(ws2, r2++, idx + 1, me.monthLabelEn + ' (' + me.monthLabelAr + ')', mgr.oracleId, ms.store || '—', ms.storeCode || '—', me.agg, false);
       });
 
-      writeEntityRowToSheet(ws2, r2++, 0, 'إجمالي / متوسط ' + mgr.label + ' (' + mgr.monthEntries.length + ' شهور)', mgr.oracleId, branchesStr, '', tg, true);
+      (model.pendingEvalMonths || []).forEach(function (pm) {
+        var pmLabel = (MONTH_LABELS[pm] || pm) + ' ' + (pm.split('-')[1] || '') + ' (' + (MONTH_AR_NAMES[pm] || pm) + ')';
+        ws2.getCell(r2, 1).value = '⏳';
+        ws2.getCell(r2, 2).value = pmLabel;
+        ws2.getCell(r2, 3).value = mgr.oracleId || '—';
+        ws2.getCell(r2, 4).value = 'Pending Evaluation (بدون فرع)';
+        ws2.getCell(r2, 5).value = '—';
+        ws2.mergeCells(r2, 6, r2, N2);
+        ws2.getCell(r2, 6).value = '⏳ Pending Evaluation — لا يتم احتساب أرقام أو كتابة اسم الفرع في المجموع، وسيتم إرسال Update فور استلام تقييم شهر أكتوبر (Oct Evaluation)';
+        for (var cc = 1; cc <= N2; cc++) {
+          styleCell(ws2.getCell(r2, cc), { bg: '#FFFBEB', fg: '#92400E', b: true, sz: 10, al: cc === 6 ? 'left' : 'center', bd: '#F59E0B' });
+        }
+        ws2.getRow(r2).height = 20;
+        r2++;
+      });
+
+      writeEntityRowToSheet(ws2, r2++, 0, 'إجمالي / متوسط ' + mgr.label + ' (' + mgr.monthEntries.length + ' شهور — بدون شهر 10 Pending Eval)', mgr.oracleId, branchesStr, '', tg, true);
       r2 += 2;
     });
 
@@ -14182,8 +14225,9 @@ async function buildManagersPerfExcelBuffer(customModel) {
     });
 
     // ════════════════════════════════════════════════════════════
-    // SHEET 5: Flat Linked Database (قاعدة البيانات المربوطة)
+    // SHEET 5: Flat Linked Database (قاعدة البيانات المربوطة) — Omitted for single manager export
     // ════════════════════════════════════════════════════════════
+    if (!isSingleManagerExport) {
     var ws4 = wb.addWorksheet('All Linked Data (قاعدة البيانات)');
     ws4.views = [{ state: 'frozen', ySplit: 1 }];
     ws4.properties.tabColor = { argb: 'FF0F766E' };
@@ -14240,6 +14284,7 @@ async function buildManagersPerfExcelBuffer(customModel) {
       });
     });
     ws4.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(1, r4 - 1), column: cols4.length } };
+    } // end if (!isSingleManagerExport) for Sheet 5
 
     return await wb.xlsx.writeBuffer();
 }
@@ -15274,7 +15319,7 @@ function syncMobileBottomNav(tabName) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <label style="font-size:11px;font-weight:800;color:var(--we-purple)">📎 الشيت المرفق في الميل (Attached Sheet):</label>
           <select id="mgr-email-attach-scope" style="padding:5px 10px;border-radius:12px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">
-            <option value="single">شيت تقييم المدير نفسه بالشهور والـ Gaps (5 شيتات)</option>
+            <option value="single">شيت تقييم المدير نفسه بالشهور والـ Gaps (3 شيتات: بدون By Month و All Linked Data)</option>
             <option value="all">شيت الـ Export الكامل للفلتر الحالي (كل المديرين)</option>
           </select>
         </div>
@@ -15563,25 +15608,35 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
   }).join('');
 
   var monthBarsHTML = mgr.monthEntries.map(function (me) {
-    var isPend = !!me.agg.isPendingEvalOnly;
     var mp = me.agg.evalScore !== null ? (me.agg.evalScore * 100) : me.agg.effMobPct;
     var clr = mp >= 90 ? '#16a34a' : (mp >= 75 ? '#d97706' : '#dc2626');
     var mGap = Math.round((me.agg.mobileSubs || 0) - (me.agg.mobileTarget || 0));
     var bName = me.agg.sample.store || '';
-    var boxStyle = isPend
-      ? 'background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px'
-      : 'background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px';
-    var scoreLine = isPend
-      ? '<div style="font-size:9.5px;font-weight:900;color:#b45309;background:#fef3c7;border-radius:6px;padding:1px 5px;margin:2px auto;line-height:1.4">⏳ Pending Eval</div>' +
-        '<div style="font-size:11.5px;font-weight:900;color:' + (mp >= 100 ? '#15803d' : '#1d4ed8') + ';line-height:1.3">Mob: ' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>'
-      : '<div style="font-size:14px;font-weight:900;color:' + clr + ';margin:3px 0;line-height:1.3">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>';
-    return '<div style="' + boxStyle + '">' +
-      '<div style="font-size:10.5px;font-weight:800;color:' + (isPend ? '#92400e' : '#475569') + ';line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
-      scoreLine +
+    return '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px">' +
+      '<div style="font-size:10.5px;font-weight:800;color:#475569;line-height:1.4">' + mgrEsc(me.monthLabelEn) + '</div>' +
+      '<div style="font-size:14px;font-weight:900;color:' + clr + ';margin:3px 0;line-height:1.3">' + (mp ? mp.toFixed(1) + '%' : '—') + '</div>' +
       '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:10.5px;font-weight:700;color:#1e293b;line-height:1.55;padding:3px 2px;margin:2px 0;word-break:break-word;overflow:visible">' + mgrEsc(bName) + '</div>' +
       (model.hasRawProducts ? '<div style="font-size:9.5px;font-weight:800;color:' + (mGap >= 0 ? '#15803d' : '#dc2626') + ';line-height:1.4;margin-top:2px">Gap: ' + (mGap > 0 ? '+' : '') + fmtN(mGap) + '</div>' : '') +
     '</div>';
   }).join('');
+
+  var pendingMonthsForCard = (model && model.pendingEvalMonths && model.pendingEvalMonths.length) ? model.pendingEvalMonths : [];
+  var pendingCardsHTML = pendingMonthsForCard.map(function (pm) {
+    var pmEn = (MONTH_LABELS[pm] || pm) + ' ' + (pm.split('-')[1] || '');
+    return '<div style="background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:10px;padding:10px 8px 11px;text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:96px">' +
+      '<div style="font-size:10.5px;font-weight:900;color:#92400e;line-height:1.4">' + mgrEsc(pmEn) + '</div>' +
+      '<div style="font-size:9.5px;font-weight:900;color:#b45309;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:3px 6px;margin:4px auto;line-height:1.35">⏳ Pending Evaluation</div>' +
+      '<div style="font-size:9.5px;font-weight:700;color:#92400e;line-height:1.4">—</div>' +
+      '<div style="font-size:8.5px;font-weight:800;color:#b45309;line-height:1.35">Not in Total</div>' +
+    '</div>';
+  }).join('');
+
+  var pendingNoteCardHTML = pendingMonthsForCard.length
+    ? '<div style="margin-top:10px;background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:10px;padding:9px 12px;font-size:10.5px;color:#92400e;line-height:1.55">' +
+        '<div><strong>📌 Note:</strong> October 2026 is currently <strong>Pending Evaluation</strong> (not included in the cumulative total or branch list above) — an updated report will be sent once the <strong>Oct Evaluation</strong> is received.</div>' +
+        '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;margin-top:2px;font-weight:700">ملاحظة: شهر أكتوبر (Oct 2026) يظهر Pending Evaluation بدون أرقام أو اسم فرع ولا يُضاف للمجموع نظراً لتنقلات المديرين، وسيتم إرسال Update فور استلام تقييم شهر أكتوبر.</div>' +
+      '</div>'
+    : '';
 
   var mgrEmail = getManagerEmailByOracleId(mgr.oracleId);
 
@@ -15589,7 +15644,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
     '<div style="background:linear-gradient(135deg,#1e1b4b,#5E2D91,#7c3aed);color:white;border-radius:16px;padding:18px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:Cairo,Inter,Arial,sans-serif">' +
       '<div style="flex:1;min-width:240px">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-          '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Rank #' + (idx + 1) + ' of ' + model.byManager.length + '</span>' +
+          '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Rank #' + trueRank + ' of ' + trueTotal + '</span>' +
           (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:800;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
           '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:700;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">📅 ' + mgr.monthEntries.length + ' Months</span>' +
           (mgrEmail ? '<span style="background:rgba(34,197,94,0.25);color:#bbf7d0;font-size:10.5px;font-weight:700;padding:4px 10px 5px;border-radius:8px;line-height:1.5;display:inline-block">📧 ' + mgrEsc(mgrEmail) + '</span>' : '') +
@@ -15622,7 +15677,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
     (model.hasRawProducts ? ('<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📦 أداء المنتجات والـ Gap (+ / -):</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
     '<!-- Monthly Trajectory -->' +
     '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📅 مسار الأداء الشهري (Month-by-Month):</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px">' + monthBarsHTML + '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px">' + monthBarsHTML + pendingCardsHTML + '</div>' + pendingNoteCardHTML +
     '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;line-height:1.5">' +
       '<span>FAKHARANY³⁶⁰ · Performance Intelligence Platform</span>' +
       '<span>East Cairo Team · Mohamed Elfakharany</span>' +
@@ -16882,38 +16937,88 @@ function getManagerMonthRangeEn(mgr) {
   };
 }
 
+function getManagerEmailPerformanceTierInfo(mgr) {
+  var g = (mgr && mgr.agg) ? mgr.agg : {};
+  var mobNetGap = Math.round((g.mobileSubs || 0) - (g.mobileTarget || 0));
+  var mobPct = g.effMobPct || 0;
+  var gapStr = (mobNetGap > 0 ? '+' : '') + fmtN(mobNetGap);
+
+  if (mobNetGap >= 0) {
+    // Tier 1: Over Gap / Surplus (>= 100%)
+    return {
+      tier: 'over_gap',
+      bg: '#f0fdf4',
+      border: '#86efac',
+      leftBar: '#16a34a',
+      fg: '#166534',
+      text: 'Thank you for your great effort and outstanding performance! Let us push even harder in the coming days to go further over target and maximize your Over Gap (' + gapStr + ').'
+    };
+  } else if (mobPct >= 85) {
+    // Tier 2: Moderate Gap (85% - 99.9%) -> Need more pushing in next days to cover Gaps
+    return {
+      tier: 'need_push',
+      bg: '#fffbeb',
+      border: '#fde68a',
+      leftBar: '#f59e0b',
+      fg: '#92400e',
+      text: 'Thank you for your effort — we need more pushing in next days to cover Gaps (Mobile Gap: ' + gapStr + ') and reach 100% of your target.'
+    };
+  } else {
+    // Tier 3: Large / Far Gap (< 85%) -> Not accepted performance and will reflect on annual evaluation + full right to improve in coming days
+    return {
+      tier: 'critical_gap',
+      bg: '#fef2f2',
+      border: '#fecaca',
+      leftBar: '#dc2626',
+      fg: '#991b1b',
+      text: 'Please note that this is not accepted performance and will reflect on annual evaluation (Mobile Achievement: ' + mobPct.toFixed(1) + '%, Gap: ' + gapStr + '); however, you still have the full right and opportunity to improve your performance in the coming days and cover the Gaps.'
+    };
+  }
+}
+
 function buildManagerEmailSubjectAndPlainBody(mgr) {
   var range = getManagerMonthRangeEn(mgr);
+  var tierObj = getManagerEmailPerformanceTierInfo(mgr);
   var subject = 'Performance & Evaluation Scorecard (' + range.fromMonth + ' To ' + range.toMonth + ') - ' + mgr.label + (mgr.oracleId && mgr.oracleId !== '—' ? ' [Oracle ID: ' + mgr.oracleId + ']' : '');
   var lines = [
     'Dear ' + mgr.label + ',',
     '               Find the performance and Gaps over all year from ' + range.fromMonth + ' To ' + range.toMonth + '.',
+    '               ' + tierObj.text,
     '',
     '[Scorecard Image Attached / Embedded]',
     '',
     'And find all evaluation details in attached sheet.',
     '',
+    'Note: October 2026 is currently Pending Evaluation (not included in the totals or branch assignment above due to October branch transfers) — an updated report will be sent once the Oct Evaluation is received.',
+    '',
     'Best Regards,',
     'East Cairo Team — Mohamed Elfakharany',
     'FAKHARANY360 Performance Intelligence Platform'
   ];
-  return { subject: subject, body: lines.join('\r\n'), fromMonth: range.fromMonth, toMonth: range.toMonth };
+  return { subject: subject, body: lines.join('\r\n'), fromMonth: range.fromMonth, toMonth: range.toMonth, tierObj: tierObj };
 }
 
 function buildScorecardEmailHTMLWithCid(mgr, fromMonth, toMonth, cidName) {
   var f = 'font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1f2937;line-height:1.6';
+  var tierObj = getManagerEmailPerformanceTierInfo(mgr);
   return '<!DOCTYPE html><html><head><meta charset="utf-8"></head>' +
     '<body style="' + f + ';background:#ffffff;padding:20px;margin:0;direction:ltr;text-align:left">' +
       '<p style="' + f + ';font-size:15.5px;margin:0 0 10px">Dear <strong>' + mgrEsc(mgr.label) + '</strong>,</p>' +
-      '<p style="' + f + ';font-size:14.5px;margin:0 0 18px;padding-left:36px">' +
+      '<p style="' + f + ';font-size:14.5px;margin:0 0 12px;padding-left:36px">' +
         'Find the performance and Gaps over all year from <strong>' + mgrEsc(fromMonth) + '</strong> To <strong>' + mgrEsc(toMonth) + '</strong>:' +
       '</p>' +
+      '<div style="' + f + ';background:' + tierObj.bg + ';border:1px solid ' + tierObj.border + ';border-left:5px solid ' + tierObj.leftBar + ';border-radius:10px;padding:11px 15px;margin:0 0 18px 36px;max-width:784px;font-size:14px;font-weight:bold;color:' + tierObj.fg + '">' +
+        mgrEsc(tierObj.text) +
+      '</div>' +
       '<div style="margin:16px 0 20px">' +
         '<img src="cid:' + cidName + '" alt="Scorecard - ' + mgrEsc(mgr.label) + '" width="820" style="display:block;max-width:100%;width:820px;height:auto;border:1px solid #e2e8f0;border-radius:14px" />' +
       '</div>' +
-      '<p style="' + f + ';font-size:15px;font-weight:bold;color:#5E2D91;margin:18px 0">' +
+      '<p style="' + f + ';font-size:15px;font-weight:bold;color:#5E2D91;margin:18px 0 12px">' +
         'And find all evaluation details in attached sheet.' +
       '</p>' +
+      '<div style="' + f + ';background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 14px;margin:12px 0 18px;max-width:820px;font-size:13px;color:#92400e">' +
+        '<strong>📌 Note (October 2026 — Pending Evaluation):</strong> October 2026 performance and branch assignment are currently <strong>Pending Evaluation</strong> and are not counted in the cumulative totals above due to October branch transfers. An updated report will be sent once the <strong>Oct Evaluation</strong> is received.' +
+      '</div>' +
       '<p style="' + f + ';font-size:13px;color:#4b5563;margin-top:22px;border-top:1px solid #e5e7eb;padding-top:12px">' +
         'Best Regards,<br>' +
         '<strong>East Cairo Team — Mohamed Elfakharany</strong><br>' +
