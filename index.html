@@ -1259,10 +1259,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- OVERVIEW TAB -->
     <div id="tab-overview" class="tab-content">
-      <!-- Quick Compare trigger -->
-      <button onclick="openQuickCompare()" style="float:right;margin-top:-2px;margin-bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:5px 14px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(94,45,145,0.25);transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-        <i class="fas fa-exchange-alt"></i> Quick Compare
-      </button>
+      <!-- Overview Master Export + Quick Compare triggers -->
+      <div style="float:right;margin-top:-2px;margin-bottom:8px;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <button id="ov-master-export-btn" onclick="exportOverviewMasterReport(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28);transition:opacity .2s" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'" title="تصدير ملف إكسيل شامل للأداء بنفس تنسيق MTD Branch Achievements (6 شيتات: Overview + Area Managers + Quarters & Months + Branches with Area Manager per Month + Ranking Matrix + Packages)">
+          <i class="fas fa-file-excel"></i> Export Overview Excel
+        </button>
+        <button onclick="openQuickCompare()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(94,45,145,0.25);transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          <i class="fas fa-exchange-alt"></i> Quick Compare
+        </button>
+      </div>
       <!-- Executive KPIs -->
       <div class="section-title"><i class="fas fa-tachometer-alt mr-2"></i>Executive KPIs</div>
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
@@ -1315,9 +1320,9 @@ document.addEventListener('DOMContentLoaded', function() {
             style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
             <i class="fas fa-th-large mr-1"></i>Details
           </button>
-          <button onclick="exportTeamPivot()"
-            style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #5E2D91;background:white;color:#5E2D91">
-            <i class="fas fa-file-export mr-1"></i>Export
+          <button onclick="exportOverviewMasterReport(this)"
+            style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;box-shadow:0 2px 8px rgba(22,163,74,0.25)" title="تصدير تقرير الأداء الشامل (6 شيتات بتنسيق MTD Branch Achievements)">
+            <i class="fas fa-file-excel mr-1"></i>Export Excel (6 Sheets)
           </button>
           <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
           <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden">
@@ -1458,8 +1463,8 @@ document.addEventListener('DOMContentLoaded', function() {
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 <span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">Data Type:</span>
                 <div style="display:inline-flex;border:1.5px solid #e5e7eb;border-radius:20px;overflow:hidden;background:#f9fafb">
-                  <button id="mgr-dtype-sales" onclick="setMgrDataMode('sales')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#c0392b;color:white"><i class="fas fa-shopping-cart mr-1"></i>Sales</button>
-                  <button id="mgr-dtype-act" onclick="setMgrDataMode('activation')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563"><i class="fas fa-bolt mr-1"></i>Activation</button>
+                  <button id="mgr-dtype-act" onclick="setMgrDataMode('activation')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white"><i class="fas fa-bolt mr-1"></i>Activation</button>
+                  <button id="mgr-dtype-sales" onclick="setMgrDataMode('sales')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563"><i class="fas fa-shopping-cart mr-1"></i>Sales</button>
                 </div>
               </div>
             </div>
@@ -11985,7 +11990,7 @@ var EVAL_INDEX_CACHE = null;
 var MGR_VIEW_MODE = 'bymonth';      // 'bymonth' | 'bymanager' | 'summary'
 var MGR_LEVEL = 'storeManager';     // 'storeManager' | 'areaManager' | 'supervisor' | 'regionalManager'
 var MGR_METRIC_MODE = 'combined';   // 'combined' | 'products_detail' | 'eval_detail'
-var MGR_DATA_MODE = 'sales';        // 'sales' | 'activation' (independent for Managers tab)
+var MGR_DATA_MODE = 'activation';   // 'sales' | 'activation' (Default: 'activation')
 var MGR_DATA_SCOPE = 'dashboard';   // 'dashboard' | 'all_eval'
 var MGR_INCLUDE_PENDING_EVAL = true; // true: include closure months whose Eval sheet is not uploaded yet (e.g. Month 10)
 var MGR_MONTH_ASC = true;           // true: Jan -> Sep, false: Sep -> Jan
@@ -12862,8 +12867,7 @@ function setMgrMetricMode(mode) {
   renderManagersPerf();
 }
 
-function setMgrDataMode(mode) {
-  MGR_DATA_MODE = mode;
+function syncDataModeButtonsUI(mode) {
   var bSal = document.getElementById('mgr-dtype-sales');
   var bAct = document.getElementById('mgr-dtype-act');
   if (bSal) {
@@ -12876,7 +12880,33 @@ function setMgrDataMode(mode) {
     bAct.style.color = mode === 'activation' ? 'white' : '#4b5563';
     bAct.style.fontWeight = mode === 'activation' ? '800' : '700';
   }
+  var scSal = document.getElementById('sc-dtype-sales');
+  var scAct = document.getElementById('sc-dtype-act');
+  if (scSal) {
+    scSal.style.background = mode === 'sales' ? '#c0392b' : 'transparent';
+    scSal.style.color = mode === 'sales' ? 'white' : '#4b5563';
+    scSal.style.fontWeight = mode === 'sales' ? '800' : '700';
+  }
+  if (scAct) {
+    scAct.style.background = mode === 'activation' ? '#5E2D91' : 'transparent';
+    scAct.style.color = mode === 'activation' ? 'white' : '#4b5563';
+    scAct.style.fontWeight = mode === 'activation' ? '800' : '700';
+  }
+}
+
+function setMgrDataMode(mode) {
+  MGR_DATA_MODE = mode;
+  syncDataModeButtonsUI(mode);
   renderManagersPerf();
+}
+
+function setScorecardDataMode(mode) {
+  MGR_DATA_MODE = mode;
+  syncDataModeButtonsUI(mode);
+  renderManagersPerf();
+  var q = ((document.getElementById('scorecard-search-input') || {}).value || '');
+  var chosen = populateScorecardSelectOptions(q, SCORECARD_CURRENT_KEY);
+  renderScorecardForEntity(chosen || SCORECARD_CURRENT_KEY);
 }
 
 function resetMgrFiltersOnly() {
@@ -15274,11 +15304,16 @@ function syncMobileBottomNav(tabName) {
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;background:var(--gray-bg);border-radius:20px 20px 0 0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
         <span style="font-size:13px;font-weight:900;color:var(--we-purple);white-space:nowrap"><i class="fas fa-id-card mr-1.5"></i>Scorecard</span>
-        <div style="position:relative;min-width:185px;max-width:240px;flex:1">
+        <!-- Activation / Sales Toggle inside Scorecard (Default: Activation) -->
+        <div style="display:inline-flex;border:1.5px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card-bg)" title="التبديل بين أرقام الـ Activation وأرقام الـ Sales داخل الكارت">
+          <button id="sc-dtype-act" onclick="setScorecardDataMode('activation')" style="padding:5px 11px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:#5E2D91;color:white;white-space:nowrap"><i class="fas fa-bolt mr-1"></i>Activation</button>
+          <button id="sc-dtype-sales" onclick="setScorecardDataMode('sales')" style="padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;background:transparent;color:#4b5563;white-space:nowrap"><i class="fas fa-shopping-cart mr-1"></i>Sales</button>
+        </div>
+        <div style="position:relative;min-width:170px;max-width:225px;flex:1">
           <input id="scorecard-search-input" type="text" placeholder="🔍 ابحث بالاسم أو ID أو الفرع..." oninput="onScorecardSearchInput(this.value)" style="width:100%;padding:6px 26px 6px 10px;border-radius:14px;border:1.5px solid var(--border);font-size:11.5px;font-weight:700;color:var(--text-primary);background:var(--card-bg);outline:none" />
           <span onclick="clearScorecardSearch()" style="position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-muted);font-size:11px" title="مسح البحث">✕</span>
         </div>
-        <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--we-purple);font-size:11.5px;font-weight:800;color:var(--text-primary);background:var(--card-bg);min-width:230px;max-width:360px;flex:1.3;outline:none"></select>
+        <select id="scorecard-entity-select" onchange="renderScorecardForEntity(this.value)" style="padding:6px 12px;border-radius:14px;border:1.5px solid var(--we-purple);font-size:11.5px;font-weight:800;color:var(--text-primary);background:var(--card-bg);min-width:210px;max-width:340px;flex:1.3;outline:none"></select>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <button onclick="sendCurrentScorecardEmail(this, false)" style="padding:6px 14px;border-radius:14px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,0.3)" title="تجهيز إيميل كامل بالـ الديباجة الإنجليزي + صورة الـ Scorecard في الـ Body + شيت الإكسيل مرفق (Attached)"><i class="fas fa-paper-plane mr-1"></i>Send Scorecard + Excel</button>
@@ -15721,6 +15756,13 @@ function clearScorecardSearch() {
 }
 
 function openScorecardModal(entityKey) {
+  if (MGR_DATA_MODE !== 'activation') {
+    MGR_DATA_MODE = 'activation';
+    syncDataModeButtonsUI('activation');
+    MGR_LAST_MODEL = buildManagersModel();
+  } else {
+    syncDataModeButtonsUI(MGR_DATA_MODE);
+  }
   var model = MGR_LAST_MODEL || buildManagersModel();
   var pool = getScorecardPool(model);
   if (!pool.length) {
@@ -15828,6 +15870,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
           '<span style="background:#f5a623;color:#111827;font-size:11px;font-weight:900;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Rank #' + trueRank + ' of ' + trueTotal + '</span>' +
           (mgr.oracleId && mgr.oracleId !== '—' ? '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:800;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">Oracle ID: ' + mgrEsc(mgr.oracleId) + '</span>' : '') +
           '<span style="background:rgba(255,255,255,0.18);font-size:11px;font-weight:700;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">📅 ' + mgr.monthEntries.length + ' Months</span>' +
+          '<span style="background:' + (MGR_DATA_MODE === 'activation' ? 'rgba(250,204,21,0.25);color:#fef08a' : 'rgba(248,113,113,0.28);color:#fecaca') + ';font-size:11px;font-weight:800;padding:4px 11px 5px;border-radius:8px;line-height:1.5;display:inline-block">' + (MGR_DATA_MODE === 'activation' ? '⚡ Activation' : '🛒 Sales') + '</span>' +
           (mgrEmail ? '<span style="background:rgba(34,197,94,0.25);color:#bbf7d0;font-size:10.5px;font-weight:700;padding:4px 10px 5px;border-radius:8px;line-height:1.5;display:inline-block">📧 ' + mgrEsc(mgrEmail) + '</span>' : '') +
         '</div>' +
         '<div style="font-size:21px;font-weight:900;margin-top:8px;line-height:1.4">' + mgrEsc(mgr.label) + '</div>' +
@@ -15855,7 +15898,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
       '<div style="font-size:11px;font-weight:800;color:#4b5563;line-height:1.5">Mob 35%: ' + (g.mob35 !== null ? g.mob35.toFixed(1) : '—') + ' · Mix 30%: ' + (g.mix30 !== null ? g.mix30.toFixed(1) : '—') + ' · Perf 25%: ' + (g.perf25 !== null ? g.perf25.toFixed(1) : '—') + '</div>' +
     '</div>' +
     '<!-- 6 Products Grid -->' +
-    (model.hasRawProducts ? ('<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📦 أداء المنتجات والـ Gap (+ / -):</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
+    (model.hasRawProducts ? ('<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📦 أداء المنتجات والـ Gap (+ / -) — [' + (MGR_DATA_MODE === 'activation' ? '⚡ Activation' : '🛒 Sales') + ']:</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
     '<!-- Monthly Trajectory -->' +
     '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📅 مسار الأداء الشهري (Month-by-Month):</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px">' + monthBarsHTML + pendingCardsHTML + '</div>' + pendingNoteCardHTML +
@@ -17602,6 +17645,1217 @@ async function downloadAllLinkedManagersEmlBatch(btn) {
     }
   });
 })();
+</script>
+
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  OVERVIEW MASTER MULTI-SHEET EXCEL EXPORT (MTD Branch Achievements Style)
+//  Generates a 6-sheet executive workbook using ExcelJS with the exact visual
+//  identity of MTD Branch Achievements:
+//   Sheet 1: 1. Executive Overview (6 Core Products & Gaps + 6 Package Families & Sub-Packages + Tariff Tiers)
+//   Sheet 2: 2. Area Managers & Supers (Area Managers under each Supervisor + Supervisor Total row underneath)
+//   Sheet 3: 3. Per Quarter & Month (Q1 / Q2 / Q3 / Q4 Subtotals + Monthly trajectory + Area Mgr Quarterly breakdown)
+//   Sheet 4: 4. Branches & Area Mgr by Month (Every Branch's monthly rows with Area Manager in each month + Store Manager & Eval% + Branch Total)
+//   Sheet 5: 5. Branches Ranking & Matrix (Pro Bonus: Consolidated Branch Ranking, Quadrant Badge, Area Mgr Path & Month-by-Month Matrix)
+//   Sheet 6: 6. Packages & Tariff Mix (Pro Bonus: 6 Package Families & Low/Mid/High Tier % per Supervisor -> Area Manager -> Branch)
+// ════════════════════════════════════════════════════════════════════════════
+
+var OV_QUARTER_DEFS = [
+  { key: 'Q1', label: 'Q1 2026 (Jan – Mar)', arLabel: 'الربع الأول Q1 (يناير – مارس)', months: ['01-2026', '02-2026', '03-2026'] },
+  { key: 'Q2', label: 'Q2 2026 (Apr – Jun)', arLabel: 'الربع الثاني Q2 (أبريل – يونيو)', months: ['04-2026', '05-2026', '06-2026'] },
+  { key: 'Q3', label: 'Q3 2026 (Jul – Sep)', arLabel: 'الربع الثالث Q3 (يوليو – سبتمبر)', months: ['07-2026', '08-2026', '09-2026'] },
+  { key: 'Q4', label: 'Q4 2026 (Oct – Dec)', arLabel: 'الربع الرابع Q4 (أكتوبر – ديسمبر)', months: ['10-2026', '11-2026', '12-2026'] }
+];
+
+function ovGetQuarterForMonth(m) {
+  for (var i = 0; i < OV_QUARTER_DEFS.length; i++) {
+    if (OV_QUARTER_DEFS[i].months.indexOf(m) >= 0) return OV_QUARTER_DEFS[i].key;
+  }
+  return 'Q4';
+}
+
+function ovGetFilterContext() {
+  var getVal = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  var rm = getVal('f-regMgr');
+  var sv = getVal('f-supervisor');
+  var am = getVal('f-areaMgr');
+  var ac = getVal('f-accMgr');
+  var pt = getVal('f-partner');
+  var mo = getVal('f-month');
+  var cls = (typeof activeClass !== 'undefined' && activeClass !== 'all') ? activeClass : '';
+  var st = (typeof selectedStore !== 'undefined' && selectedStore) ? selectedStore : '';
+  var stName = (typeof selectedStoreName !== 'undefined' && selectedStoreName) ? selectedStoreName : st;
+  var basis = (typeof DASH_MODE !== 'undefined' && DASH_MODE === 'activation') ? 'Activation' : 'Sales';
+
+  var chips = [];
+  if (rm) chips.push('Regional Mgr: ' + rm);
+  if (sv) chips.push('Supervisor: ' + sv);
+  if (am) chips.push('Area Mgr: ' + am);
+  if (ac) chips.push('Account Mgr: ' + ac);
+  if (pt) chips.push('Partner: ' + pt);
+  if (cls) chips.push('Class: ' + cls);
+  if (stName) chips.push('Store: ' + stName);
+  if (mo) chips.push('Month Filter: ' + (MONTH_EN_FULL[mo] || MONTH_LABELS[mo] || mo));
+
+  // All-year rows for the selected entity filters (ignores f-month so full-year Overview, Quarters & Monthly trajectory are always complete)
+  var allYearRows = (Array.isArray(RAW_DATA) ? RAW_DATA : []).filter(function (r) {
+    return (!rm || r.regionalManager === rm) &&
+           (!sv || r.supervisor === sv) &&
+           (!am || r.areaManager === am) &&
+           (!ac || r.accountManager === ac) &&
+           (!pt || r.partner === pt) &&
+           (!st || (r.storeCode || r.store) === st) &&
+           (!cls || r.classification === cls);
+  });
+
+  var activeRows = (Array.isArray(filteredData) && filteredData.length) ? filteredData : allYearRows;
+
+  var monthsInYear = MONTH_ORDER.filter(function (m) {
+    return allYearRows.some(function (r) { return r.month === m; });
+  });
+  var firstM = monthsInYear.length ? (MONTH_LABELS[monthsInYear[0]] || monthsInYear[0]) : 'Jan';
+  var lastM = monthsInYear.length ? ((MONTH_LABELS[monthsInYear[monthsInYear.length - 1]] || monthsInYear[monthsInYear.length - 1]) + ' ' + (monthsInYear[monthsInYear.length - 1].split('-')[1] || '2026')) : '2026';
+
+  return {
+    rm: rm, sv: sv, am: am, ac: ac, pt: pt, mo: mo, cls: cls, st: st,
+    basis: basis,
+    scopeLabel: chips.length ? chips.join(' · ') : 'All Regions & Supervisors',
+    shortScopeName: sv || am || rm || pt || cls || 'All_Scope',
+    periodLabel: firstM + ' – ' + lastM + ' (' + monthsInYear.length + ' Months)',
+    monthsInYear: monthsInYear,
+    allYearRows: allYearRows,
+    activeRows: activeRows
+  };
+}
+
+// Compute MTD-Branch-Achievements style aggregation across all 6 Products + Package Families + Below <100% / <90% / <70% store counts
+function ovCalcRichGroup(rows) {
+  var base = calcGroup(rows);
+  // Group by unique store to count stores below 100%, 90%, 70% for each product
+  var storeMap = {};
+  rows.forEach(function (r) {
+    var k = r.storeCode || r.store || 'UNKNOWN';
+    if (!storeMap[k]) storeMap[k] = [];
+    storeMap[k].push(r);
+  });
+  var storeKeys = Object.keys(storeMap);
+  var storeObjs = storeKeys.map(function (k) {
+    var sRows = storeMap[k];
+    var sg = calcGroup(sRows);
+    var lastR = sRows[sRows.length - 1] || {};
+    return { key: k, store: lastR.store || k, storeCode: lastR.storeCode || '', agg: sg, rows: sRows, sample: lastR };
+  });
+
+  var prodStats = {};
+  PRODUCTS.forEach(function (p) {
+    var t = base[p.tKey] || 0;
+    var a = base[p.aKey] || 0;
+    var gap = a - t;
+    var ratio = t > 0 ? (a / t) : null;
+    var l100 = 0, l90 = 0, l70 = 0;
+    var bestSt = null, worstSt = null;
+    storeObjs.forEach(function (so) {
+      var stT = so.agg[p.tKey] || 0;
+      var stA = so.agg[p.aKey] || 0;
+      if (stT > 0) {
+        var r = stA / stT;
+        if (r < 1.0) l100++;
+        if (r < 0.9) l90++;
+        if (r < 0.7) l70++;
+        if (!bestSt || r > bestSt.r) bestSt = { name: so.store, r: r, a: stA, t: stT };
+        if (!worstSt || r < worstSt.r) worstSt = { name: so.store, r: r, a: stA, t: stT };
+      }
+    });
+    prodStats[p.key] = {
+      target: t,
+      ach: a,
+      gap: gap,
+      ratio: ratio,
+      l100: l100,
+      l90: l90,
+      l70: l70,
+      bestStore: bestSt,
+      worstStore: worstSt
+    };
+  });
+
+  var pkgStats = {};
+  var totalPkgAch = 0;
+  (typeof PKG_GROUPS !== 'undefined' ? PKG_GROUPS : []).forEach(function (pg) {
+    var pt = sum(rows, pg.tKey);
+    var pa = sum(rows, pg.aKey);
+    totalPkgAch += pa;
+    var l100 = 0, l90 = 0, l70 = 0;
+    storeObjs.forEach(function (so) {
+      var stT = sum(so.rows, pg.tKey);
+      var stA = sum(so.rows, pg.aKey);
+      if (stT > 0) {
+        var r = stA / stT;
+        if (r < 1.0) l100++;
+        if (r < 0.9) l90++;
+        if (r < 0.7) l70++;
+      }
+    });
+    var subBreakdown = (pg.subs || []).map(function (sb) {
+      return { label: sb.label, val: sum(rows, sb.key) };
+    }).filter(function (x) { return x.val > 0; }).sort(function (a, b) { return b.val - a.val; });
+
+    pkgStats[pg.key] = {
+      label: pg.label,
+      target: pt,
+      ach: pa,
+      gap: pa - pt,
+      ratio: pt > 0 ? (pa / pt) : null,
+      l100: l100,
+      l90: l90,
+      l70: l70,
+      topSubsText: subBreakdown.slice(0, 4).map(function (s) { return s.label + ': ' + fmtN(s.val); }).join(' | ')
+    };
+  });
+
+  var lowT = base.lowT || 0, midT = base.midT || 0, highT = base.highT || 0;
+  var totTiers = lowT + midT + highT;
+
+  return Object.assign({}, base, {
+    storeCount: storeKeys.length,
+    monthCount: Array.from(new Set(rows.map(function (r) { return r.month; }).filter(Boolean))).length,
+    prodStats: prodStats,
+    pkgStats: pkgStats,
+    totalPkgAch: totalPkgAch,
+    lowRatio: totTiers > 0 ? (lowT / totTiers) : null,
+    midRatio: totTiers > 0 ? (midT / totTiers) : null,
+    highRatio: totTiers > 0 ? (highT / totTiers) : null
+  });
+}
+
+// ── MTD Branch Achievements Styling Helpers for Overview Workbook ──
+function ovArgb(hex) {
+  return 'FF' + String(hex || '#FFFFFF').replace('#', '').toUpperCase();
+}
+
+function ovTierColors(ratio) {
+  if (ratio === null || ratio === undefined || isNaN(ratio)) return { bg: '#F9FAFB', fg: '#9CA3AF' };
+  if (ratio >= 1.0)  return { bg: '#DCFCE7', fg: '#15803D' };
+  if (ratio >= 0.90) return { bg: '#E0F2FE', fg: '#0369A1' };
+  if (ratio >= 0.75) return { bg: '#FEF3C7', fg: '#A16207' };
+  if (ratio >= 0.55) return { bg: '#FEE2E2', fg: '#B91C1C' };
+  return { bg: '#FECACA', fg: '#991B1B' };
+}
+
+function ovRowKindColors(kind, idx) {
+  // Matches mtdBAKind exactly:
+  // 'sv' or 'sub' (Supervisor / Quarter Subtotal): #DBE8F7 / #1E3A5F bold
+  // 'total' (Grand Total / Branch Total): #111827 / #FFFFFF bold
+  // 'am' (Area Manager / Main Entity): alternating #FFFFFF and #F3F4F6 bold
+  // 'store' (Branch / Month row): alternating #FFFFFF and #FAF9FB
+  if (kind === 'sv' || kind === 'sub') return { bg: '#DBE8F7', fg: '#1E3A5F', b: true };
+  if (kind === 'total') return { bg: '#111827', fg: '#FFFFFF', b: true };
+  if (kind === 'am') return { bg: (idx % 2 === 1) ? '#F3F4F6' : '#FFFFFF', fg: '#1F2937', b: true };
+  return { bg: (idx % 2 === 1) ? '#FAF9FB' : '#FFFFFF', fg: '#1F2937', b: false };
+}
+
+function ovStyleCell(cell, opts) {
+  var bdHex = opts.bd || '#E5E7EB';
+  var border = { style: 'thin', color: { argb: ovArgb(bdHex) } };
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ovArgb(opts.bg || '#FFFFFF') } };
+  cell.font = {
+    name: 'Calibri',
+    size: opts.sz || (opts.hd ? 10.5 : 10.5),
+    bold: !!opts.b,
+    color: { argb: ovArgb(opts.fg || '#1F2937') }
+  };
+  cell.alignment = {
+    horizontal: opts.al === 'l' ? 'left' : (opts.al === 'r' ? 'right' : 'center'),
+    vertical: 'middle',
+    indent: opts.al === 'l' ? (opts.indent || 1) : 0,
+    wrapText: !!opts.wrap
+  };
+  cell.border = { top: border, left: border, bottom: border, right: border };
+  if (opts.numFmt) cell.numFmt = opts.numFmt;
+}
+
+function ovWriteMergedBanner(ws, r, c1, c2, text, opts) {
+  ws.mergeCells(r, c1, r, c2);
+  for (var c = c1; c <= c2; c++) {
+    ovStyleCell(ws.getCell(r, c), opts);
+  }
+  ws.getCell(r, c1).value = text;
+  ws.getRow(r).height = opts.h || 23;
+}
+
+function ovWriteTwoRowHeader(ws, startRow, row1Specs, row2Specs) {
+  var r1 = startRow, r2 = startRow + 1;
+  var occ = {};
+  var col1 = 1;
+  row1Specs.forEach(function (h) {
+    while (occ[r1 + ':' + col1]) col1++;
+    var cs = h.cs || 1, rs = h.rs || 1;
+    var st = {
+      hd: true,
+      bg: h.bg || '#5E2D91',
+      fg: h.fg || '#FFFFFF',
+      b: true,
+      al: h.al || 'c',
+      bd: h.bd || '#4C1D95',
+      wrap: true
+    };
+    if (cs > 1 || rs > 1) {
+      ws.mergeCells(r1, col1, r1 + rs - 1, col1 + cs - 1);
+      for (var rr = r1; rr < r1 + rs; rr++) {
+        for (var cc = col1; cc < col1 + cs; cc++) {
+          occ[rr + ':' + cc] = true;
+          ovStyleCell(ws.getCell(rr, cc), st);
+        }
+      }
+    } else {
+      occ[r1 + ':' + col1] = true;
+      ovStyleCell(ws.getCell(r1, col1), st);
+    }
+    ws.getCell(r1, col1).value = h.t;
+    col1 += cs;
+  });
+
+  var col2 = 1;
+  (row2Specs || []).forEach(function (h) {
+    while (occ[r2 + ':' + col2]) col2++;
+    var cs = h.cs || 1;
+    var st = {
+      hd: true,
+      bg: h.bg || '#6D3FA8',
+      fg: h.fg || '#FFFFFF',
+      b: true,
+      al: h.al || 'c',
+      bd: h.bd || '#5E2D91',
+      wrap: true
+    };
+    if (cs > 1) {
+      ws.mergeCells(r2, col2, r2, col2 + cs - 1);
+      for (var cc = col2; cc < col2 + cs; cc++) {
+        occ[r2 + ':' + cc] = true;
+        ovStyleCell(ws.getCell(r2, cc), st);
+      }
+    } else {
+      occ[r2 + ':' + col2] = true;
+      ovStyleCell(ws.getCell(r2, col2), st);
+    }
+    ws.getCell(r2, col2).value = h.t;
+    col2 += cs;
+  });
+
+  ws.getRow(r1).height = 22;
+  ws.getRow(r2).height = 20;
+  return startRow + 2;
+}
+
+// Helper to write a single cell and advance column pointer
+function ovPutProductMetrics(ws, r, startCol, prodStat, kind, idx) {
+  var k = ovRowKindColors(kind, idx);
+  var isTot = (kind === 'total');
+  var isSub = (kind === 'sv' || kind === 'sub');
+  var t = Math.round(prodStat.target || 0);
+  var a = Math.round(prodStat.ach || 0);
+  var gap = Math.round(prodStat.gap || 0);
+  var ratio = prodStat.ratio;
+  var c = startCol;
+
+  // 1. Target
+  var cT = ws.getCell(r, c++);
+  cT.value = t;
+  ovStyleCell(cT, { bg: k.bg, fg: isTot ? '#E5E7EB' : k.fg, b: k.b, numFmt: '#,##0' });
+
+  // 2. Achievement
+  var cA = ws.getCell(r, c++);
+  cA.value = a;
+  ovStyleCell(cA, { bg: k.bg, fg: k.fg, b: true, numFmt: '#,##0' });
+
+  // 3. Gap (+ / -)
+  var cG = ws.getCell(r, c++);
+  cG.value = (t > 0 || a > 0) ? gap : null;
+  if (cG.value === null) {
+    cG.value = '–';
+    ovStyleCell(cG, { bg: k.bg, fg: '#9CA3AF', b: false });
+  } else {
+    var gBg = isTot ? (gap >= 0 ? '#14532D' : '#7F1D1D') : (isSub ? k.bg : (gap >= 0 ? '#DCFCE7' : '#FEE2E2'));
+    var gFg = isTot ? '#FFFFFF' : (gap >= 0 ? '#15803D' : '#B91C1C');
+    ovStyleCell(cG, { bg: gBg, fg: gFg, b: true, numFmt: '+#,##0;-#,##0;0' });
+  }
+
+  // 4. Ach %
+  var cP = ws.getCell(r, c++);
+  if (ratio !== null && ratio !== undefined && !isNaN(ratio)) {
+    cP.value = ratio;
+    var tc = ovTierColors(ratio);
+    var pBg = (isTot || isSub) ? k.bg : tc.bg;
+    var pFg = isTot ? '#FFFFFF' : (isSub ? k.fg : tc.fg);
+    ovStyleCell(cP, { bg: pBg, fg: pFg, b: true, numFmt: (isTot || isSub) ? '0.0%' : '0%' });
+  } else {
+    cP.value = '–';
+    ovStyleCell(cP, { bg: k.bg, fg: '#9CA3AF', b: false });
+  }
+
+  return c;
+}
+
+async function buildOverviewMasterWorkbook() {
+  await mtdInsLoadExcelJS();
+  var ctx = ovGetFilterContext();
+  var evalIdx = (typeof buildEvalIndex === 'function') ? buildEvalIndex() : { byCodeMonth: {}, inferredNoEvalByCodeMonth: {} };
+
+  var wb = new ExcelJS.Workbook();
+  wb.creator = 'FAKHARANY360';
+  wb.created = new Date();
+
+  var allYearRows = ctx.allYearRows;
+  var activeRows = ctx.activeRows;
+  var yearAgg = ovCalcRichGroup(allYearRows);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 1: 1. Executive Overview (6 Core Products & Gaps + 6 Core Packages & Sub-Packages + Tariff Tiers)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws1 = wb.addWorksheet('1. Executive Overview');
+  ws1.views = [{ showGridLines: false }];
+  ws1.properties.tabColor = { argb: 'FF5E2D91' };
+  ws1.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  var w1 = [30, 12, 12, 14, 14, 14, 12, 12, 12, 12, 28, 28];
+  w1.forEach(function (w, i) { ws1.getColumn(i + 1).width = w; });
+  var N1 = w1.length;
+  var r1 = 1;
+
+  ovWriteMergedBanner(ws1, r1++, 1, N1,
+    'FAKHARANY360 — Executive Annual Performance Overview (' + ctx.basis + ' Basis) · ' + ctx.scopeLabel + ' · ' + ctx.periodLabel,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r1++;
+
+  // Block 1A: 6 Core Products Overview
+  ovWriteMergedBanner(ws1, r1++, 1, N1,
+    '📦 1. Core 6 Products Performance & Gaps Across Year (' + ctx.periodLabel + ' · ' + yearAgg.storeCount + ' Stores)',
+    { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+  );
+  ovWriteMergedBanner(ws1, r1++, 1, N1,
+    'Scope: ' + ctx.scopeLabel + ' · Data Basis: ' + ctx.basis + ' · Shows Target, Achievement, Signed Gap (+/-), Ach %, and Stores Below <100% / <90% / <70%',
+    { bg: '#F5F3FF', fg: '#5E2D91', b: true, al: 'l', bd: '#DDD6FE', sz: 10, h: 19 }
+  );
+
+  r1 = ovWriteTwoRowHeader(ws1, r1, [
+    { t: 'Product / Stream (المنتج)', rs: 2, al: 'l' },
+    { t: 'Stores', rs: 2 },
+    { t: 'Months', rs: 2 },
+    { t: 'Annual Performance & Gap (+ / -)', cs: 4 },
+    { t: 'Stores Below Target', cs: 3 },
+    { t: 'Best Store (أعلى فرع)', rs: 2, al: 'l' },
+    { t: 'Weakest Store (أقل فرع)', rs: 2, al: 'l' }
+  ], [
+    { t: 'Target' },
+    { t: 'Ach' },
+    { t: 'Gap (+ / -)' },
+    { t: 'Ach %' },
+    { t: '< 100%', bg: '#FEF3C7', fg: '#A16207', bd: '#E5E7EB' },
+    { t: '< 90%',  bg: '#FEE2E2', fg: '#B91C1C', bd: '#E5E7EB' },
+    { t: '< 70%',  bg: '#FFFFFF', fg: '#DC2626', bd: '#E5E7EB' }
+  ]);
+
+  PRODUCTS.forEach(function (p, idx) {
+    var ps = yearAgg.prodStats[p.key];
+    var k = ovRowKindColors('am', idx);
+    var c = 1;
+    var cName = ws1.getCell(r1, c++);
+    cName.value = p.label;
+    ovStyleCell(cName, { bg: k.bg, fg: p.color, b: true, al: 'l', indent: 1 });
+
+    var cSt = ws1.getCell(r1, c++); cSt.value = yearAgg.storeCount; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: true, numFmt: '#,##0' });
+    var cMo = ws1.getCell(r1, c++); cMo.value = yearAgg.monthCount; ovStyleCell(cMo, { bg: k.bg, fg: k.fg, b: false, numFmt: '#,##0' });
+
+    c = ovPutProductMetrics(ws1, r1, c, ps, 'am', idx);
+
+    var cB100 = ws1.getCell(r1, c++); cB100.value = ps.l100; ovStyleCell(cB100, { bg: k.bg, fg: '#A16207', b: true, numFmt: '#,##0' });
+    var cB90  = ws1.getCell(r1, c++); cB90.value  = ps.l90;  ovStyleCell(cB90,  { bg: k.bg, fg: '#1F2937', b: false, numFmt: '#,##0' });
+    var cB70  = ws1.getCell(r1, c++); cB70.value  = ps.l70;  ovStyleCell(cB70,  { bg: k.bg, fg: '#B91C1C', b: true, numFmt: '#,##0' });
+
+    var bestTxt = ps.bestStore ? (ps.bestStore.name + ' (' + Math.round(ps.bestStore.r * 100) + '%)') : '–';
+    var worstTxt = ps.worstStore ? (ps.worstStore.name + ' (' + Math.round(ps.worstStore.r * 100) + '%)') : '–';
+    var cBest = ws1.getCell(r1, c++); cBest.value = bestTxt; ovStyleCell(cBest, { bg: k.bg, fg: '#15803D', b: true, al: 'l' });
+    var cWorst = ws1.getCell(r1, c++); cWorst.value = worstTxt; ovStyleCell(cWorst, { bg: k.bg, fg: '#B91C1C', b: false, al: 'l' });
+
+    ws1.getRow(r1).height = 20;
+    r1++;
+  });
+  r1 += 2;
+
+  // Block 1B: Core 6 Package Families & Sub-Packages + Tariff Tiers Overview
+  ovWriteMergedBanner(ws1, r1++, 1, N1,
+    '💎 2. Core Package Families (الباقات الأساسية) & Tariff Mix Quality Across Year (' + ctx.periodLabel + ')',
+    { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+  );
+  var lowPctTxt = yearAgg.lowRatio !== null ? (yearAgg.lowRatio * 100).toFixed(1) + '%' : '–';
+  var midPctTxt = yearAgg.midRatio !== null ? (yearAgg.midRatio * 100).toFixed(1) + '%' : '–';
+  var highPctTxt = yearAgg.highRatio !== null ? (yearAgg.highRatio * 100).toFixed(1) + '%' : '–';
+  ovWriteMergedBanner(ws1, r1++, 1, N1,
+    'Tariff Mix Distribution: Low Tier = ' + lowPctTxt + ' (' + fmtN(yearAgg.lowT) + ') · Mid Tier = ' + midPctTxt + ' (' + fmtN(yearAgg.midT) + ') · High Tier = ' + highPctTxt + ' (' + fmtN(yearAgg.highT) + ') · 12 PT (PAYG) = ' + fmtN(yearAgg.pt12),
+    { bg: '#F5F3FF', fg: '#5E2D91', b: true, al: 'l', bd: '#DDD6FE', sz: 10, h: 19 }
+  );
+
+  r1 = ovWriteTwoRowHeader(ws1, r1, [
+    { t: 'Package Family (عائلة الباقة)', rs: 2, al: 'l' },
+    { t: 'Stores', rs: 2 },
+    { t: 'Share of Mix', rs: 2 },
+    { t: 'Package Performance & Gap (+ / -)', cs: 4 },
+    { t: 'Stores Below Target', cs: 3 },
+    { t: 'Top Sub-Packages Breakdown (تفصيل الباقات الفرعية)', cs: 2, rs: 2, al: 'l' }
+  ], [
+    { t: 'Target' },
+    { t: 'Ach' },
+    { t: 'Gap (+ / -)' },
+    { t: 'Ach %' },
+    { t: '< 100%', bg: '#FEF3C7', fg: '#A16207', bd: '#E5E7EB' },
+    { t: '< 90%',  bg: '#FEE2E2', fg: '#B91C1C', bd: '#E5E7EB' },
+    { t: '< 70%',  bg: '#FFFFFF', fg: '#DC2626', bd: '#E5E7EB' }
+  ]);
+
+  (typeof PKG_GROUPS !== 'undefined' ? PKG_GROUPS : []).forEach(function (pg, idx) {
+    var pk = yearAgg.pkgStats[pg.key];
+    if (!pk) return;
+    var k = ovRowKindColors('am', idx);
+    var c = 1;
+    var cName = ws1.getCell(r1, c++);
+    cName.value = pg.label;
+    ovStyleCell(cName, { bg: k.bg, fg: pg.color || '#5E2D91', b: true, al: 'l', indent: 1 });
+
+    var cSt = ws1.getCell(r1, c++); cSt.value = yearAgg.storeCount; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: false, numFmt: '#,##0' });
+    var share = yearAgg.totalPkgAch > 0 ? (pk.ach / yearAgg.totalPkgAch) : 0;
+    var cSh = ws1.getCell(r1, c++); cSh.value = share; ovStyleCell(cSh, { bg: k.bg, fg: '#4B5563', b: true, numFmt: '0.0%' });
+
+    c = ovPutProductMetrics(ws1, r1, c, pk, 'am', idx);
+
+    var cB100 = ws1.getCell(r1, c++); cB100.value = pk.l100; ovStyleCell(cB100, { bg: k.bg, fg: '#A16207', b: true, numFmt: '#,##0' });
+    var cB90  = ws1.getCell(r1, c++); cB90.value  = pk.l90;  ovStyleCell(cB90,  { bg: k.bg, fg: '#1F2937', b: false, numFmt: '#,##0' });
+    var cB70  = ws1.getCell(r1, c++); cB70.value  = pk.l70;  ovStyleCell(cB70,  { bg: k.bg, fg: '#B91C1C', b: true, numFmt: '#,##0' });
+
+    ws1.mergeCells(r1, c, r1, c + 1);
+    var cSub = ws1.getCell(r1, c);
+    cSub.value = pk.topSubsText || 'Direct Package Stream';
+    ovStyleCell(cSub, { bg: k.bg, fg: '#374151', b: false, al: 'l' });
+    ovStyleCell(ws1.getCell(r1, c + 1), { bg: k.bg, fg: '#374151', b: false, al: 'l' });
+
+    ws1.getRow(r1).height = 20;
+    r1++;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 2: 2. Area Managers & Supers (Exact MTD Branch Achievements Hierarchy:
+  //          Regional Mgr -> Supervisor -> Area Managers under Supervisor -> Supervisor Total underneath!)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws2 = wb.addWorksheet('2. Area Managers & Supers');
+  ws2.views = [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }];
+  ws2.properties.tabColor = { argb: 'FF2563EB' };
+  ws2.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  // Columns: [Entity (Supervisor / Area Manager), Stores, Month Count] + 6 Products * 4 cols (Target, Ach, Gap, Ach%) + [Mobile Below <100%, <90%, <70%] + [Low Tier %, High Tier %]
+  var w2 = [34, 9, 9];
+  PRODUCTS.forEach(function () { w2.push(11, 11, 11, 10); });
+  w2.push(9, 9, 9, 11, 11);
+  w2.forEach(function (w, i) { ws2.getColumn(i + 1).width = w; });
+  var N2 = w2.length;
+  var r2 = 1;
+
+  ovWriteMergedBanner(ws2, r2++, 1, N2,
+    'FAKHARANY360 — Area Managers & Supervisors Performance (' + ctx.basis + ' Basis) · ' + ctx.scopeLabel + ' · ' + ctx.periodLabel,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r2++;
+
+  // Group activeRows by Regional Manager -> Supervisor -> Area Manager
+  var tree = buildTeamPivotTree(activeRows);
+  var rmNames = Object.keys(tree).sort(function (a, b) {
+    return calcGroup(tree[b].rows).mobileTarget - calcGroup(tree[a].rows).mobileTarget;
+  });
+
+  rmNames.forEach(function (rmName) {
+    var rmObj = tree[rmName];
+    var rmAgg = ovCalcRichGroup(rmObj.rows);
+    ovWriteMergedBanner(ws2, r2++, 1, N2,
+      '👔 Regional Manager: ' + rmName + ' · ' + rmAgg.storeCount + ' Stores · ' + rmAgg.monthCount + ' Months',
+      { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+    );
+    ovWriteMergedBanner(ws2, r2++, 1, N2,
+      'Branch Achievement Hierarchy — Each Supervisor followed by their Area Managers & the Supervisor Total row underneath (' + ctx.basis + ')',
+      { bg: '#F5F3FF', fg: '#5E2D91', b: true, al: 'l', bd: '#DDD6FE', sz: 10, h: 19 }
+    );
+
+    var h1 = [
+      { t: 'Supervisor / Area Manager', rs: 2, al: 'l' },
+      { t: 'Stores', rs: 2 },
+      { t: 'Months', rs: 2 }
+    ];
+    var h2 = [];
+    PRODUCTS.forEach(function (p) {
+      h1.push({ t: p.label + ' Performance', cs: 4, bg: p.color });
+      h2.push(
+        { t: 'Target', bg: '#6D3FA8' },
+        { t: 'Ach', bg: '#6D3FA8' },
+        { t: 'Gap (+/-)', bg: '#6D3FA8' },
+        { t: 'Ach %', bg: '#6D3FA8' }
+      );
+    });
+    h1.push({ t: 'Mobile Stores Below', cs: 3, bg: '#5E2D91' });
+    h2.push(
+      { t: '< 100%', bg: '#FEF3C7', fg: '#A16207', bd: '#E5E7EB' },
+      { t: '< 90%',  bg: '#FEE2E2', fg: '#B91C1C', bd: '#E5E7EB' },
+      { t: '< 70%',  bg: '#FFFFFF', fg: '#DC2626', bd: '#E5E7EB' }
+    );
+    h1.push({ t: 'Tariff Quality', cs: 2, bg: '#0F766E' });
+    h2.push({ t: 'Low Tier %', bg: '#115E59' }, { t: 'High Tier %', bg: '#115E59' });
+
+    r2 = ovWriteTwoRowHeader(ws2, r2, h1, h2);
+
+    function writeHierarchyRow(ws, rowIdx, labelTxt, gObj, kind, idx, indentLvl) {
+      var k = ovRowKindColors(kind, idx);
+      var c = 1;
+      var cLbl = ws.getCell(rowIdx, c++);
+      cLbl.value = labelTxt;
+      ovStyleCell(cLbl, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indentLvl || 1 });
+
+      var cSt = ws.getCell(rowIdx, c++); cSt.value = gObj.storeCount; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      var cMo = ws.getCell(rowIdx, c++); cMo.value = gObj.monthCount; ovStyleCell(cMo, { bg: k.bg, fg: k.fg, b: false, numFmt: '#,##0' });
+
+      PRODUCTS.forEach(function (p) {
+        c = ovPutProductMetrics(ws, rowIdx, c, gObj.prodStats[p.key], kind, idx);
+      });
+
+      var mStat = gObj.prodStats.mobile;
+      var isTot = (kind === 'total');
+      var cB100 = ws.getCell(rowIdx, c++); cB100.value = mStat.l100; ovStyleCell(cB100, { bg: k.bg, fg: isTot ? '#FFFFFF' : '#A16207', b: true, numFmt: '#,##0' });
+      var cB90  = ws.getCell(rowIdx, c++); cB90.value  = mStat.l90;  ovStyleCell(cB90,  { bg: k.bg, fg: isTot ? '#FFFFFF' : '#1F2937', b: false, numFmt: '#,##0' });
+      var cB70  = ws.getCell(rowIdx, c++); cB70.value  = mStat.l70;  ovStyleCell(cB70,  { bg: k.bg, fg: isTot ? '#FFFFFF' : '#B91C1C', b: true, numFmt: '#,##0' });
+
+      var cLow = ws.getCell(rowIdx, c++);
+      cLow.value = gObj.lowRatio !== null ? gObj.lowRatio : '–';
+      ovStyleCell(cLow, { bg: k.bg, fg: isTot ? '#FCA5A5' : '#B91C1C', b: true, numFmt: gObj.lowRatio !== null ? '0.0%' : undefined });
+
+      var cHigh = ws.getCell(rowIdx, c++);
+      cHigh.value = gObj.highRatio !== null ? gObj.highRatio : '–';
+      ovStyleCell(cHigh, { bg: k.bg, fg: isTot ? '#86EFAC' : '#15803D', b: true, numFmt: gObj.highRatio !== null ? '0.0%' : undefined });
+
+      ws.getRow(rowIdx).height = (kind === 'total' || kind === 'sv' || kind === 'sub') ? 21 : 19;
+    }
+
+    var svNames = Object.keys(rmObj.supervisors).sort(function (a, b) {
+      return calcGroup(rmObj.supervisors[b].rows).mobileTarget - calcGroup(rmObj.supervisors[a].rows).mobileTarget;
+    });
+
+    svNames.forEach(function (svName) {
+      var svObj = rmObj.supervisors[svName];
+      var svAgg = ovCalcRichGroup(svObj.rows);
+      var amNames = Object.keys(svObj.areaManagers).sort(function (a, b) {
+        var ga = calcGroup(svObj.areaManagers[a]), gb = calcGroup(svObj.areaManagers[b]);
+        var pa = ga.mobileTarget > 0 ? (ga.mobileSubs / ga.mobileTarget) : 0;
+        var pb = gb.mobileTarget > 0 ? (gb.mobileSubs / gb.mobileTarget) : 0;
+        return pb - pa;
+      });
+
+      // Supervisor Header Row (MTD Branch Achievements light blue #DBE8F7)
+      writeHierarchyRow(ws2, r2++, '🧑‍💼 Supervisor: ' + svName + ' (' + amNames.length + ' Area Managers)', svAgg, 'sv', 0, 1);
+
+      // Area Managers under this Supervisor
+      amNames.forEach(function (amName, ai) {
+        var amRows = svObj.areaManagers[amName];
+        var amAgg = ovCalcRichGroup(amRows);
+        writeHierarchyRow(ws2, r2++, '   📍 ' + amName, amAgg, 'am', ai, 2);
+      });
+
+      // Explicit Supervisor Total / Subtotal Row right underneath their Area Managers (as requested!)
+      writeHierarchyRow(ws2, r2++, '∑ إجمالي السوبرفايزر — ' + svName + ' Total (' + amNames.length + ' Area Mgrs · ' + svAgg.storeCount + ' Stores)', svAgg, (svNames.length === 1 ? 'total' : 'sub'), 0, 1);
+    });
+
+    if (svNames.length > 1) {
+      writeHierarchyRow(ws2, r2++, '🏆 GRAND TOTAL — ' + rmName + ' (' + svNames.length + ' Supervisors · ' + rmAgg.storeCount + ' Stores)', rmAgg, 'total', 0, 1);
+    }
+    r2 += 2;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 3: 3. Per Quarter & Month (أداء السوبرفايزر / الفلتر بالكوارتر والشهور + الكوارتر لكل Area Manager)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws3 = wb.addWorksheet('3. Per Quarter & Month');
+  ws3.views = [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }];
+  ws3.properties.tabColor = { argb: 'FF16A34A' };
+  ws3.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  var w3 = [32, 10, 10];
+  PRODUCTS.forEach(function () { w3.push(11, 11, 11, 10); });
+  w3.push(10, 10, 10); // Low %, Mid %, High %
+  w3.forEach(function (w, i) { ws3.getColumn(i + 1).width = w; });
+  var N3 = w3.length;
+  var r3 = 1;
+
+  ovWriteMergedBanner(ws3, r3++, 1, N3,
+    'FAKHARANY360 — Performance Per Quarter & Month (' + ctx.basis + ' Basis) · ' + ctx.scopeLabel + ' · ' + ctx.periodLabel,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r3++;
+
+  // Table 3A: Overall Selected Scope Per Quarter & Month (6 Core Products & Gaps)
+  ovWriteMergedBanner(ws3, r3++, 1, N3,
+    '📅 1. Quarterly & Monthly Trajectory — 6 Core Products & Gaps (' + ctx.scopeLabel + ')',
+    { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+  );
+  ovWriteMergedBanner(ws3, r3++, 1, N3,
+    'Grouped by Quarter (Q1, Q2, Q3, Q4) with Monthly rows and Quarter Subtotals right below each Quarter',
+    { bg: '#F5F3FF', fg: '#5E2D91', b: true, al: 'l', bd: '#DDD6FE', sz: 10, h: 19 }
+  );
+
+  var h3_1 = [
+    { t: 'Quarter / Month (الكوارتر والشهر)', rs: 2, al: 'l' },
+    { t: 'Quarter', rs: 2 },
+    { t: 'Stores', rs: 2 }
+  ];
+  var h3_2 = [];
+  PRODUCTS.forEach(function (p) {
+    h3_1.push({ t: p.label + ' Performance', cs: 4, bg: p.color });
+    h3_2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+  });
+  h3_1.push({ t: 'Tariff Tiers %', cs: 3, bg: '#0F766E' });
+  h3_2.push({ t: 'Low %', bg: '#115E59' }, { t: 'Mid %', bg: '#115E59' }, { t: 'High %', bg: '#115E59' });
+
+  r3 = ovWriteTwoRowHeader(ws3, r3, h3_1, h3_2);
+
+  function writeQuarterMonthRow(ws, rowIdx, labelTxt, qCode, gObj, kind, idx, indentLvl) {
+    var k = ovRowKindColors(kind, idx);
+    var isTot = (kind === 'total');
+    var c = 1;
+    var cLbl = ws.getCell(rowIdx, c++); cLbl.value = labelTxt; ovStyleCell(cLbl, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indentLvl || 1 });
+    var cQ   = ws.getCell(rowIdx, c++); cQ.value   = qCode;    ovStyleCell(cQ,   { bg: k.bg, fg: k.fg, b: true });
+    var cSt  = ws.getCell(rowIdx, c++); cSt.value  = gObj.storeCount; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+
+    PRODUCTS.forEach(function (p) {
+      c = ovPutProductMetrics(ws, rowIdx, c, gObj.prodStats[p.key], kind, idx);
+    });
+
+    var cL = ws.getCell(rowIdx, c++); cL.value = gObj.lowRatio !== null ? gObj.lowRatio : '–';
+    ovStyleCell(cL, { bg: k.bg, fg: isTot ? '#FCA5A5' : '#B91C1C', b: true, numFmt: gObj.lowRatio !== null ? '0.0%' : undefined });
+    var cM = ws.getCell(rowIdx, c++); cM.value = gObj.midRatio !== null ? gObj.midRatio : '–';
+    ovStyleCell(cM, { bg: k.bg, fg: isTot ? '#FDE68A' : '#A16207', b: false, numFmt: gObj.midRatio !== null ? '0.0%' : undefined });
+    var cH = ws.getCell(rowIdx, c++); cH.value = gObj.highRatio !== null ? gObj.highRatio : '–';
+    ovStyleCell(cH, { bg: k.bg, fg: isTot ? '#86EFAC' : '#15803D', b: true, numFmt: gObj.highRatio !== null ? '0.0%' : undefined });
+
+    ws.getRow(rowIdx).height = (kind === 'total' || kind === 'sub') ? 21 : 19;
+  }
+
+  OV_QUARTER_DEFS.forEach(function (qDef) {
+    var qMos = qDef.months.filter(function (m) { return ctx.monthsInYear.indexOf(m) >= 0; });
+    if (!qMos.length) return;
+    var qRows = allYearRows.filter(function (r) { return qMos.indexOf(r.month) >= 0; });
+    var qAgg = ovCalcRichGroup(qRows);
+
+    qMos.forEach(function (m, mi) {
+      var mRows = allYearRows.filter(function (r) { return r.month === m; });
+      var mAgg = ovCalcRichGroup(mRows);
+      var mLabel = '📅 ' + (MONTH_EN_FULL[m] || m) + ' (' + (MONTH_AR_NAMES[m] || m) + ')';
+      writeQuarterMonthRow(ws3, r3++, mLabel, qDef.key, mAgg, 'store', mi, 2);
+    });
+
+    writeQuarterMonthRow(ws3, r3++, '📊 ' + qDef.label + ' Total (' + qMos.length + ' Months)', qDef.key, qAgg, 'sub', 0, 1);
+  });
+
+  writeQuarterMonthRow(ws3, r3++, '🏆 FULL YEAR TOTAL (' + ctx.monthsInYear.length + ' Months · ' + yearAgg.storeCount + ' Stores)', 'YEAR', yearAgg, 'total', 0, 1);
+  r3 += 2;
+
+  // Table 3B: Per Area Manager × Quarter & Month Breakdown
+  var amSet = Array.from(new Set(allYearRows.map(function (r) { return r.areaManager; }).filter(Boolean))).sort();
+  if (amSet.length > 0) {
+    ovWriteMergedBanner(ws3, r3++, 1, N3,
+      '📍 2. Area Managers Quarterly & Monthly Breakdown (' + amSet.length + ' Area Managers)',
+      { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+    );
+    r3 = ovWriteTwoRowHeader(ws3, r3, h3_1, h3_2);
+
+    amSet.forEach(function (amName) {
+      var amRowsAll = allYearRows.filter(function (r) { return r.areaManager === amName; });
+      var amYearAgg = ovCalcRichGroup(amRowsAll);
+      ovWriteMergedBanner(ws3, r3++, 1, N3,
+        '📍 Area Manager: ' + amName + ' · ' + amYearAgg.storeCount + ' Stores · ' + amYearAgg.monthCount + ' Months',
+        { bg: '#F5F3FF', fg: '#5E2D91', b: true, al: 'l', bd: '#DDD6FE', sz: 10.5, h: 20 }
+      );
+      OV_QUARTER_DEFS.forEach(function (qDef) {
+        var qMos = qDef.months.filter(function (m) { return amRowsAll.some(function (r) { return r.month === m; }); });
+        if (!qMos.length) return;
+        qMos.forEach(function (m, mi) {
+          var mRows = amRowsAll.filter(function (r) { return r.month === m; });
+          writeQuarterMonthRow(ws3, r3++, '   📅 ' + (MONTH_EN_FULL[m] || m), qDef.key, ovCalcRichGroup(mRows), 'store', mi, 2);
+        });
+        var qRows = amRowsAll.filter(function (r) { return qMos.indexOf(r.month) >= 0; });
+        writeQuarterMonthRow(ws3, r3++, '   📊 ' + qDef.key + ' Subtotal — ' + amName, qDef.key, ovCalcRichGroup(qRows), 'sub', 0, 1);
+      });
+      writeQuarterMonthRow(ws3, r3++, '∑ Total — ' + amName + ' (' + amYearAgg.monthCount + ' Months)', 'TOTAL', amYearAgg, 'total', 0, 1);
+      r3++;
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 4: 4. Branches & Area Mgr by Month (أداء الفروع بالشهور مع توضيح الـ Area Manager في كل شهر)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws4 = wb.addWorksheet('4. Branches & Area Mgr by Month');
+  ws4.views = [{ state: 'frozen', xSplit: 3, ySplit: 2, showGridLines: false }];
+  ws4.properties.tabColor = { argb: 'FFD97706' };
+  ws4.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  // Columns: [Month, Quarter, Area Manager in Month, Supervisor in Month, Store Manager in Month, Eval %, Classification, Partner] + 6 Products * 4 cols + [Low %, High %]
+  var w4 = [22, 9, 28, 24, 26, 11, 15, 18];
+  PRODUCTS.forEach(function () { w4.push(11, 11, 11, 10); });
+  w4.push(10, 10);
+  w4.forEach(function (w, i) { ws4.getColumn(i + 1).width = w; });
+  var N4 = w4.length;
+  var r4 = 1;
+
+  ovWriteMergedBanner(ws4, r4++, 1, N4,
+    'FAKHARANY360 — Branches Monthly Performance & Area Manager Assignment Per Month (' + ctx.basis + ' Basis) · ' + ctx.scopeLabel,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r4++;
+
+  // Group allYearRows by Branch (Store Code / Store Name)
+  var byBranch = {};
+  allYearRows.forEach(function (r) {
+    var bKey = r.storeCode || r.store || 'UNKNOWN';
+    if (!byBranch[bKey]) byBranch[bKey] = [];
+    byBranch[bKey].push(r);
+  });
+
+  var branchList = Object.keys(byBranch).map(function (bKey) {
+    var bRows = byBranch[bKey].slice().sort(function (a, b) {
+      return MONTH_ORDER.indexOf(a.month) - MONTH_ORDER.indexOf(b.month);
+    });
+    var bAgg = ovCalcRichGroup(bRows);
+    var lastR = bRows[bRows.length - 1] || {};
+    var uniqueAMs = [];
+    bRows.forEach(function (r) {
+      if (r.areaManager && uniqueAMs.indexOf(r.areaManager) < 0) uniqueAMs.push(r.areaManager);
+    });
+    return {
+      key: bKey,
+      storeName: lastR.store || bKey,
+      storeCode: lastR.storeCode || '',
+      classification: lastR.classification || '',
+      partner: lastR.partner || '',
+      rows: bRows,
+      agg: bAgg,
+      uniqueAMs: uniqueAMs,
+      changedAM: uniqueAMs.length > 1
+    };
+  }).sort(function (a, b) {
+    var ra = a.agg.prodStats.mobile.ratio || 0;
+    var rb = b.agg.prodStats.mobile.ratio || 0;
+    return rb - ra;
+  });
+
+  var h4_1 = [
+    { t: 'Month (الشهر)', rs: 2, al: 'l' },
+    { t: 'Quarter', rs: 2 },
+    { t: 'Area Manager in Month (الأريا مانجر في الشهر)', rs: 2, al: 'l', bg: '#1E3A8A' },
+    { t: 'Supervisor in Month', rs: 2, al: 'l' },
+    { t: 'Store Manager (مدير الفرع)', rs: 2, al: 'l' },
+    { t: 'Eval %', rs: 2, bg: '#0F766E' },
+    { t: 'Class', rs: 2 },
+    { t: 'Partner', rs: 2 }
+  ];
+  var h4_2 = [];
+  PRODUCTS.forEach(function (p) {
+    h4_1.push({ t: p.label + ' Performance', cs: 4, bg: p.color });
+    h4_2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+  });
+  h4_1.push({ t: 'Tariff Mix', cs: 2, bg: '#0F766E' });
+  h4_2.push({ t: 'Low %', bg: '#115E59' }, { t: 'High %', bg: '#115E59' });
+
+  branchList.forEach(function (br, bIdx) {
+    var amPathTxt = br.uniqueAMs.join('  ➔  ');
+    var mobStat = br.agg.prodStats.mobile;
+    var mobPctTxt = mobStat.ratio !== null ? (mobStat.ratio * 100).toFixed(1) + '%' : '–';
+    var mobGapTxt = (mobStat.gap > 0 ? '+' : '') + fmtN(Math.round(mobStat.gap));
+
+    ovWriteMergedBanner(ws4, r4++, 1, N4,
+      '#' + (bIdx + 1) + ' 🏪 الفرع: ' + br.storeName + (br.storeCode ? ' [' + br.storeCode + ']' : '') +
+      ' · (' + br.rows.length + ' Months) · Area Manager(s): ' + amPathTxt +
+      (br.changedAM ? ' (🔄 انتقل بين ' + br.uniqueAMs.length + ' Area Managers)' : '') +
+      ' · Mobile: ' + mobPctTxt + ' (Gap: ' + mobGapTxt + ')',
+      { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11, h: 23 }
+    );
+
+    r4 = ovWriteTwoRowHeader(ws4, r4, h4_1, h4_2);
+
+    var prevAM = null;
+    br.rows.forEach(function (mRow, mi) {
+      var mAgg = ovCalcRichGroup([mRow]);
+      var k = ovRowKindColors('store', mi);
+      var curAM = mRow.areaManager || '—';
+      var amChangedThisMonth = (prevAM !== null && curAM !== prevAM);
+      var amCellDisplay = amChangedThisMonth ? ('🔄 ' + curAM + ' (من: ' + prevAM + ')') : curAM;
+      prevAM = curAM;
+
+      var codeNorm = (typeof mgrNormCode === 'function') ? mgrNormCode(mRow.storeCode) : String(mRow.storeCode || '').trim().toUpperCase();
+      var evRec = (codeNorm && mRow.month && evalIdx.byCodeMonth && evalIdx.byCodeMonth[codeNorm + '|' + mRow.month]) ||
+                  (codeNorm && mRow.month && evalIdx.inferredNoEvalByCodeMonth && evalIdx.inferredNoEvalByCodeMonth[codeNorm + '|' + mRow.month]) ||
+                  null;
+      var smName = evRec ? evRec.managerName : (mRow.storeManager || '—');
+      var isNoEv = !!(evRec && evRec.isNoEvalMonth);
+      var evScore = (evRec && evRec.evalScore !== null && !isNoEv) ? evRec.evalScore : null;
+
+      var c = 1;
+      var cMo = ws4.getCell(r4, c++);
+      cMo.value = (MONTH_EN_FULL[mRow.month] || mRow.month) + ' (' + (MONTH_AR_NAMES[mRow.month] || '') + ')';
+      ovStyleCell(cMo, { bg: k.bg, fg: '#5E2D91', b: true, al: 'l', indent: 1 });
+
+      var cQ = ws4.getCell(r4, c++);
+      cQ.value = ovGetQuarterForMonth(mRow.month);
+      ovStyleCell(cQ, { bg: k.bg, fg: '#4B5563', b: true });
+
+      var cAM = ws4.getCell(r4, c++);
+      cAM.value = amCellDisplay;
+      ovStyleCell(cAM, {
+        bg: amChangedThisMonth ? '#FEF3C7' : '#EFF6FF',
+        fg: amChangedThisMonth ? '#92400E' : '#1E3A8A',
+        b: true,
+        al: 'l',
+        indent: 1
+      });
+
+      var cSV = ws4.getCell(r4, c++);
+      cSV.value = mRow.supervisor || '—';
+      ovStyleCell(cSV, { bg: k.bg, fg: '#374151', b: false, al: 'l', indent: 1 });
+
+      var cSM = ws4.getCell(r4, c++);
+      cSM.value = smName;
+      ovStyleCell(cSM, { bg: k.bg, fg: '#1F2937', b: false, al: 'l', indent: 1 });
+
+      var cEv = ws4.getCell(r4, c++);
+      if (evScore !== null) {
+        cEv.value = evScore;
+        var evTc = ovTierColors(evScore);
+        ovStyleCell(cEv, { bg: evTc.bg, fg: evTc.fg, b: true, numFmt: '0.0%' });
+      } else if (isNoEv) {
+        var rsn = (typeof getManagerNoEvalReason === 'function') ? getManagerNoEvalReason(evRec.oracleId, evRec.managerName, mRow.month) : '';
+        cEv.value = 'No Eval' + (rsn ? ' (' + rsn + ')' : '');
+        ovStyleCell(cEv, { bg: '#FFEDD5', fg: '#C2410C', b: true });
+      } else {
+        cEv.value = '–';
+        ovStyleCell(cEv, { bg: k.bg, fg: '#9CA3AF', b: false });
+      }
+
+      var cCls = ws4.getCell(r4, c++); cCls.value = mRow.classification || '—'; ovStyleCell(cCls, { bg: k.bg, fg: '#4B5563', b: false });
+      var cPt  = ws4.getCell(r4, c++); cPt.value  = mRow.partner || '—';        ovStyleCell(cPt,  { bg: k.bg, fg: '#4B5563', b: false });
+
+      PRODUCTS.forEach(function (p) {
+        c = ovPutProductMetrics(ws4, r4, c, mAgg.prodStats[p.key], 'store', mi);
+      });
+
+      var cL = ws4.getCell(r4, c++); cL.value = mAgg.lowRatio !== null ? mAgg.lowRatio : '–';
+      ovStyleCell(cL, { bg: k.bg, fg: '#B91C1C', b: true, numFmt: mAgg.lowRatio !== null ? '0.0%' : undefined });
+      var cH = ws4.getCell(r4, c++); cH.value = mAgg.highRatio !== null ? mAgg.highRatio : '–';
+      ovStyleCell(cH, { bg: k.bg, fg: '#15803D', b: true, numFmt: mAgg.highRatio !== null ? '0.0%' : undefined });
+
+      ws4.getRow(r4).height = 19.5;
+      r4++;
+    });
+
+    // Branch Total Row
+    var ct = 1;
+    var cTotLbl = ws4.getCell(r4, ct++); cTotLbl.value = '∑ إجمالي الفرع — ' + br.storeName + ' (' + br.rows.length + ' Months)';
+    ovStyleCell(cTotLbl, { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', indent: 1 });
+    var cTotQ  = ws4.getCell(r4, ct++); cTotQ.value = 'TOTAL'; ovStyleCell(cTotQ, { bg: '#111827', fg: '#FFFFFF', b: true });
+    var cTotAM = ws4.getCell(r4, ct++); cTotAM.value = amPathTxt; ovStyleCell(cTotAM, { bg: '#111827', fg: '#93C5FD', b: true, al: 'l', indent: 1 });
+    var cTotSV = ws4.getCell(r4, ct++); cTotSV.value = (br.rows[br.rows.length - 1] || {}).supervisor || '—'; ovStyleCell(cTotSV, { bg: '#111827', fg: '#E5E7EB', b: true, al: 'l', indent: 1 });
+    var cTotSM = ws4.getCell(r4, ct++); cTotSM.value = br.storeCode || '—'; ovStyleCell(cTotSM, { bg: '#111827', fg: '#E5E7EB', b: true });
+    var cTotEv = ws4.getCell(r4, ct++); cTotEv.value = '–'; ovStyleCell(cTotEv, { bg: '#111827', fg: '#9CA3AF', b: true });
+    var cTotCl = ws4.getCell(r4, ct++); cTotCl.value = br.classification || '—'; ovStyleCell(cTotCl, { bg: '#111827', fg: '#E5E7EB', b: false });
+    var cTotPt = ws4.getCell(r4, ct++); cTotPt.value = br.partner || '—'; ovStyleCell(cTotPt, { bg: '#111827', fg: '#E5E7EB', b: false });
+
+    PRODUCTS.forEach(function (p) {
+      ct = ovPutProductMetrics(ws4, r4, ct, br.agg.prodStats[p.key], 'total', 0);
+    });
+    var cTotL = ws4.getCell(r4, ct++); cTotL.value = br.agg.lowRatio !== null ? br.agg.lowRatio : '–';
+    ovStyleCell(cTotL, { bg: '#111827', fg: '#FCA5A5', b: true, numFmt: br.agg.lowRatio !== null ? '0.0%' : undefined });
+    var cTotH = ws4.getCell(r4, ct++); cTotH.value = br.agg.highRatio !== null ? br.agg.highRatio : '–';
+    ovStyleCell(cTotH, { bg: '#111827', fg: '#86EFAC', b: true, numFmt: br.agg.highRatio !== null ? '0.0%' : undefined });
+
+    ws4.getRow(r4).height = 21.5;
+    r4 += 2;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 5: 5. Branches Ranking & Matrix (Pro Bonus: Consolidated Branch Ranking,
+  //          Area Manager Path, Performance Quadrant Badge & Month-by-Month Matrix)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws5 = wb.addWorksheet('5. Branches Ranking & Matrix');
+  ws5.views = [{ state: 'frozen', xSplit: 3, ySplit: 5, showGridLines: false }];
+  ws5.properties.tabColor = { argb: 'FFE91E8C' };
+  ws5.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  var w5 = [7, 28, 16, 28, 22, 15, 18, 18];
+  PRODUCTS.forEach(function () { w5.push(11, 11, 11, 10); });
+  ctx.monthsInYear.forEach(function () { w5.push(10); });
+  w5.forEach(function (w, i) { ws5.getColumn(i + 1).width = w; });
+  var N5 = w5.length;
+  var r5 = 1;
+
+  ovWriteMergedBanner(ws5, r5++, 1, N5,
+    'FAKHARANY360 — Consolidated Branches Ranking, Area Manager Path & Monthly Matrix (' + ctx.basis + ' Basis) · ' + branchList.length + ' Stores',
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r5++;
+
+  ovWriteMergedBanner(ws5, r5++, 1, N5,
+    '🏆 Branches Overall Ranking (Sorted by Mobile Ach %) — With Area Manager History & Month-by-Month Achievement Matrix',
+    { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+  );
+
+  var h5_1 = [
+    { t: 'Rank', rs: 2 },
+    { t: 'Branch Name (الفرع)', rs: 2, al: 'l' },
+    { t: 'Store Code', rs: 2 },
+    { t: 'Area Manager Path Across Year (مسار الأريا مانجر)', rs: 2, al: 'l', bg: '#1E3A8A' },
+    { t: 'Supervisor', rs: 2, al: 'l' },
+    { t: 'Class', rs: 2 },
+    { t: 'Partner', rs: 2 },
+    { t: 'Performance Quadrant', rs: 2, bg: '#0F766E' }
+  ];
+  var h5_2 = [];
+  PRODUCTS.forEach(function (p) {
+    h5_1.push({ t: p.label + ' Total', cs: 4, bg: p.color });
+    h5_2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+  });
+  if (ctx.monthsInYear.length > 0) {
+    h5_1.push({ t: 'Month-by-Month Mobile Ach % Matrix', cs: ctx.monthsInYear.length, bg: '#1E1B4B' });
+    ctx.monthsInYear.forEach(function (m) {
+      h5_2.push({ t: (MONTH_LABELS[m] || m) + ' %', bg: '#312E81' });
+    });
+  }
+
+  r5 = ovWriteTwoRowHeader(ws5, r5, h5_1, h5_2);
+
+  branchList.forEach(function (br, idx) {
+    var k = ovRowKindColors('am', idx);
+    var mobRatio = br.agg.prodStats.mobile.ratio || 0;
+    var quadTxt, quadBg, quadFg;
+    if (mobRatio >= 1.0)       { quadTxt = '🌟 Star (>=100%)';      quadBg = '#DCFCE7'; quadFg = '#15803D'; }
+    else if (mobRatio >= 0.90) { quadTxt = '🔥 Quick Win (90-99%)'; quadBg = '#E0F2FE'; quadFg = '#0369A1'; }
+    else if (mobRatio >= 0.75) { quadTxt = '⚠️ Needs Push (75-89%)'; quadBg = '#FEF3C7'; quadFg = '#A16207'; }
+    else                       { quadTxt = '🚨 Critical (<75%)';    quadBg = '#FEE2E2'; quadFg = '#B91C1C'; }
+
+    var amDetailedPath = [];
+    var lastAmP = null;
+    br.rows.forEach(function (r) {
+      var amP = r.areaManager || '—';
+      var mShort = MONTH_LABELS[r.month] || r.month;
+      if (amP !== lastAmP) {
+        amDetailedPath.push(amP + ' (' + mShort + ')');
+        lastAmP = amP;
+      }
+    });
+    var amPathSummary = br.changedAM ? amDetailedPath.join(' ➔ ') : (br.uniqueAMs[0] || '—');
+
+    var c = 1;
+    var cRnk = ws5.getCell(r5, c++); cRnk.value = idx + 1; ovStyleCell(cRnk, { bg: k.bg, fg: '#5E2D91', b: true });
+    var cSt  = ws5.getCell(r5, c++); cSt.value  = br.storeName; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: true, al: 'l', indent: 1 });
+    var cCd  = ws5.getCell(r5, c++); cCd.value  = br.storeCode || '—'; ovStyleCell(cCd, { bg: k.bg, fg: '#4B5563', b: false });
+    var cAM  = ws5.getCell(r5, c++); cAM.value  = amPathSummary;
+    ovStyleCell(cAM, { bg: br.changedAM ? '#FEF3C7' : k.bg, fg: br.changedAM ? '#92400E' : '#1E3A8A', b: true, al: 'l', indent: 1 });
+    var cSV  = ws5.getCell(r5, c++); cSV.value  = (br.rows[br.rows.length - 1] || {}).supervisor || '—'; ovStyleCell(cSV, { bg: k.bg, fg: '#374151', b: false, al: 'l', indent: 1 });
+    var cCl  = ws5.getCell(r5, c++); cCl.value  = br.classification || '—'; ovStyleCell(cCl, { bg: k.bg, fg: '#4B5563', b: false });
+    var cPt  = ws5.getCell(r5, c++); cPt.value  = br.partner || '—'; ovStyleCell(cPt, { bg: k.bg, fg: '#4B5563', b: false });
+    var cQd  = ws5.getCell(r5, c++); cQd.value  = quadTxt; ovStyleCell(cQd, { bg: quadBg, fg: quadFg, b: true });
+
+    PRODUCTS.forEach(function (p) {
+      c = ovPutProductMetrics(ws5, r5, c, br.agg.prodStats[p.key], 'am', idx);
+    });
+
+    var moRowMap = {};
+    br.rows.forEach(function (r) { moRowMap[r.month] = r; });
+    ctx.monthsInYear.forEach(function (m) {
+      var mr = moRowMap[m];
+      var cm = ws5.getCell(r5, c++);
+      if (mr && (Number(mr.mobileTarget) || 0) > 0) {
+        var rVal = (Number(mr.mobileSubs) || 0) / Number(mr.mobileTarget);
+        var tc = ovTierColors(rVal);
+        cm.value = rVal;
+        ovStyleCell(cm, { bg: tc.bg, fg: tc.fg, b: true, numFmt: '0%' });
+      } else {
+        cm.value = '–';
+        ovStyleCell(cm, { bg: k.bg, fg: '#9CA3AF', b: false });
+      }
+    });
+
+    ws5.getRow(r5).height = 20;
+    r5++;
+  });
+
+  // Grand Total row for Sheet 5
+  var c5t = 1;
+  ovStyleCell(ws5.getCell(r5, c5t), { bg: '#111827', fg: '#FFFFFF', b: true }); ws5.getCell(r5, c5t++).value = 'TOTAL';
+  ovStyleCell(ws5.getCell(r5, c5t), { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', indent: 1 }); ws5.getCell(r5, c5t++).value = 'All Branches Total (' + branchList.length + ' Stores)';
+  for (var pad = 0; pad < 6; pad++) {
+    ovStyleCell(ws5.getCell(r5, c5t), { bg: '#111827', fg: '#9CA3AF', b: true });
+    ws5.getCell(r5, c5t++).value = '—';
+  }
+  PRODUCTS.forEach(function (p) {
+    c5t = ovPutProductMetrics(ws5, r5, c5t, yearAgg.prodStats[p.key], 'total', 0);
+  });
+  ctx.monthsInYear.forEach(function (m) {
+    var mRows = allYearRows.filter(function (r) { return r.month === m; });
+    var mg = calcGroup(mRows);
+    var cm = ws5.getCell(r5, c5t++);
+    cm.value = mg.mobileTarget > 0 ? (mg.mobileSubs / mg.mobileTarget) : '–';
+    ovStyleCell(cm, { bg: '#111827', fg: '#FFFFFF', b: true, numFmt: mg.mobileTarget > 0 ? '0.0%' : undefined });
+  });
+  ws5.getRow(r5).height = 22;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SHEET 6: 6. Packages & Tariff Mix (Pro Bonus: 6 Package Families + Tariff Tiers
+  //          per Supervisor -> Area Manager -> Store)
+  // ══════════════════════════════════════════════════════════════════════════
+  var ws6 = wb.addWorksheet('6. Packages & Tariff Mix');
+  ws6.views = [{ state: 'frozen', xSplit: 1, ySplit: 5, showGridLines: false }];
+  ws6.properties.tabColor = { argb: 'FF0F766E' };
+  ws6.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  var corePkgs = (typeof PKG_GROUPS !== 'undefined' ? PKG_GROUPS.slice(0, 6) : []);
+  var w6 = [34, 9, 10, 10, 10]; // Entity, Stores, Low %, Mid %, High %
+  corePkgs.forEach(function () { w6.push(11, 11, 11, 10); });
+  w6.forEach(function (w, i) { ws6.getColumn(i + 1).width = w; });
+  var N6 = w6.length;
+  var r6 = 1;
+
+  ovWriteMergedBanner(ws6, r6++, 1, N6,
+    'FAKHARANY360 — Core 6 Package Families & Tariff Quality Per Supervisor, Area Manager & Store · ' + ctx.scopeLabel,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r6++;
+
+  ovWriteMergedBanner(ws6, r6++, 1, N6,
+    '💎 Package Families (Kix, Tazbeet, Data SIM, WE Mix, WE Club, 12 PT / PAYG) & Tariff Tiers (Low / Mid / High %)',
+    { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11.5, h: 23 }
+  );
+
+  var h6_1 = [
+    { t: 'Supervisor / Area Manager / Store', rs: 2, al: 'l' },
+    { t: 'Stores', rs: 2 },
+    { t: 'Tariff Tiers Share %', cs: 3, bg: '#0F766E' }
+  ];
+  var h6_2 = [
+    { t: 'Low %',  bg: '#FEE2E2', fg: '#B91C1C', bd: '#E5E7EB' },
+    { t: 'Mid %',  bg: '#FEF3C7', fg: '#A16207', bd: '#E5E7EB' },
+    { t: 'High %', bg: '#DCFCE7', fg: '#15803D', bd: '#E5E7EB' }
+  ];
+  corePkgs.forEach(function (pg) {
+    h6_1.push({ t: pg.label, cs: 4, bg: pg.color || '#5E2D91' });
+    h6_2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+  });
+
+  r6 = ovWriteTwoRowHeader(ws6, r6, h6_1, h6_2);
+
+  function writePkgHierarchyRow(ws, rowIdx, labelTxt, gObj, kind, idx, indentLvl) {
+    var k = ovRowKindColors(kind, idx);
+    var isTot = (kind === 'total');
+    var c = 1;
+    var cLbl = ws.getCell(rowIdx, c++); cLbl.value = labelTxt; ovStyleCell(cLbl, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indentLvl || 1 });
+    var cSt  = ws.getCell(rowIdx, c++); cSt.value  = gObj.storeCount; ovStyleCell(cSt, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+
+    var cL = ws.getCell(rowIdx, c++); cL.value = gObj.lowRatio !== null ? gObj.lowRatio : '–';
+    ovStyleCell(cL, { bg: k.bg, fg: isTot ? '#FCA5A5' : '#B91C1C', b: true, numFmt: gObj.lowRatio !== null ? '0.0%' : undefined });
+    var cM = ws.getCell(rowIdx, c++); cM.value = gObj.midRatio !== null ? gObj.midRatio : '–';
+    ovStyleCell(cM, { bg: k.bg, fg: isTot ? '#FDE68A' : '#A16207', b: false, numFmt: gObj.midRatio !== null ? '0.0%' : undefined });
+    var cH = ws.getCell(rowIdx, c++); cH.value = gObj.highRatio !== null ? gObj.highRatio : '–';
+    ovStyleCell(cH, { bg: k.bg, fg: isTot ? '#86EFAC' : '#15803D', b: true, numFmt: gObj.highRatio !== null ? '0.0%' : undefined });
+
+    corePkgs.forEach(function (pg) {
+      c = ovPutProductMetrics(ws, rowIdx, c, gObj.pkgStats[pg.key] || { target: 0, ach: 0, gap: 0, ratio: null }, kind, idx);
+    });
+
+    ws.getRow(rowIdx).height = (kind === 'total' || kind === 'sv' || kind === 'sub') ? 21 : 19;
+  }
+
+  rmNames.forEach(function (rmName) {
+    var rmObj = tree[rmName];
+    var svNames = Object.keys(rmObj.supervisors).sort(function (a, b) {
+      return calcGroup(rmObj.supervisors[b].rows).mobileTarget - calcGroup(rmObj.supervisors[a].rows).mobileTarget;
+    });
+    svNames.forEach(function (svName) {
+      var svObj = rmObj.supervisors[svName];
+      var svAgg = ovCalcRichGroup(svObj.rows);
+      var amNames = Object.keys(svObj.areaManagers).sort();
+      writePkgHierarchyRow(ws6, r6++, '🧑‍💼 Supervisor: ' + svName, svAgg, 'sv', 0, 1);
+
+      amNames.forEach(function (amName, ai) {
+        var amRows = svObj.areaManagers[amName];
+        var amAgg = ovCalcRichGroup(amRows);
+        writePkgHierarchyRow(ws6, r6++, '   📍 ' + amName, amAgg, 'am', ai, 2);
+
+        // Stores under this Area Manager
+        var stMap = {};
+        amRows.forEach(function (r) {
+          var sk = r.storeCode || r.store;
+          if (!stMap[sk]) stMap[sk] = [];
+          stMap[sk].push(r);
+        });
+        Object.keys(stMap).forEach(function (sk, si) {
+          var sRows = stMap[sk];
+          var sAgg = ovCalcRichGroup(sRows);
+          writePkgHierarchyRow(ws6, r6++, '      🏪 ' + (sRows[sRows.length - 1].store || sk), sAgg, 'store', si, 3);
+        });
+      });
+
+      writePkgHierarchyRow(ws6, r6++, '∑ إجمالي السوبرفايزر — ' + svName + ' Total', svAgg, (svNames.length === 1 ? 'total' : 'sub'), 0, 1);
+    });
+  });
+
+  if (rmNames.length > 1 || Object.keys((tree[rmNames[0]] || {}).supervisors || {}).length > 1) {
+    writePkgHierarchyRow(ws6, r6++, '🏆 GRAND TOTAL (' + yearAgg.storeCount + ' Stores)', yearAgg, 'total', 0, 1);
+  }
+
+  return { wb: wb, ctx: ctx };
+}
+
+async function exportOverviewMasterReport(btn) {
+  var rowsCheck = (Array.isArray(filteredData) && filteredData.length) ? filteredData : RAW_DATA;
+  if (!rowsCheck || !rowsCheck.length) {
+    alert('⚠️ مفيش بيانات في العرض الحالي للتصدير');
+    return;
+  }
+  if (!(await mtdInsAuth())) return;
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting 6 Sheets...';
+  }
+
+  try {
+    var res = await buildOverviewMasterWorkbook();
+    var buf = await res.wb.xlsx.writeBuffer();
+    var now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var cleanScope = String(res.ctx.shortScopeName || 'Overview').replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_').slice(0, 35);
+    var fileName = 'FAKHARANY360_Overview_' + cleanScope + '_' + res.ctx.basis + '_' + stamp + '.xlsx';
+
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') {
+      mgrToast('✅ تم تصدير تقرير الـ Overview الشامل (6 شيتات بتنسيق MTD Branch Achievements) بنجاح!');
+    }
+  } catch (err) {
+    console.error('[Overview Master Excel Export]', err);
+    alert('❌ تعذر تصدير ملف الـ Overview: ' + (err && err.message ? err.message : err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldHtml;
+    }
+  }
+}
 </script>
 
 </body>
