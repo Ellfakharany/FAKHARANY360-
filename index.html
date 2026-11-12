@@ -1126,10 +1126,10 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="tabs-bar flex gap-1 px-6 pb-0">
       <button class="tab-btn active" onclick="switchTab('overview')"><i class="fas fa-chart-pie mr-1"></i>Overview</button>
       <button class="tab-btn" onclick="switchTab('products')"><i class="fas fa-boxes mr-1"></i>Products</button>
-      <button class="tab-btn" onclick="switchTab('tariff')"><i class="fas fa-layer-group mr-1"></i>Tariff Mix</button>
+      <button class="tab-btn" onclick="switchTab('packages')"><i class="fas fa-layer-group mr-1"></i>Packages &amp; Tariffs</button>
+      <button class="tab-btn" onclick="switchTab('contribution')"><i class="fas fa-percentage mr-1"></i>Contribution</button>
       <button class="tab-btn" onclick="switchTab('rankings')"><i class="fas fa-trophy mr-1"></i>Rankings</button>
       <button class="tab-btn" onclick="switchTab('heatmap')"><i class="fas fa-th mr-1"></i>Heatmap</button>
-      <button class="tab-btn" onclick="switchTab('packages')"><i class="fas fa-th-list mr-1"></i>Package Mix</button>
       <button class="tab-btn" onclick="switchTab('insights')" style="position:relative"><i class="fas fa-lightbulb mr-1"></i>Smart Insights<span style="position:absolute;top:-4px;right:-4px;background:#e91e8c;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">AI</span></button>
       <button class="tab-btn" onclick="switchTab('managers')" id="mgr-tab-btn" style="position:relative"><i class="fas fa-user-tie mr-1"></i>Managers<span style="position:absolute;top:-4px;right:-4px;background:#16a34a;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">NEW</span></button>
       <button class="tab-btn" onclick="switchTab('mtd')" id="mtd-tab-btn" style="position:relative"><i class="fas fa-calendar-day mr-1"></i>MTD<span style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:white;font-size:8px;font-weight:800;border-radius:8px;padding:1px 4px;line-height:1.4">LIVE</span></button>
@@ -1286,9 +1286,15 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="kpi-card-best" id="kpi-best-store"></div>
       </div>
 
-      <!-- Product KPIs -->
-      <div class="section-title"><i class="fas fa-boxes mr-2"></i>Product Performance</div>
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" id="product-kpi-grid"></div>
+      <!-- Product KPIs + Contribution Basis Toggle & Dedicated Section Trigger -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-boxes mr-2"></i>Product Performance</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:inline-flex;align-items:center;background:var(--card-bg);border:1.5px solid var(--border);border-radius:16px;padding:2px"><span style="font-size:10.5px;font-weight:800;color:var(--text-muted);padding:0 7px">Cont.:</span><button type="button" class="contrib-basis-ach-btn" onclick="setContribBasis('ach')" style="padding:3px 10px;border-radius:13px;border:none;background:#5E2D91;color:white;font-size:10px;font-weight:800;cursor:pointer;transition:all .15s">From Ach</button><button type="button" class="contrib-basis-tgt-btn" onclick="setContribBasis('target')" style="padding:3px 10px;border-radius:13px;border:none;background:transparent;color:#6b7280;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s">From Target</button></div></div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4" id="product-kpi-grid"></div>
+
+      
 
       <!-- Overview Charts Row -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -1584,33 +1590,6 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
-    <!-- TARIFF MIX TAB -->
-    <div id="tab-tariff" class="tab-content hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-        <div class="section-title" style="margin-bottom:0"><i class="fas fa-layer-group mr-2"></i>Tariff Mix Analysis</div>
-        <button onclick="exportTariffMixMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)">
-          <i class="fas fa-file-excel"></i> Export Tariff Mix Excel
-        </button>
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin:-8px 0 10px">اضغط على أي كارت أو جزء من الدائرة عشان تشوف الفروع اللي عاملة الأرقام دي</div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="tariff-kpi-grid"></div>
-      <div class="grid grid-cols-2 gap-3 mb-4">
-        <div class="chart-card" style="padding:10px">
-          <div class="chart-title" style="font-size:11px">Tariff Mix Distribution</div>
-          <canvas id="chart-tariff-donut" height="150"></canvas>
-        </div>
-        <div class="chart-card" style="padding:10px">
-          <div class="chart-title" style="font-size:11px">Tariff Mix by Month</div>
-          <canvas id="chart-tariff-trend" height="150"></canvas>
-        </div>
-      </div>
-      <div id="tariff-drill" style="margin-bottom:16px"></div>
-      <div class="chart-card">
-        <div class="chart-title">Stacked Mix by Supervisor</div>
-        <canvas id="chart-tariff-stacked" height="160"></canvas>
-      </div>
-    </div>
-
     <!-- RANKINGS TAB -->
     <div id="tab-rankings" class="tab-content hidden">
       <div class="section-title"><i class="fas fa-trophy mr-2"></i>Rankings <span style="font-size:10px;font-weight:500;color:var(--text-muted);text-transform:none;letter-spacing:0;margin-left:8px;border:1px solid #d1d5db;padding:2px 8px;border-radius:20px;">Ranked by <span class="prod-rank-label">Mobile</span> %</span></div>
@@ -1681,9 +1660,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-    <!-- PACKAGE MIX TAB -->
+    <!-- PACKAGES & TARIFFS MERGED TAB -->
     <div id="tab-packages" class="tab-content hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <!-- Sub-View Switcher Bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 14px;background:var(--card-bg);border:1.5px solid var(--border);border-radius:14px;box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em"><i class="fas fa-layer-group mr-1" style="color:var(--we-purple)"></i>View Mode:</span>
+          <div style="display:inline-flex;background:var(--gray-bg);border:1.5px solid var(--border);border-radius:12px;padding:3px;gap:3px">
+            <button type="button" id="pkg-sub-btn-packages" onclick="setPkgTariffSubView('packages')" style="padding:5px 14px;border-radius:9px;border:none;background:#5E2D91;color:white;font-size:11px;font-weight:800;cursor:pointer;transition:all .15s"><i class="fas fa-th-list mr-1"></i>Package Mix</button>
+            <button type="button" id="pkg-sub-btn-tariff" onclick="setPkgTariffSubView('tariff')" style="padding:5px 14px;border-radius:9px;border:none;background:transparent;color:var(--text-muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s"><i class="fas fa-chart-pie mr-1"></i>Tariff Mix</button>
+            <button type="button" id="pkg-sub-btn-both" onclick="setPkgTariffSubView('both')" style="padding:5px 14px;border-radius:9px;border:none;background:transparent;color:var(--text-muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s"><i class="fas fa-columns mr-1"></i>Both Together</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);font-weight:600">Switch between Package Breakdown, Tariff Tiers, or view both side-by-side</div>
+      </div>
+
+      <!-- Sub-View 1: Package Mix -->
+      <div id="subview-packages-wrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
         <div class="section-title" style="margin-bottom:0"><i class="fas fa-th-list mr-2"></i>Package Mix Breakdown</div>
         <button onclick="exportPackageMixMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)" title="تصدير شيت الباقات الأساسية والباقات الفرعية (Kix 25..150 & Tazbeet 40..165) لكل فرع بتنسيق ExcelJS">
           <i class="fas fa-file-excel"></i> Export Packages & Sub-Packages Excel
@@ -1737,8 +1731,40 @@ document.addEventListener('DOMContentLoaded', function() {
           <table id="pkg-detail-table" class="data-table w-full text-xs"></table>
         </div>
       </div>
-    
-</div>
+      </div>
+
+      <!-- Sub-View 2: Tariff Mix -->
+      <div id="subview-tariff-wrap" style="display:none;margin-top:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-layer-group mr-2"></i>Tariff Mix Analysis</div>
+        <button onclick="exportTariffMixMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)">
+          <i class="fas fa-file-excel"></i> Export Tariff Mix Excel
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin:-8px 0 10px">اضغط على أي كارت أو جزء من الدائرة عشان تشوف الفروع اللي عاملة الأرقام دي</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="tariff-kpi-grid"></div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="chart-card" style="padding:10px">
+          <div class="chart-title" style="font-size:11px">Tariff Mix Distribution</div>
+          <canvas id="chart-tariff-donut" height="150"></canvas>
+        </div>
+        <div class="chart-card" style="padding:10px">
+          <div class="chart-title" style="font-size:11px">Tariff Mix by Month</div>
+          <canvas id="chart-tariff-trend" height="150"></canvas>
+        </div>
+      </div>
+      <div id="tariff-drill" style="margin-bottom:16px"></div>
+      <div class="chart-card">
+        <div class="chart-title">Stacked Mix by Supervisor</div>
+        <canvas id="chart-tariff-stacked" height="160"></canvas>
+      </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED CONTRIBUTION TAB -->
+    <div id="tab-contribution" class="tab-content hidden">
+      <div id="tab-contribution-body" style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden"></div>
+    </div>
 
     <!-- Smart Insights Tab -->
     <div id="tab-insights" class="tab-content hidden">
@@ -1787,6 +1813,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="section-title" style="margin-bottom:0"><i class="fas fa-calendar-day mr-2" style="color:#c0392b"></i>MTD Performance</div>
           <span id="mtd-date-badge" style="background:#c0392b;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px"></span>
           <span id="mtd-wallet-badge" style="display:none;background:#16a34a;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px"><i class="fas fa-wallet mr-1"></i>Wallet Loaded</span>
+          <div style="display:inline-flex;align-items:center;background:var(--card-bg);border:1.5px solid var(--border);border-radius:16px;padding:2px"><span style="font-size:10px;font-weight:800;color:var(--text-muted);padding:0 7px">Cont.:</span><button type="button" class="contrib-basis-ach-btn" onclick="setContribBasis('ach')" style="padding:3px 9px;border-radius:13px;border:none;background:#5E2D91;color:white;font-size:10px;font-weight:800;cursor:pointer">From Ach</button><button type="button" class="contrib-basis-tgt-btn" onclick="setContribBasis('target')" style="padding:3px 9px;border-radius:13px;border:none;background:transparent;color:#6b7280;font-size:10px;font-weight:700;cursor:pointer">From Target</button></div><button type="button" onclick="onCardContributionPillClick('mtd','mobile')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:16px;border:1.5px solid #5E2D91;background:#f5f3ff;color:#5E2D91;font-size:10.5px;font-weight:800;cursor:pointer" title="Open Contribution Tab"><i class="fas fa-percentage"></i><span>Contribution Tab</span></button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <button id="mtd-refresh-btn" onclick="refreshAutoMTDData()" title="اسحب آخر نسخة تلقائية من data/mtd/" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:white;color:#374151;border:1.5px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:700">
@@ -2700,11 +2727,11 @@ function renderAll() {
   if (activeTab === 'products') renderProductKPIs('product-kpi-grid2');
   if (activeTab === 'overview') { renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); renderMonthlyPerf(); }
   if (activeTab === 'products') { renderProductDetail(); renderProductPct(); renderAchTrend(); }
-  if (activeTab === 'tariff') { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
+  if (activeTab === 'tariff' || activeTab === 'packages') { if (typeof renderMergedPackagesAndTariffs === 'function') renderMergedPackagesAndTariffs(); }
   if (activeTab === 'rankings') { renderAllRankings(); }
   if (activeTab === 'heatmap') { renderHeatmap(); }
   
-  if (activeTab === 'packages') { renderPackages(); }
+  if (activeTab === 'contribution') { if (typeof onMainFiltersChangedForContribution === 'function') onMainFiltersChangedForContribution(); }
   if (activeTab === 'insights') { renderInsights(); }
 }
 
@@ -4161,11 +4188,12 @@ function switchTab(name) {
   // Lazy render
   if (name==='overview')   { renderProductChart(); renderMonthlyTrend(); }
   if (name==='products')   { renderProductKPIs('product-kpi-grid2'); renderProductDetail(); renderProductPct(); renderAchTrend(); }
-  if (name==='tariff')     { renderTariffKPIs(); renderTariffDonut(); renderTariffTrend(); renderTariffStacked(); }
+  if (name==='tariff')     { switchTab('packages'); setPkgTariffSubView('tariff'); return; }
   if (name==='rankings')   renderAllRankings();
   if (name==='heatmap')    renderHeatmap();
   
-  if (name==='packages')   renderPackages();
+  if (name==='packages')   { if (typeof renderMergedPackagesAndTariffs === 'function') renderMergedPackagesAndTariffs(); else renderPackages(); }
+  if (name==='contribution') { if (typeof renderContributionTab === 'function') renderContributionTab(); }
   if (name==='insights')   renderInsights();
   if (name==='mtd')        renderMTD();
 
@@ -11076,7 +11104,7 @@ function mtdBASyncBasis() {
   if (s) s.setAttribute('style', mtdInsSegStyle(MTD_BA_BASIS === 'sales'));
 }
 function setMTDBABasis(b) { MTD_BA_BASIS = b; mtdBASyncBasis(); if (MTD_BA_OPEN) renderMTDBA(); }
-var MTD_BA_NC = 16;     // columns of the table (Excel merge width)
+var MTD_BA_NC = 18;     // columns of the table (16 + 2 Contrib % columns for Mobile & Wallet)
 var MTD_BA_META = false; // export-only: adds Account Manager / Classification / Partner columns (store rows)
 // Name shown on top of each Regional Manager's table. Edit here if a Regional's label changes.
 var MTD_BA_REGION_LABELS = { 'ahmed elananey': 'East Cairo', 'mohamed elsisiy': 'West Cairo', 'mamdouh farag': 'Canal' };
@@ -11156,12 +11184,26 @@ function mtdBABelow(v, which, kind, idx) {
   var fg = dark ? '#ffffff' : (which === 70 ? '#b91c1c' : (which === 100 ? '#a16207' : '#1f2937'));
   return { v: v, f: 'int', bg: k.bg, fg: fg, b: (which === 70 || which === 100 || dark) ? 1 : 0, al: 'c' };
 }
-function mtdBARow(kind, name, g, pace, idx, item) {
+function mtdBAContribCell(x, refX, kind, idx) {
   var k = mtdBAKind(kind, idx);
+  var useTgt = (typeof CONTRIB_BASIS !== 'undefined' && CONTRIB_BASIS === 'target');
+  var num = useTgt ? (x ? x.T : 0) : (x ? x.A : 0);
+  var den = useTgt ? (refX ? refX.T : 0) : (refX ? refX.A : 0);
+  if (!(den > 0)) return { v: null, f: 'pct1', bg: k.bg, fg: k.fg, b: 0, al: 'c' };
+  var ratio = num / den;
+  var bg = kind === 'total' ? '#111827' : (kind === 'sv' || kind === 'sub' ? k.bg : '#eef2ff');
+  var fg = kind === 'total' ? '#c7d2fe' : (kind === 'sv' || kind === 'sub' ? '#1e3a5f' : '#3730a3');
+  return { v: ratio, f: 'pct1', bg: bg, fg: fg, b: 1, al: 'c' };
+}
+function mtdBARow(kind, name, g, pace, idx, item, refDenomG) {
+  var k = mtdBAKind(kind, idx);
+  var refG = refDenomG || g;
   var row = [{ v: name, f: 'txt', bg: k.bg, fg: k.fg, b: k.b, al: 'l', sticky: 1, rtl: kind === 'store' ? 1 : 0, indent: kind === 'sv' ? 1 : (kind === 'store' ? 2 : 0) }, mtdBANum(g.n, kind, idx)];
-  [g.m, g.w].forEach(function (x) {
+  [['m', g.m, refG.m], ['w', g.w, refG.w]].forEach(function (pair) {
+    var x = pair[1], rx = pair[2];
     row.push(mtdBANum(Math.round(x.T), kind, idx), mtdBANum(Math.round(x.A), kind, idx),
       mtdBAPct(x.T, x.A, kind, idx, pace, false), mtdBAPct(x.T, x.P, kind, idx, pace, true),
+      mtdBAContribCell(x, rx, kind, idx),
       mtdBABelow(x.l100, 100, kind, idx), mtdBABelow(x.l90, 90, kind, idx), mtdBABelow(x.l70, 70, kind, idx));
   });
   if (MTD_BA_META) {
@@ -11171,69 +11213,89 @@ function mtdBARow(kind, name, g, pace, idx, item) {
   return row;
 }
 function mtdBAHead(label) {
+  var cLbl = (typeof CONTRIB_BASIS !== 'undefined' && CONTRIB_BASIS === 'target') ? 'Contrib% (Tgt)' : 'Contrib% (Ach)';
   var r1 = [mtdInsH(label, { rs: 2, al: 'l' }), mtdInsH('Stores', { rs: 2 }),
-    mtdInsH('Mobile Performance', { cs: 4 }), mtdInsH('Below', { cs: 3 }), mtdInsH('Wallet / WE Pay Performance', { cs: 4 }), mtdInsH('Below', { cs: 3 })];
+    mtdInsH('Mobile Performance', { cs: 5 }), mtdInsH('Below', { cs: 3 }), mtdInsH('Wallet / WE Pay Performance', { cs: 5 }), mtdInsH('Below', { cs: 3 })];
   function below() {
     return [mtdInsH('< 100%', { bg: '#fef3c7', fg: '#a16207', bd: '#e5e7eb' }), mtdInsH('< 90%', { bg: '#fee2e2', fg: '#b91c1c', bd: '#e5e7eb' }), mtdInsH('< 70%', { bg: '#ffffff', fg: '#dc2626', bd: '#e5e7eb' })];
   }
-  var sub = '#6d3fa8';
+  var sub = '#6d3fa8', cBg = '#3730a3';
   if (MTD_BA_META) ['Account Manager', 'Classification', 'Partner'].forEach(function (t) { r1.push(mtdInsH(t, { rs: 2, al: 'l' })); });
-  var r2 = [mtdInsH('Target', { bg: sub }), mtdInsH('Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })].concat(below(),
-    [mtdInsH('Wallet TGT', { bg: sub }), mtdInsH('Wallet Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub })], below());
+  var r2 = [mtdInsH('Target', { bg: sub }), mtdInsH('Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub }), mtdInsH(cLbl, { bg: cBg })].concat(below(),
+    [mtdInsH('Wallet TGT', { bg: sub }), mtdInsH('Wallet Ach', { bg: sub }), mtdInsH('Ach %', { bg: sub }), mtdInsH('Proj %', { bg: sub }), mtdInsH(cLbl, { bg: cBg })], below());
   return [r1, r2];
 }
 
 function mtdBASfx() { var b = mtdBABasisLabel(); return b ? ' · ' + b : ''; }
 // ── model: mode = 'areas' (the card + sheet 2) | 'stores' (sheet 3: branches under each area) | 'regions' (sheet 1) ──
 function mtdBAModel(items, pace, mode) {
+  var allUniverseItems = (typeof MTD_DATA !== 'undefined' && Array.isArray(MTD_DATA) && MTD_DATA.length) ? mtdInsBuildItems(MTD_DATA).items : items;
+  var universeByRm = {}, universeByZone = {};
+  mtdBAGroups(allUniverseItems).forEach(function (ug) {
+    universeByRm[ug.rm] = ug.items;
+    universeByZone[ug.zone.label] = (universeByZone[ug.zone.label] || []).concat(ug.items);
+  });
+  var allNetAgg = mtdBAAgg(allUniverseItems, pace);
+
   var groups = mtdBAGroups(items), blocks = [];
   var zoneOf = {};                                   // zone label → groups in it
   groups.forEach(function (g) { (zoneOf[g.zone.label] = zoneOf[g.zone.label] || []).push(g); });
   var zoneCount = Object.keys(zoneOf).length;
   function zoneItems(z) { var a = []; zoneOf[z].forEach(function (g) { a = a.concat(g.items); }); return a; }
+  function getZoneDenomAgg(zLabel) {
+    var zUniv = universeByZone[zLabel] || zoneItems(zLabel);
+    return mtdBAAgg(zUniv.length ? zUniv : allUniverseItems, pace);
+  }
+  function getRegionDenomAgg(gObj) {
+    var rUniv = universeByRm[gObj.rm] || gObj.items;
+    return mtdBAAgg(rUniv.length ? rUniv : gObj.items, pace);
+  }
   function closing(g, idxInGroups, body) {           // zone subtotal / grand total rows attached to the last table of a zone / of the report
     var zg = zoneOf[g.zone.label], lastOfZone = zg[zg.length - 1] === g;
-    if (lastOfZone && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0));
-    if (idxInGroups === groups.length - 1 && zoneCount > 1) body.push(mtdBARow('total', 'All Regions Total', mtdBAAgg(items, pace), pace, 0));
+    if (lastOfZone && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0, null, allNetAgg));
+    if (idxInGroups === groups.length - 1 && zoneCount > 1) body.push(mtdBARow('total', 'All Regions Total', mtdBAAgg(items, pace), pace, 0, null, allNetAgg));
   }
   if (mode === 'regions') {
     var body = [], seenZ = {};
     groups.forEach(function (g, gi) {
-      body.push(mtdBARow('reg', (g.label && g.label !== g.rm ? g.label + ' — ' : '') + g.rm, mtdBAAgg(g.items, pace), pace, gi));
+      // Regional Manager row -> Contrib % is relative to its Senior Zone (East & West Cairo & Canal)
+      body.push(mtdBARow('reg', (g.label && g.label !== g.rm ? g.label + ' — ' : '') + g.rm, mtdBAAgg(g.items, pace), pace, gi, null, getZoneDenomAgg(g.zone.label)));
       var zg = zoneOf[g.zone.label];
-      if (zg[zg.length - 1] === g && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0));
+      if (zg[zg.length - 1] === g && zg.length > 1) body.push(mtdBARow('sub', g.zone.label + ' Subtotal', mtdBAAgg(zoneItems(g.zone.label), pace), pace, 0, null, allNetAgg));
     });
-    body.push(mtdBARow('total', 'Total', mtdBAAgg(items, pace), pace, 0));
+    body.push(mtdBARow('total', 'Total', mtdBAAgg(items, pace), pace, 0, null, allNetAgg));
     blocks.push({ k: 'tbl', head: mtdBAHead('Region — Regional Manager'), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet · per Region' + mtdBASfx(), c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
     return blocks;
   }
   groups.forEach(function (g, gi) {
+    var regDenomAgg = getRegionDenomAgg(g);          // Full Region total (e.g. East Cairo) for Supervisors, Area Managers & Branches
+    var zoneDenomAgg = getZoneDenomAgg(g.zone.label); // Senior Zone total (East & West Cairo & Canal) for the Region Total row
     blocks.push({ k: 'rm', t: g.rm + ' · ' + g.items.length + ' stores' });
     var svOrder = [], svMap = {};
     g.items.forEach(function (i) { if (!svMap[i.sv]) { svMap[i.sv] = { items: [], ams: {}, amOrder: [] }; svOrder.push(i.sv); } var s = svMap[i.sv]; s.items.push(i); if (!s.ams[i.am]) { s.ams[i.am] = []; s.amOrder.push(i.am); } s.ams[i.am].push(i); });
     var body = [];
     svOrder.forEach(function (sv) {
-      body.push(mtdBARow('sv', sv, mtdBAAgg(svMap[sv].items, pace), pace, 0));
+      body.push(mtdBARow('sv', sv, mtdBAAgg(svMap[sv].items, pace), pace, 0, null, regDenomAgg));
       svMap[sv].amOrder.forEach(function (am, ai) {
         var amItems = svMap[sv].ams[am];
-        body.push(mtdBARow('am', am, mtdBAAgg(amItems, pace), pace, ai));
+        body.push(mtdBARow('am', am, mtdBAAgg(amItems, pace), pace, ai, null, regDenomAgg));
         if (mode === 'stores') {
           amItems.slice().sort(function (x, y) {
             var rx = mtdBARowOf(x), ry = mtdBARowOf(y), tx = Number(rx.mobileTarget) || 0, ty = Number(ry.mobileTarget) || 0;
             return (ty > 0 ? (Number(ry.mobileSubs) || 0) / ty : -1) - (tx > 0 ? (Number(rx.mobileSubs) || 0) / tx : -1);
-          }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si, it)); });
+          }).forEach(function (it, si) { body.push(mtdBARow('store', it.store, mtdBAAgg([it], pace), pace, si, it, regDenomAgg)); });
         }
       });
     });
-    body.push(mtdBARow('total', 'Total', mtdBAAgg(g.items, pace), pace, 0));
+    body.push(mtdBARow('total', 'Total (' + g.label + ')', mtdBAAgg(g.items, pace), pace, 0, null, zoneDenomAgg));
     closing(g, gi, body);
-    blocks.push({ k: 'tbl', head: mtdBAHead(g.label), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet' + mtdBASfx(), c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
+    blocks.push({ k: 'tbl', head: mtdBAHead(g.label), body: body, title: [{ t: 'Branch Achievement — Mobile & Wallet · Contrib % of ' + g.label + mtdBASfx(), c: '#5E2D91', b: 1 }], titleBg: '#f5f3ff' });
   });
   return blocks;
 }
 
 // ── HTML ──
-var MTD_BA_WIDTHS = [250, 56, 72, 72, 60, 60, 54, 54, 54, 72, 72, 60, 60, 54, 54, 54];
+var MTD_BA_WIDTHS = [250, 56, 72, 72, 60, 60, 66, 54, 54, 54, 72, 72, 60, 60, 66, 54, 54, 54];
 function mtdBAFmt(c) {
   if (c.v === null || c.v === undefined || c.v === '') return c.f === 'txt' ? '' : '–';
   if (c.f === 'pct') return Math.round(c.v * 100) + '%';
@@ -11280,7 +11342,7 @@ function renderMTDBA() {
 }
 
 // ── Excel: 3 sheets, active filters ──
-var MTD_BA_XL_WIDTHS = [46, 8, 11, 11, 9, 9, 8, 8, 8, 11, 11, 9, 9, 8, 8, 8, 24, 16, 24];
+var MTD_BA_XL_WIDTHS = [46, 8, 11, 11, 9, 9, 11, 8, 8, 8, 11, 11, 9, 9, 11, 8, 8, 8, 24, 16, 24];
 function mtdBAXlValue(cell, c) {
   if (c.v === null || c.v === undefined || c.v === '') { cell.value = c.f === 'txt' ? '' : '–'; return; }
   cell.value = c.v;
@@ -11372,7 +11434,7 @@ async function exportMTDBA(btn) {
 //           if the phone can't share files it falls back to a plain-text mailto: in the default mail app.
 //  A mailto: link alone can't carry coloured tables (plain text only), which is why it's done this way.
 var MTD_BA_SIGNATURE = ['Best regards,', 'Mohamed Elfakharany', 'East Cairo Team'];
-var MTD_BA_EMAIL_W = [230, 50, 64, 64, 52, 52, 46, 46, 46, 64, 64, 52, 52, 46, 46, 46];
+var MTD_BA_EMAIL_W = [220, 46, 60, 60, 48, 48, 54, 44, 44, 44, 60, 60, 48, 48, 54, 44, 44, 44];
 var MTD_BA_EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 var MTD_BA_PENDING = null;     // a prepared share (if the browser asked for a fresh tap)
 
@@ -14201,6 +14263,7 @@ async function buildManagersPerfExcelBuffer(customModel) {
       );
     });
     gapCols.push(
+      { hdr: 'Mobile Contrib % (of Region)', w: 16 },
       { hdr: 'Total Gap', w: 14, isGap: true },
       { hdr: 'Avg Evaluation %', w: 15 }
     );
@@ -14260,6 +14323,15 @@ async function buildManagersPerfExcelBuffer(customModel) {
         }
       });
 
+      var useTgtC = (typeof CONTRIB_BASIS !== 'undefined' && CONTRIB_BASIS === 'target');
+      var fullM = MGR_LAST_MODEL || model;
+      var rmKeyG = s.regionalManager || '';
+      var regRowsG = (fullM.rows || model.rows || []).filter(function (rx) { return (!rmKeyG || rx.regionalManager === rmKeyG) && mgr.rows.some(function (mr) { return mr.month === rx.month; }); });
+      var regDenG = regRowsG.reduce(function (acc, rx) { return acc + (Number(useTgtC ? rx.mobileTarget : rx.mobileSubs) || 0); }, 0);
+      var mgrNumG = Number(useTgtC ? tg.mobileTarget : tg.mobileSubs) || 0;
+      var contribRatioG = regDenG > 0 ? (mgrNumG / regDenG) : null;
+      putG(contribRatioG, contribRatioG !== null ? { numFmt: '0.00%', b: true, bg: '#EEF2FF', fg: '#3730A3' } : { fg: '#9CA3AF' });
+
       var totNet = Math.round(tg.totalSignedGap || 0);
       putG(totNet, {
         numFmt: '+#,##0;-#,##0;0',
@@ -14297,6 +14369,7 @@ async function buildManagersPerfExcelBuffer(customModel) {
       putGT(net, { numFmt: '+#,##0;-#,##0;0', bg: net >= 0 ? '#15803D' : '#991B1B' });
       putGT(t > 0 ? a / t : 0, { numFmt: '0.0%' });
     });
+    putGT(1, { numFmt: '0.0%' });
     var grandNet = Math.round(gTot.totalSignedGap || 0);
     putGT(grandNet, { numFmt: '+#,##0;-#,##0;0', bg: grandNet >= 0 ? '#15803D' : '#991B1B' });
     putGT(gTot.evalScore !== null ? gTot.evalScore : '—', gTot.evalScore !== null ? { numFmt: '0.0%' } : {});
@@ -14323,7 +14396,7 @@ async function buildManagersPerfExcelBuffer(customModel) {
       { hdr: 'Area Manager', w: 24 }
     ];
     if (hasRaw) {
-      cols3.push({ hdr: 'Mobile TGT', w: 13 }, { hdr: 'Mobile ACH', w: 13 }, { hdr: 'Mobile Gap', w: 13 }, { hdr: 'Mobile %', w: 12 });
+      cols3.push({ hdr: 'Mobile TGT', w: 13 }, { hdr: 'Mobile ACH', w: 13 }, { hdr: 'Mobile Gap', w: 13 }, { hdr: 'Mobile %', w: 12 }, { hdr: 'Contrib % (Region)', w: 15 });
     }
     cols3.push(
       { hdr: 'Avg Ach.Act %', w: 14 },
@@ -14379,6 +14452,14 @@ async function buildManagersPerfExcelBuffer(customModel) {
         put3(ma, { numFmt: '#,##0', b: true });
         put3(mnet, { numFmt: '+#,##0;-#,##0;0', b: true, bg: mnet >= 0 ? '#DCFCE7' : '#FEE2E2', fg: mnet >= 0 ? '#15803D' : '#B91C1C' });
         if (mr !== null) { var mc = pctColors(mr, false); put3(mr, { numFmt: '0.0%', b: true, bg: mc.bg, fg: mc.fg }); } else put3('—', {});
+        var useTgt3 = (typeof CONTRIB_BASIS !== 'undefined' && CONTRIB_BASIS === 'target');
+        var fullM3 = MGR_LAST_MODEL || model;
+        var rmKey3 = s.regionalManager || '';
+        var regRows3 = (fullM3.rows || model.rows || []).filter(function (rx) { return (!rmKey3 || rx.regionalManager === rmKey3) && mgr.rows.some(function (mr2) { return mr2.month === rx.month; }); });
+        var regDen3 = regRows3.reduce(function (acc, rx) { return acc + (Number(useTgt3 ? rx.mobileTarget : rx.mobileSubs) || 0); }, 0);
+        var mgrNum3 = Number(useTgt3 ? mt : ma) || 0;
+        var cRatio3 = regDen3 > 0 ? (mgrNum3 / regDen3) : null;
+        put3(cRatio3, cRatio3 !== null ? { numFmt: '0.00%', b: true, bg: '#EEF2FF', fg: '#3730A3' } : {});
       }
 
       put3(tg.actPct !== null ? tg.actPct : null, { numFmt: '0.0%', b: true });
@@ -19546,6 +19627,1207 @@ async function exportSheetJSWorkbookAsStyledExcelJS(wbSheetJS, baseName, titleBa
 exportWithPassword = async function (wb2, baseName) {
   await exportSheetJSWorkbookAsStyledExcelJS(wb2, baseName, 'FAKHARANY360 — ' + baseName);
 };
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     8. MULTI-LEVEL CONTRIBUTION INTELLIGENCE MODAL & ENGINE (v20 - ULTRA-LIGHT & 100% ENGLISH)
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="contrib-explorer-modal-overlay" onclick="if(event.target===this)closeContributionExplorerModal()" style="display:none;position:fixed;inset:0;z-index:99988;background:rgba(15,23,42,0.72);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
+  <div style="background:var(--card-bg);border-radius:18px;max-width:1120px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.45);border:1.5px solid var(--border);font-family:'Inter','Cairo',sans-serif" dir="ltr">
+    <div id="contrib-explorer-modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  MULTI-LEVEL CONTRIBUTION INTELLIGENCE ENGINE (v20 — Feather-Light O(1) Cache & 100% English)
+//  • Zero object cloning, single-pass O(N) cached aggregation (< 0.5ms)
+//  • Clean, uncluttered KPI Card badge showing ONLY Supervisor & Regional contribution:
+//      - Store / Area Mgr filter -> "Cont.: X.X% Supervisor · Y.Y% Regional"
+//      - Supervisor filter       -> "Cont.: Y.Y% Regional"
+//      - Regional Mgr filter     -> "Cont.: Z.Z% Zone"
+//      - All (no filter)         -> minimal "Cont. (Ach) ▸" pill (no noisy 100% clutter)
+//  • Fixed MTD filter bindings (mtd-f-rm, mtd-f-sv, mtd-f-am, mtd-f-region, MTD_SELECTED_STORE)
+// ════════════════════════════════════════════════════════════════════════════
+
+var CONTRIB_BASIS = 'ach';            // 'ach' (From Ach) | 'target' (From Target)
+var CONTRIB_SOURCE_MODE = 'overview'; // 'overview' | 'mtd'
+var CONTRIB_SELECTED_PROD = 'mobile'; // 'mobile' | 'gold' | 'fbb' | 'fixed' | 'wallet' | 'fwa' | 'all'
+var CONTRIB_CUSTOM_RM = '';
+var CONTRIB_CUSTOM_SV = '';
+var CONTRIB_CUSTOM_AM = '';
+var CONTRIB_CUSTOM_ST = '';
+var OV_CONTRIB_DRAWER_OPEN = false;
+
+var RM_REGION_FRIENDLY = {
+  'ahmed elananey': 'East Cairo (Ahmed Elananey)',
+  'mohamed elsisiy': 'West Cairo (Mohamed ElSisiy)',
+  'mamdouh farag': 'Canal (Mamdouh Farag)',
+  'mohamed bdier': 'Greater Cairo (Mohamed Bdier)'
+};
+
+var RM_REGION_SHORT = {
+  'ahmed elananey': 'East Cairo',
+  'mohamed elsisiy': 'West Cairo',
+  'mamdouh farag': 'Canal',
+  'mohamed bdier': 'Greater Cairo'
+};
+
+function getFriendlyRegionLabel(rmName, regionName) {
+  var k = String(rmName || '').trim().toLowerCase();
+  if (RM_REGION_FRIENDLY[k]) return RM_REGION_FRIENDLY[k];
+  if (rmName && regionName) return regionName + ' (' + rmName + ')';
+  return rmName || regionName || 'Regional';
+}
+
+function getShortRegionLabel(rmName, regionName) {
+  var k = String(rmName || '').trim().toLowerCase();
+  if (RM_REGION_SHORT[k]) return RM_REGION_SHORT[k];
+  return regionName || rmName || 'Regional';
+}
+
+// Memoized hierarchy map so mtdNwHierMap() is never rebuilt repeatedly
+var _FAST_HIER_MAP_CACHE = null;
+var _FAST_HIER_MAP_SRC = null;
+function getFastHierMap() {
+  var src = (typeof MTD_NW_HIER !== 'undefined' && MTD_NW_HIER) ? MTD_NW_HIER : (typeof MTD_NW_HIER_BASE !== 'undefined' ? MTD_NW_HIER_BASE : null);
+  if (_FAST_HIER_MAP_CACHE && _FAST_HIER_MAP_SRC === src) return _FAST_HIER_MAP_CACHE;
+  _FAST_HIER_MAP_SRC = src;
+  _FAST_HIER_MAP_CACHE = (typeof mtdNwHierMap === 'function') ? mtdNwHierMap() : {};
+  return _FAST_HIER_MAP_CACHE;
+}
+
+function getRowZoneLabel(r, hierMap) {
+  var code = String((r && r.storeCode) || '').trim().toUpperCase();
+  var h = (hierMap && code && hierMap[code]) || {};
+  var rmLow = String((r && r.regionalManager) || h.rm || '').trim().toLowerCase();
+  var regLow = String((r && r.region) || h.region || '').trim().toLowerCase();
+  var zRaw = String(h.zone || '').trim();
+  if (rmLow === 'ahmed elananey' || rmLow === 'mohamed elsisiy' || rmLow === 'mamdouh farag' || rmLow === 'mohamed bdier' ||
+      regLow === 'greater cairo' || regLow === 'canal' || zRaw.indexOf('Cairo') >= 0) {
+    return 'East & West Cairo & Canal';
+  }
+  if (regLow === 'upper egypt' || zRaw.indexOf('Upper') >= 0) return 'Upper Egypt';
+  if (regLow === 'alex' || regLow === 'delta' || zRaw.indexOf('Alex') >= 0) return 'Alex & Delta';
+  if (regLow === 'tka' || zRaw.indexOf('TKA') >= 0) return 'TKA';
+  return zRaw || regLow || 'East & West Cairo & Canal';
+}
+
+// Fast O(N) Pre-Aggregation Cache for Denominators (computed once per state change, < 0.5ms)
+var _CONTRIB_FAST_CACHE = { ovKey: '', ovData: null, mtdKey: '', mtdData: null };
+
+function invalidateContribFastCache() {
+  _CONTRIB_FAST_CACHE.ovKey = '';
+  _CONTRIB_FAST_CACHE.mtdKey = '';
+}
+
+function getContribFastAgg(sourceMode) {
+  var isMtd = (sourceMode === 'mtd');
+  var getVal = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  var hierMap = getFastHierMap();
+
+  if (isMtd) {
+    var ds = (typeof getMTDActiveDataset === 'function' ? getMTDActiveDataset() : (typeof MTD_DATA !== 'undefined' ? MTD_DATA : [])) || [];
+    var wKeysLen = (typeof WALLET_DATA !== 'undefined' && WALLET_DATA) ? Object.keys(WALLET_DATA).length : 0;
+    var mtdKey = [ds.length, typeof MTD_MODE !== 'undefined' ? MTD_MODE : 'act', wKeysLen, ds[0] ? ds[0].storeCode : ''].join('|');
+    if (_CONTRIB_FAST_CACHE.mtdKey === mtdKey && _CONTRIB_FAST_CACHE.mtdData) {
+      return _CONTRIB_FAST_CACHE.mtdData;
+    }
+    var aggM = buildFastUniverseAgg(ds, true, hierMap);
+    _CONTRIB_FAST_CACHE.mtdKey = mtdKey;
+    _CONTRIB_FAST_CACHE.mtdData = aggM;
+    return aggM;
+  } else {
+    var raw = Array.isArray(RAW_DATA) ? RAW_DATA : [];
+    var fMo = getVal('f-month');
+    var ovKey = [raw.length, typeof DASH_MODE !== 'undefined' ? DASH_MODE : 'act', fMo].join('|');
+    if (_CONTRIB_FAST_CACHE.ovKey === ovKey && _CONTRIB_FAST_CACHE.ovData) {
+      return _CONTRIB_FAST_CACHE.ovData;
+    }
+    var periodRows = fMo ? raw.filter(function (r) { return r.month === fMo; }) : raw;
+    var aggO = buildFastUniverseAgg(periodRows, false, hierMap);
+    _CONTRIB_FAST_CACHE.ovKey = ovKey;
+    _CONTRIB_FAST_CACHE.ovData = aggO;
+    return aggO;
+  }
+}
+
+function getProdValueFast(r, prodKey, useTgt, isMtd) {
+  if (isMtd) {
+    if (prodKey === 'wallet') {
+      var code = String(r.storeCode || '').trim().toUpperCase();
+      var w = (typeof WALLET_DATA !== 'undefined' && WALLET_DATA[code]) || r;
+      return Number(useTgt ? w.walletTarget : w.walletSales) || 0;
+    }
+    var mp = (typeof MTD_PRODS !== 'undefined' && MTD_PRODS[prodKey]) || { tKey: 'mobileTarget', aKey: 'mobileSubs' };
+    return Number(r[useTgt ? mp.tKey : mp.aKey]) || 0;
+  }
+  if (prodKey === 'all') {
+    var s = 0;
+    for (var i = 0; i < PRODUCTS.length; i++) {
+      var p = PRODUCTS[i];
+      s += Number(r[useTgt ? p.tKey : p.aKey]) || 0;
+    }
+    return s;
+  }
+  for (var j = 0; j < PRODUCTS.length; j++) {
+    if (PRODUCTS[j].key === prodKey) {
+      return Number(r[useTgt ? PRODUCTS[j].tKey : PRODUCTS[j].aKey]) || 0;
+    }
+  }
+  var p0 = PRODUCTS[0] || { tKey: 'mobileTarget', aKey: 'mobileSubs' };
+  return Number(r[useTgt ? p0.tKey : p0.aKey]) || 0;
+}
+
+function buildFastUniverseAgg(rows, isMtd, hierMap) {
+  var prodKeys = ['mobile', 'gold', 'fbb', 'fixed', 'wallet', 'fwa', 'all'];
+  var makeBucket = function () {
+    return {
+      ach: { mobile: 0, gold: 0, fbb: 0, fixed: 0, wallet: 0, fwa: 0, all: 0 },
+      target: { mobile: 0, gold: 0, fbb: 0, fixed: 0, wallet: 0, fwa: 0, all: 0 },
+      stores: new Set()
+    };
+  };
+  var byAm = {}, bySv = {}, byRm = {}, byZone = {}, byStore = {};
+  var fran = makeBucket();
+  var amMeta = {}, svMeta = {}, rmMeta = {}, storeMeta = {};
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    var stName = r.store || code || '—';
+    var stKey = code || stName;
+    var am = r.areaManager || h.am || 'Unassigned';
+    var sv = r.supervisor || h.sv || 'Unassigned';
+    var rm = r.regionalManager || h.rm || r.region || h.region || 'Unassigned';
+    var reg = r.region || h.region || '';
+    var zone = getRowZoneLabel(r, hierMap);
+
+    if (!storeMeta[stName]) storeMeta[stName] = { code: code, store: stName, am: am, sv: sv, rm: rm, reg: reg, zone: zone };
+    if (code && !storeMeta[code]) storeMeta[code] = storeMeta[stName];
+    if (!amMeta[am]) amMeta[am] = { sv: sv, rm: rm, reg: reg, zone: zone };
+    if (!svMeta[sv]) svMeta[sv] = { rm: rm, reg: reg, zone: zone };
+    if (!rmMeta[rm]) rmMeta[rm] = { reg: reg, zone: zone };
+
+    var bAm = byAm[am] || (byAm[am] = makeBucket());
+    var bSv = bySv[sv] || (bySv[sv] = makeBucket());
+    var bRm = byRm[rm] || (byRm[rm] = makeBucket());
+    var bZn = byZone[zone] || (byZone[zone] = makeBucket());
+    var bSt = byStore[stKey] || (byStore[stKey] = makeBucket());
+    if (stName !== stKey) byStore[stName] = bSt;
+
+    bAm.stores.add(stKey);
+    bSv.stores.add(stKey);
+    bRm.stores.add(stKey);
+    bZn.stores.add(stKey);
+    bSt.stores.add(stKey);
+    fran.stores.add(stKey);
+
+    for (var pk = 0; pk < prodKeys.length; pk++) {
+      var k = prodKeys[pk];
+      var vAch = getProdValueFast(r, k, false, isMtd);
+      var vTgt = getProdValueFast(r, k, true, isMtd);
+      bAm.ach[k] += vAch; bAm.target[k] += vTgt;
+      bSv.ach[k] += vAch; bSv.target[k] += vTgt;
+      bRm.ach[k] += vAch; bRm.target[k] += vTgt;
+      bZn.ach[k] += vAch; bZn.target[k] += vTgt;
+      bSt.ach[k] += vAch; bSt.target[k] += vTgt;
+      fran.ach[k] += vAch; fran.target[k] += vTgt;
+    }
+  }
+
+  return {
+    rows: rows,
+    byAm: byAm,
+    bySv: bySv,
+    byRm: byRm,
+    byZone: byZone,
+    byStore: byStore,
+    fran: fran,
+    amMeta: amMeta,
+    svMeta: svMeta,
+    rmMeta: rmMeta,
+    storeMeta: storeMeta
+  };
+}
+
+function setContribBasis(basis) {
+  CONTRIB_BASIS = (basis === 'target') ? 'target' : 'ach';
+  document.querySelectorAll('.contrib-basis-ach-btn').forEach(function (b) {
+    b.style.background = CONTRIB_BASIS === 'ach' ? '#5E2D91' : 'transparent';
+    b.style.color      = CONTRIB_BASIS === 'ach' ? 'white'   : '#6b7280';
+    b.style.fontWeight = CONTRIB_BASIS === 'ach' ? '800'     : '700';
+  });
+  document.querySelectorAll('.contrib-basis-tgt-btn').forEach(function (b) {
+    b.style.background = CONTRIB_BASIS === 'target' ? '#d97706' : 'transparent';
+    b.style.color      = CONTRIB_BASIS === 'target' ? 'white'   : '#6b7280';
+    b.style.fontWeight = CONTRIB_BASIS === 'target' ? '800'     : '700';
+  });
+  try {
+    renderProductKPIs('product-kpi-grid');
+    if (typeof activeTab !== 'undefined' && activeTab === 'products') renderProductKPIs('product-kpi-grid2');
+  } catch (e) {}
+  try {
+    if (typeof renderMTDKPIs === 'function') renderMTDKPIs();
+    if (typeof MTD_BA_OPEN !== 'undefined' && MTD_BA_OPEN && typeof renderMTDBA === 'function') renderMTDBA();
+  } catch (e) {}
+  try { refreshContributionViews(); } catch (e) {}
+}
+
+function sumRowsForProductAndBasis(rows, prodKey, basis, isMtd) {
+  var useTgt = (basis === 'target');
+  if (!rows || !rows.length) return 0;
+  var s = 0;
+  for (var i = 0; i < rows.length; i++) {
+    s += getProdValueFast(rows[i], prodKey, useTgt, isMtd);
+  }
+  return s;
+}
+
+// Read active filters for Overview or MTD accurately
+function getActiveFilterStateForContrib(sourceMode, customSel) {
+  var isMtd = (sourceMode === 'mtd');
+  var getVal = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  if (customSel) {
+    return {
+      rm: customSel.rm || '',
+      sv: customSel.sv || '',
+      am: customSel.am || '',
+      st: customSel.st || '',
+      reg: '',
+      cls: '',
+      acc: '',
+      pt: ''
+    };
+  }
+  if (isMtd) {
+    return {
+      rm: getVal('mtd-f-rm'),
+      sv: getVal('mtd-f-sv'),
+      am: getVal('mtd-f-am'),
+      st: (typeof MTD_SELECTED_STORE !== 'undefined' && MTD_SELECTED_STORE) ? MTD_SELECTED_STORE : '',
+      reg: getVal('mtd-f-region'),
+      cls: getVal('mtd-f-cls'),
+      acc: getVal('mtd-f-acc'),
+      pt: getVal('mtd-f-partner')
+    };
+  }
+  return {
+    rm: getVal('f-regMgr'),
+    sv: getVal('f-supervisor'),
+    am: getVal('f-areaMgr'),
+    st: (typeof selectedStore !== 'undefined' && selectedStore) ? selectedStore : '',
+    reg: '',
+    cls: (typeof activeClass !== 'undefined' && activeClass !== 'all') ? activeClass : '',
+    acc: getVal('f-accMgr'),
+    pt: getVal('f-partner')
+  };
+}
+
+// Fast O(1) lookup for KPI Card badges + full context when needed
+function computeMultiLevelContributionContext(sourceMode, prodKey, customSel, needRows) {
+  var isMtd = (sourceMode === 'mtd');
+  var pKey = prodKey || CONTRIB_SELECTED_PROD || 'mobile';
+  var basis = (CONTRIB_BASIS === 'target') ? 'target' : 'ach';
+  var agg = getContribFastAgg(sourceMode);
+  var f = getActiveFilterStateForContrib(sourceMode, customSel);
+
+  var activeLevel = 'all';
+  var entityTitle = 'All Scope';
+  var targetAm = f.am || '';
+  var targetSv = f.sv || '';
+  var targetRm = f.rm || '';
+  var targetReg = f.reg || '';
+  var targetZone = 'East & West Cairo & Canal';
+
+  if (f.st) {
+    activeLevel = 'store';
+    var sm = agg.storeMeta[f.st] || {};
+    targetAm = targetAm || sm.am || '';
+    targetSv = targetSv || sm.sv || '';
+    targetRm = targetRm || sm.rm || '';
+    targetReg = targetReg || sm.reg || '';
+    targetZone = sm.zone || targetZone;
+    entityTitle = 'Store: ' + (sm.store || f.st);
+  } else if (f.am) {
+    activeLevel = 'areaManager';
+    var amm = agg.amMeta[f.am] || {};
+    targetSv = targetSv || amm.sv || '';
+    targetRm = targetRm || amm.rm || '';
+    targetReg = targetReg || amm.reg || '';
+    targetZone = amm.zone || targetZone;
+    entityTitle = 'Area Mgr: ' + f.am;
+  } else if (f.sv) {
+    activeLevel = 'supervisor';
+    var svm = agg.svMeta[f.sv] || {};
+    targetRm = targetRm || svm.rm || '';
+    targetReg = targetReg || svm.reg || '';
+    targetZone = svm.zone || targetZone;
+    entityTitle = 'Supervisor: ' + f.sv;
+  } else if (f.rm || f.reg) {
+    activeLevel = 'regionalManager';
+    var rmm = (f.rm && agg.rmMeta[f.rm]) || {};
+    targetRm = f.rm || '';
+    targetReg = f.reg || rmm.reg || '';
+    targetZone = rmm.zone || targetZone;
+    entityTitle = 'Regional: ' + getFriendlyRegionLabel(f.rm, targetReg);
+  } else {
+    var firstRm = Object.keys(agg.byRm)[0] || '';
+    if (Object.keys(agg.byRm).length === 1 && firstRm) {
+      targetRm = firstRm;
+      targetReg = (agg.rmMeta[firstRm] && agg.rmMeta[firstRm].reg) || '';
+    }
+  }
+
+  // Compute entity numerator (use O(1) bucket if no secondary filters like cls/acc/pt are active, else sum active filtered rows)
+  var hasSecondaryFilter = !!(f.cls || f.acc || f.pt || (f.reg && !f.rm));
+  var entVal = 0;
+  var activeFilteredRows = null;
+
+  if (!customSel && !hasSecondaryFilter) {
+    if (activeLevel === 'store' && agg.byStore[f.st]) {
+      entVal = agg.byStore[f.st][basis][pKey] || 0;
+    } else if (activeLevel === 'areaManager' && agg.byAm[f.am]) {
+      entVal = agg.byAm[f.am][basis][pKey] || 0;
+    } else if (activeLevel === 'supervisor' && agg.bySv[f.sv]) {
+      entVal = agg.bySv[f.sv][basis][pKey] || 0;
+    } else if (activeLevel === 'regionalManager' && f.rm && agg.byRm[f.rm]) {
+      entVal = agg.byRm[f.rm][basis][pKey] || 0;
+    } else {
+      entVal = agg.fran[basis][pKey] || 0;
+    }
+  } else {
+    if (!customSel) {
+      activeFilteredRows = isMtd
+        ? ((typeof MTD_FILTERED !== 'undefined' && Array.isArray(MTD_FILTERED)) ? MTD_FILTERED : [])
+        : ((typeof FILTERED_DATA !== 'undefined' && Array.isArray(FILTERED_DATA)) ? FILTERED_DATA : []);
+    } else {
+      var hierMap = getFastHierMap();
+      activeFilteredRows = agg.rows.filter(function (r) {
+        var code = String(r.storeCode || '').trim().toUpperCase();
+        var h = (code && hierMap[code]) || {};
+        var rRm = r.regionalManager || h.rm || r.region || h.region || 'Unassigned';
+        var rSv = r.supervisor || h.sv || 'Unassigned';
+        var rAm = r.areaManager || h.am || 'Unassigned';
+        var rSt = r.store || code || '';
+        return (!f.rm || rRm === f.rm) &&
+               (!f.sv || rSv === f.sv) &&
+               (!f.am || rAm === f.am) &&
+               (!f.st || code === f.st || rSt === f.st);
+      });
+    }
+    entVal = sumRowsForProductAndBasis(activeFilteredRows, pKey, basis, isMtd);
+    if (activeFilteredRows.length && (!targetRm || !targetSv)) {
+      var s0 = activeFilteredRows[0];
+      var c0 = String(s0.storeCode || '').trim().toUpperCase();
+      var h0 = (c0 && getFastHierMap()[c0]) || {};
+      targetAm = targetAm || (f.st ? (s0.areaManager || h0.am || '') : '');
+      targetSv = targetSv || ((f.st || f.am) ? (s0.supervisor || h0.sv || '') : '');
+      targetRm = targetRm || ((f.st || f.am || f.sv) ? (s0.regionalManager || h0.rm || '') : '');
+    }
+  }
+
+  var areaBucket = (targetAm && agg.byAm[targetAm]) || null;
+  var supBucket  = (targetSv && agg.bySv[targetSv]) || null;
+  var regBucket  = (targetRm && agg.byRm[targetRm]) || agg.fran;
+  var zoneBucket = (targetZone && agg.byZone[targetZone]) || agg.fran;
+  var franBucket = agg.fran;
+
+  var areaVal = areaBucket ? (areaBucket[basis][pKey] || 0) : 0;
+  var supVal  = supBucket  ? (supBucket[basis][pKey]  || 0) : 0;
+  var regVal  = regBucket  ? (regBucket[basis][pKey]  || 0) : 0;
+  var zoneVal = zoneBucket ? (zoneBucket[basis][pKey] || 0) : 0;
+  var franVal = franBucket ? (franBucket[basis][pKey] || 0) : 0;
+
+  var regLabel = getFriendlyRegionLabel(targetRm, targetReg);
+  var shortReg = getShortRegionLabel(targetRm, targetReg);
+
+  var levels = [];
+  if (activeLevel === 'store') {
+    levels.push({
+      key: 'area', icon: '📍', color: '#2563eb',
+      title: 'Area Manager',
+      subTitle: targetAm || '—',
+      pct: areaVal > 0 ? (entVal / areaVal * 100) : null,
+      num: entVal, den: areaVal, stores: areaBucket ? areaBucket.stores.size : 0
+    });
+  }
+  if (activeLevel === 'store' || activeLevel === 'areaManager') {
+    levels.push({
+      key: 'sup', icon: '🧑‍💼', color: '#7c3aed',
+      title: 'Supervisor',
+      subTitle: targetSv || '—',
+      pct: supVal > 0 ? (entVal / supVal * 100) : null,
+      num: entVal, den: supVal, stores: supBucket ? supBucket.stores.size : 0
+    });
+  }
+  if (activeLevel === 'store' || activeLevel === 'areaManager' || activeLevel === 'supervisor' || activeLevel === 'all') {
+    levels.push({
+      key: 'reg', icon: '🌍', color: '#5E2D91',
+      title: 'Regional (' + shortReg + ')',
+      subTitle: regLabel,
+      pct: regVal > 0 ? (entVal / regVal * 100) : null,
+      num: entVal, den: regVal, stores: regBucket ? regBucket.stores.size : 0
+    });
+  }
+  levels.push({
+    key: 'zone', icon: '🏢', color: '#0f766e',
+    title: 'Zone (E+W+Canal)',
+    subTitle: targetZone,
+    pct: zoneVal > 0 ? (entVal / zoneVal * 100) : null,
+    num: entVal, den: zoneVal, stores: zoneBucket ? zoneBucket.stores.size : 0
+  });
+  levels.push({
+    key: 'fran', icon: '🏛️', color: '#d97706',
+    title: 'All Franchise',
+    subTitle: 'All Regions (' + (franBucket ? franBucket.stores.size : 0) + ' Stores)',
+    pct: franVal > 0 ? (entVal / franVal * 100) : null,
+    num: entVal, den: franVal, stores: franBucket ? franBucket.stores.size : 0
+  });
+
+  var enrichedUniverse = [];
+  var entityRows = [];
+  if (needRows) {
+    var hierMap2 = getFastHierMap();
+    enrichedUniverse = agg.rows.map(function (r) {
+      var code = String(r.storeCode || '').trim().toUpperCase();
+      var h = (code && hierMap2[code]) || {};
+      return Object.assign({}, r, {
+        _code: code || r.store || '',
+        _store: r.store || code || '—',
+        _am: r.areaManager || h.am || 'Unassigned',
+        _sv: r.supervisor || h.sv || 'Unassigned',
+        _rm: r.regionalManager || h.rm || r.region || h.region || 'Unassigned',
+        _reg: r.region || h.region || '',
+        _zone: getRowZoneLabel(r, hierMap2)
+      });
+    });
+    entityRows = enrichedUniverse.filter(function (r) {
+      return (!f.rm || r._rm === f.rm) &&
+             (!f.sv || r._sv === f.sv) &&
+             (!f.am || r._am === f.am) &&
+             (!f.st || r._code === f.st || r._store === f.st) &&
+             (!f.reg || r._reg === f.reg) &&
+             (!f.cls || r.classification === f.cls) &&
+             (!f.acc || r.accountManager === f.acc) &&
+             (!f.pt || r.partner === f.pt);
+    });
+  }
+
+  return {
+    isMtd: isMtd,
+    basis: basis,
+    basisLabel: basis === 'target' ? 'Target' : 'Ach',
+    prodKey: pKey,
+    activeLevel: activeLevel,
+    entityTitle: entityTitle,
+    targetAm: targetAm,
+    targetSv: targetSv,
+    targetRm: targetRm,
+    regLabel: regLabel,
+    shortReg: shortReg,
+    targetZone: targetZone,
+    entVal: entVal,
+    areaVal: areaVal,
+    supVal: supVal,
+    regVal: regVal,
+    zoneVal: zoneVal,
+    franVal: franVal,
+    levels: levels,
+    entityRows: entityRows,
+    enrichedUniverse: enrichedUniverse
+  };
+}
+
+// Build ultra-clean, 100% English 1-line badge for Overview & MTD KPI Cards
+// Shows ONLY Supervisor & Regional contribution according to active filters!
+function buildCardContributionBadgeHTML(sourceMode, prodKey) {
+  var ctx = computeMultiLevelContributionContext(sourceMode, prodKey, null, false);
+  var bTag = ctx.basis === 'target' ? 'Tgt' : 'Ach';
+  var supPct = ctx.supVal > 0 ? (ctx.entVal / ctx.supVal * 100) : null;
+  var regPct = ctx.regVal > 0 ? (ctx.entVal / ctx.regVal * 100) : null;
+  var zonePct = ctx.zoneVal > 0 ? (ctx.entVal / ctx.zoneVal * 100) : null;
+
+  var parts = [];
+  if (ctx.activeLevel === 'store' || ctx.activeLevel === 'areaManager') {
+    if (supPct !== null) parts.push('<b>' + supPct.toFixed(1) + '%</b> Supervisor');
+    if (regPct !== null) parts.push('<b>' + regPct.toFixed(1) + '%</b> Regional');
+  } else if (ctx.activeLevel === 'supervisor') {
+    if (regPct !== null) parts.push('<b>' + regPct.toFixed(1) + '%</b> Regional');
+  } else if (ctx.activeLevel === 'regionalManager') {
+    if (zonePct !== null && ctx.zoneVal > ctx.regVal) {
+      parts.push('<b>' + zonePct.toFixed(1) + '%</b> Zone');
+    } else if (regPct !== null) {
+      parts.push('<b>' + regPct.toFixed(1) + '%</b> Regional');
+    }
+  } else {
+    // No filter selected: keep card super clean without noisy 100% text
+    parts.push('<span style="opacity:.8">Select Filter (Sup / Regional) ▸</span>');
+  }
+
+  var tooltipTxt = ctx.levels.map(function (lv) {
+    return lv.title + ' (' + lv.subTitle + '): ' + (lv.pct !== null ? lv.pct.toFixed(2) + '%' : '—') + ' [' + fmtN(Math.round(lv.num)) + ' / ' + fmtN(Math.round(lv.den)) + ']';
+  }).join(' &#10; ');
+
+  return '<div onclick="event.stopPropagation();onCardContributionPillClick(\'' + sourceMode + '\', \'' + prodKey + '\')" title="' + tooltipTxt + '" style="margin-top:6px;padding:3px 7px;border-radius:6px;background:rgba(94,45,145,0.06);border:1px solid rgba(94,45,145,0.15);color:var(--we-purple);font-size:9.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between;gap:4px;font-family:\'Inter\',sans-serif" dir="ltr">' +
+    '<span>Cont. (' + bTag + '): ' + parts.join(' · ') + '</span>' +
+  '</div>';
+}
+
+var PKG_TARIFF_SUBVIEW = 'packages'; // 'packages' | 'tariff' | 'both'
+
+function setPkgTariffSubView(mode) {
+  PKG_TARIFF_SUBVIEW = (mode === 'tariff' || mode === 'both') ? mode : 'packages';
+  var pWrap = document.getElementById('subview-packages-wrap');
+  var tWrap = document.getElementById('subview-tariff-wrap');
+  if (pWrap) pWrap.style.display = (PKG_TARIFF_SUBVIEW === 'packages' || PKG_TARIFF_SUBVIEW === 'both') ? 'block' : 'none';
+  if (tWrap) {
+    tWrap.style.display = (PKG_TARIFF_SUBVIEW === 'tariff' || PKG_TARIFF_SUBVIEW === 'both') ? 'block' : 'none';
+    tWrap.style.marginTop = (PKG_TARIFF_SUBVIEW === 'both') ? '24px' : '0px';
+  }
+  ['packages', 'tariff', 'both'].forEach(function (k) {
+    var btn = document.getElementById('pkg-sub-btn-' + k);
+    if (btn) {
+      var act = (PKG_TARIFF_SUBVIEW === k);
+      btn.style.background = act ? '#5E2D91' : 'transparent';
+      btn.style.color = act ? 'white' : 'var(--text-muted)';
+      btn.style.fontWeight = act ? '800' : '700';
+    }
+  });
+  renderMergedPackagesAndTariffs();
+}
+
+function renderMergedPackagesAndTariffs() {
+  if (PKG_TARIFF_SUBVIEW === 'packages' || PKG_TARIFF_SUBVIEW === 'both') {
+    try { renderPackages(); } catch (e) {}
+  }
+  if (PKG_TARIFF_SUBVIEW === 'tariff' || PKG_TARIFF_SUBVIEW === 'both') {
+    try {
+      renderTariffKPIs();
+      renderTariffDonut();
+      renderTariffTrend();
+      renderTariffStacked();
+    } catch (e) {}
+  }
+}
+
+function renderContributionTab() {
+  renderContributionSectionInto('tab-contribution-body', false, true);
+}
+
+function onMainFiltersChangedForContribution() {
+  if (CONTRIB_SOURCE_MODE === 'overview') {
+    syncContribCustomSelectorsFromMainFilters('overview');
+  }
+  renderContributionTab();
+}
+
+function onCardContributionPillClick(sourceMode, prodKey) {
+  CONTRIB_SOURCE_MODE = (sourceMode === 'mtd') ? 'mtd' : 'overview';
+  CONTRIB_SELECTED_PROD = prodKey || 'mobile';
+  syncContribCustomSelectorsFromMainFilters(CONTRIB_SOURCE_MODE);
+  switchTab('contribution');
+  var tabEl = document.getElementById('tab-contribution');
+  if (tabEl) tabEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Hook into renderProductKPIs and renderMTDKPIs so Cards show the lightweight English Cont. badge ──
+(function () {
+  var _origRenderProductKPIs = renderProductKPIs;
+  renderProductKPIs = function (containerId) {
+    _origRenderProductKPIs.apply(this, arguments);
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var cards = el.querySelectorAll('.prod-kpi-card');
+    PRODUCTS.forEach(function (p, i) {
+      if (cards[i]) {
+        var badgeWrap = document.createElement('div');
+        badgeWrap.innerHTML = buildCardContributionBadgeHTML('overview', p.key);
+        if (badgeWrap.firstChild) cards[i].appendChild(badgeWrap.firstChild);
+      }
+    });
+    if (OV_CONTRIB_DRAWER_OPEN && containerId === 'product-kpi-grid') {
+      try { renderContributionSectionInto('ov-contrib-inline-body', false); } catch (e) {}
+    }
+  };
+
+  var _origRenderMTDKPIs = renderMTDKPIs;
+  renderMTDKPIs = function () {
+    _origRenderMTDKPIs.apply(this, arguments);
+    var mtdMap = [
+      { id: 'mtd-kpi-mobile', key: 'mobile' },
+      { id: 'mtd-kpi-fbb',    key: 'fbb' },
+      { id: 'mtd-kpi-fixed',  key: 'fixed' },
+      { id: 'mtd-kpi-fwa',    key: 'fwa' },
+      { id: 'mtd-kpi-wallet', key: 'wallet' }
+    ];
+    mtdMap.forEach(function (item) {
+      var cardEl = document.getElementById(item.id);
+      if (cardEl && cardEl.style.display !== 'none') {
+        var div = document.createElement('div');
+        div.innerHTML = buildCardContributionBadgeHTML('mtd', item.key);
+        if (div.firstChild) cardEl.appendChild(div.firstChild);
+      }
+    });
+  };
+})();
+
+// ────────────────────────────────────────────────────────────────────────────
+// DEDICATED CONTRIBUTION INTELLIGENCE SECTION & MODAL UI (100% ENGLISH)
+// ────────────────────────────────────────────────────────────────────────────
+function syncContribCustomSelectorsFromMainFilters(sourceMode) {
+  var f = getActiveFilterStateForContrib(sourceMode, null);
+  CONTRIB_CUSTOM_RM = f.rm || '';
+  CONTRIB_CUSTOM_SV = f.sv || '';
+  CONTRIB_CUSTOM_AM = f.am || '';
+  CONTRIB_CUSTOM_ST = f.st || '';
+}
+
+function toggleOverviewContribDrawer(forceState) {
+  OV_CONTRIB_DRAWER_OPEN = (forceState !== undefined) ? !!forceState : !OV_CONTRIB_DRAWER_OPEN;
+  var dr = document.getElementById('ov-contrib-inline-drawer');
+  var btn = document.getElementById('ov-contrib-drawer-btn');
+  var chev = document.getElementById('ov-contrib-drawer-chev');
+  if (dr) dr.style.display = OV_CONTRIB_DRAWER_OPEN ? 'block' : 'none';
+  if (btn) {
+    btn.style.background = OV_CONTRIB_DRAWER_OPEN ? '#5E2D91' : '#f5f3ff';
+    btn.style.color = OV_CONTRIB_DRAWER_OPEN ? 'white' : '#5E2D91';
+  }
+  if (chev) chev.className = OV_CONTRIB_DRAWER_OPEN ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+  if (OV_CONTRIB_DRAWER_OPEN) {
+    CONTRIB_SOURCE_MODE = 'overview';
+    syncContribCustomSelectorsFromMainFilters('overview');
+    renderContributionSectionInto('ov-contrib-inline-body', false);
+  }
+}
+
+function openContributionExplorerModal(sourceMode, prodKey) {
+  CONTRIB_SOURCE_MODE = sourceMode || (typeof activeTab !== 'undefined' && activeTab === 'mtd' ? 'mtd' : 'overview');
+  if (prodKey) CONTRIB_SELECTED_PROD = prodKey;
+  syncContribCustomSelectorsFromMainFilters(CONTRIB_SOURCE_MODE);
+  var ov = document.getElementById('contrib-explorer-modal-overlay');
+  if (ov) ov.style.display = 'flex';
+  renderContributionSectionInto('contrib-explorer-modal-body', true);
+}
+
+function closeContributionExplorerModal() {
+  var ov = document.getElementById('contrib-explorer-modal-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function onContribCustomFilterChange(level, val) {
+  if (level === 'source') {
+    CONTRIB_SOURCE_MODE = val;
+    syncContribCustomSelectorsFromMainFilters(val);
+  } else if (level === 'prod') {
+    CONTRIB_SELECTED_PROD = val;
+  } else if (level === 'rm') {
+    CONTRIB_CUSTOM_RM = val;
+    CONTRIB_CUSTOM_SV = '';
+    CONTRIB_CUSTOM_AM = '';
+    CONTRIB_CUSTOM_ST = '';
+  } else if (level === 'sv') {
+    CONTRIB_CUSTOM_SV = val;
+    CONTRIB_CUSTOM_AM = '';
+    CONTRIB_CUSTOM_ST = '';
+  } else if (level === 'am') {
+    CONTRIB_CUSTOM_AM = val;
+    CONTRIB_CUSTOM_ST = '';
+  } else if (level === 'st') {
+    CONTRIB_CUSTOM_ST = val;
+  }
+  refreshContributionViews();
+}
+
+function refreshContributionViews() {
+  if (typeof activeTab !== 'undefined' && activeTab === 'contribution') {
+    renderContributionSectionInto('tab-contribution-body', false, true);
+  }
+  if (OV_CONTRIB_DRAWER_OPEN) {
+    renderContributionSectionInto('ov-contrib-inline-body', false, false);
+  }
+  var modalOv = document.getElementById('contrib-explorer-modal-overlay');
+  if (modalOv && modalOv.style.display !== 'none') {
+    renderContributionSectionInto('contrib-explorer-modal-body', true, false);
+  }
+}
+
+function renderContributionSectionInto(containerId, isModal, isDedicatedTab) {
+  var box = document.getElementById(containerId);
+  if (!box) return;
+
+  var customSel = {
+    rm: CONTRIB_CUSTOM_RM,
+    sv: CONTRIB_CUSTOM_SV,
+    am: CONTRIB_CUSTOM_AM,
+    st: CONTRIB_CUSTOM_ST
+  };
+  var ctx = computeMultiLevelContributionContext(CONTRIB_SOURCE_MODE, CONTRIB_SELECTED_PROD, customSel, true);
+  var u = ctx.enrichedUniverse;
+
+  var rmList = Array.from(new Set(u.map(function (r) { return r._rm; }).filter(function (x) { return x && x !== 'Unassigned'; }))).sort();
+  var uAfterRm = CONTRIB_CUSTOM_RM ? u.filter(function (r) { return r._rm === CONTRIB_CUSTOM_RM; }) : u;
+  var svList = Array.from(new Set(uAfterRm.map(function (r) { return r._sv; }).filter(function (x) { return x && x !== 'Unassigned'; }))).sort();
+  var uAfterSv = CONTRIB_CUSTOM_SV ? uAfterRm.filter(function (r) { return r._sv === CONTRIB_CUSTOM_SV; }) : uAfterRm;
+  var amList = Array.from(new Set(uAfterSv.map(function (r) { return r._am; }).filter(function (x) { return x && x !== 'Unassigned'; }))).sort();
+  var uAfterAm = CONTRIB_CUSTOM_AM ? uAfterSv.filter(function (r) { return r._am === CONTRIB_CUSTOM_AM; }) : uAfterSv;
+  var stMap = {};
+  uAfterAm.forEach(function (r) {
+    var k = r._code || r._store;
+    if (k && !stMap[k]) stMap[k] = r._store;
+  });
+  var stKeys = Object.keys(stMap).sort(function (a, b) { return (stMap[a] || '').localeCompare(stMap[b] || ''); });
+
+  var prodList = ctx.isMtd
+    ? [
+        { key: 'mobile', label: 'Mobile' },
+        { key: 'fbb',    label: 'FBB' },
+        { key: 'fixed',  label: 'Fixed' },
+        { key: 'fwa',    label: 'WE Air' },
+        { key: 'gold',   label: 'WE Gold' },
+        { key: 'wallet', label: 'Wallet' }
+      ]
+    : PRODUCTS.map(function (p) { return { key: p.key, label: p.label }; });
+
+  var prodBtnsHTML = prodList.map(function (p) {
+    var act = (ctx.prodKey === p.key);
+    return '<button type="button" onclick="onContribCustomFilterChange(\'prod\',\'' + p.key + '\')" style="padding:4px 11px;border-radius:12px;border:' + (act ? 'none' : '1px solid var(--border)') + ';background:' + (act ? '#5E2D91' : 'var(--card-bg)') + ';color:' + (act ? 'white' : 'var(--text-primary)') + ';font-size:11px;font-weight:800;cursor:pointer">' + p.label + '</button>';
+  }).join('');
+
+  // 1. Visual Multi-Level Waterfall Cards (100% English)
+  var waterfallCardsHTML = ctx.levels.map(function (lv) {
+    var pctTxt = lv.pct !== null ? lv.pct.toFixed(2) + '%' : '—';
+    var barW = lv.pct !== null ? Math.min(100, Math.max(2, lv.pct)) : 0;
+    return '<div style="background:var(--card-bg);border:1.5px solid var(--border);border-top:4px solid ' + lv.color + ';border-radius:12px;padding:11px 13px;box-shadow:0 2px 8px rgba(0,0,0,0.03)">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
+        '<span style="font-size:11px;font-weight:800;color:var(--text-primary)">' + lv.icon + ' ' + mgrEsc(lv.title) + '</span>' +
+        '<span style="font-size:9.5px;font-weight:700;color:#6b7280;background:var(--gray-bg);padding:2px 6px;border-radius:6px">' + lv.stores + ' Stores</span>' +
+      '</div>' +
+      '<div dir="auto" style="font-size:10.5px;font-weight:700;color:' + lv.color + ';margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + mgrEsc(lv.subTitle) + '</div>' +
+      '<div style="font-size:22px;font-weight:900;color:' + lv.color + ';line-height:1.15;margin-bottom:5px">' + pctTxt + '</div>' +
+      '<div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-bottom:5px">' +
+        '<div style="height:100%;width:' + barW + '%;background:' + lv.color + ';border-radius:3px"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-muted);font-weight:700">' +
+        '<span>Entity: <strong style="color:var(--text-primary)">' + fmtN(Math.round(lv.num)) + '</strong></span>' +
+        '<span>Level Total: <strong style="color:var(--text-primary)">' + fmtN(Math.round(lv.den)) + '</strong></span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // 2. All-6-Products Multi-Level Table for the currently selected entity (O(1) fast lookup)
+  var allProdsRowsHTML = prodList.map(function (p, idx) {
+    var pCtx = computeMultiLevelContributionContext(CONTRIB_SOURCE_MODE, p.key, customSel, false);
+    var findLv = function (k) {
+      var found = pCtx.levels.find(function (x) { return x.key === k; });
+      return (found && found.pct !== null) ? found.pct.toFixed(1) + '%' : '—';
+    };
+    var bg = idx % 2 === 0 ? 'var(--card-bg)' : 'var(--gray-bg)';
+    return '<tr style="background:' + bg + ';border-bottom:1px solid var(--border);font-size:11px">' +
+      '<td style="padding:6px 10px;font-weight:800;color:var(--we-purple);text-align:left">' + p.label + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:800">' + fmtN(Math.round(pCtx.entVal)) + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:700;color:#2563eb;background:rgba(37,99,235,0.04)">' + findLv('area') + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:800;color:#7c3aed;background:rgba(124,58,237,0.06)">' + findLv('sup') + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:900;color:#5E2D91;background:rgba(94,45,145,0.08)">' + findLv('reg') + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:700;color:#0f766e;background:rgba(15,118,110,0.04)">' + findLv('zone') + '</td>' +
+      '<td style="padding:6px 10px;text-align:center;font-weight:700;color:#d97706;background:rgba(217,119,6,0.04)">' + findLv('fran') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // 3. Hierarchical Drill Table (Regional -> Supervisor -> Area Manager -> Store) using pre-aggregated cache
+  var agg = getContribFastAgg(CONTRIB_SOURCE_MODE);
+  var hierRowsHTML = '';
+  var scopedRows = ctx.entityRows.length ? ctx.entityRows : u;
+  var byRm = {};
+  scopedRows.forEach(function (r) {
+    if (!byRm[r._rm]) byRm[r._rm] = [];
+    byRm[r._rm].push(r);
+  });
+
+  var franDen = ctx.franVal;
+  Object.keys(byRm).sort().forEach(function (rmName) {
+    var rmRows = byRm[rmName];
+    var zKey = (rmRows[0] && rmRows[0]._zone) || 'East & West Cairo & Canal';
+    var regDen = (agg.byRm[rmName] && agg.byRm[rmName][ctx.basis][ctx.prodKey]) || 0;
+    var zoneDen = (agg.byZone[zKey] && agg.byZone[zKey][ctx.basis][ctx.prodKey]) || franDen;
+    var rmVal = sumRowsForProductAndBasis(rmRows, ctx.prodKey, ctx.basis, ctx.isMtd);
+    var rmStores = new Set(rmRows.map(function (x) { return x._code || x._store; })).size;
+
+    hierRowsHTML += '<tr style="background:#5E2D91;color:white;font-weight:800;font-size:11px">' +
+      '<td style="padding:6px 10px;text-align:left">👔 Regional: ' + mgrEsc(getFriendlyRegionLabel(rmName, (rmRows[0] || {})._reg)) + '</td>' +
+      '<td style="padding:6px 8px;text-align:center">' + rmStores + '</td>' +
+      '<td style="padding:6px 8px;text-align:center">' + fmtN(Math.round(rmVal)) + '</td>' +
+      '<td style="padding:6px 8px;text-align:center">—</td>' +
+      '<td style="padding:6px 8px;text-align:center">—</td>' +
+      '<td style="padding:6px 8px;text-align:center">100.0%</td>' +
+      '<td style="padding:6px 8px;text-align:center;color:#fef08a">' + (zoneDen > 0 ? (rmVal / zoneDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;color:#bbf7d0">' + (franDen > 0 ? (rmVal / franDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+    '</tr>';
+
+    var bySv = {};
+    rmRows.forEach(function (r) { if (!bySv[r._sv]) bySv[r._sv] = []; bySv[r._sv].push(r); });
+    Object.keys(bySv).sort().forEach(function (svName) {
+      var svRows = bySv[svName];
+      var svDen = (agg.bySv[svName] && agg.bySv[svName][ctx.basis][ctx.prodKey]) || 0;
+      var svVal = sumRowsForProductAndBasis(svRows, ctx.prodKey, ctx.basis, ctx.isMtd);
+      var svStores = new Set(svRows.map(function (x) { return x._code || x._store; })).size;
+
+      hierRowsHTML += '<tr style="background:#dbe8f7;color:#1e3a5f;font-weight:800;font-size:11px;border-bottom:1px solid #cbd5e1">' +
+        '<td style="padding:5px 10px 5px 18px;text-align:left">🧑‍💼 Supervisor: ' + mgrEsc(svName) + '</td>' +
+        '<td style="padding:5px 8px;text-align:center">' + svStores + '</td>' +
+        '<td style="padding:5px 8px;text-align:center">' + fmtN(Math.round(svVal)) + '</td>' +
+        '<td style="padding:5px 8px;text-align:center">—</td>' +
+        '<td style="padding:5px 8px;text-align:center">100.0%</td>' +
+        '<td style="padding:5px 8px;text-align:center;font-weight:900;color:#5E2D91">' + (regDen > 0 ? (svVal / regDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+        '<td style="padding:5px 8px;text-align:center">' + (zoneDen > 0 ? (svVal / zoneDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+        '<td style="padding:5px 8px;text-align:center">' + (franDen > 0 ? (svVal / franDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+      '</tr>';
+
+      var byAm = {};
+      svRows.forEach(function (r) { if (!byAm[r._am]) byAm[r._am] = []; byAm[r._am].push(r); });
+      Object.keys(byAm).sort().forEach(function (amName, ai) {
+        var amRows = byAm[amName];
+        var amDen = (agg.byAm[amName] && agg.byAm[amName][ctx.basis][ctx.prodKey]) || 0;
+        var amVal = sumRowsForProductAndBasis(amRows, ctx.prodKey, ctx.basis, ctx.isMtd);
+        var amStores = new Set(amRows.map(function (x) { return x._code || x._store; })).size;
+
+        hierRowsHTML += '<tr style="background:' + (ai % 2 === 0 ? '#ffffff' : '#f8fafc') + ';color:#1f2937;font-weight:700;font-size:10.5px;border-bottom:1px solid #e5e7eb">' +
+          '<td style="padding:5px 10px 5px 32px;text-align:left">📍 Area Mgr: ' + mgrEsc(amName) + '</td>' +
+          '<td style="padding:5px 8px;text-align:center">' + amStores + '</td>' +
+          '<td style="padding:5px 8px;text-align:center">' + fmtN(Math.round(amVal)) + '</td>' +
+          '<td style="padding:5px 8px;text-align:center">100.0%</td>' +
+          '<td style="padding:5px 8px;text-align:center;font-weight:800;color:#7c3aed">' + (svDen > 0 ? (amVal / svDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;font-weight:800;color:#5E2D91;background:#f5f3ff">' + (regDen > 0 ? (amVal / regDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;color:#0f766e">' + (zoneDen > 0 ? (amVal / zoneDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;color:#b45309">' + (franDen > 0 ? (amVal / franDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+        '</tr>';
+
+        if (CONTRIB_CUSTOM_SV || CONTRIB_CUSTOM_AM || CONTRIB_CUSTOM_ST || rmStores <= 35) {
+          var bySt = {};
+          amRows.forEach(function (r) { var sk = r._code || r._store; if (!bySt[sk]) bySt[sk] = []; bySt[sk].push(r); });
+          Object.keys(bySt).sort(function (a, b) {
+            return sumRowsForProductAndBasis(bySt[b], ctx.prodKey, ctx.basis, ctx.isMtd) - sumRowsForProductAndBasis(bySt[a], ctx.prodKey, ctx.basis, ctx.isMtd);
+          }).forEach(function (sk) {
+            var sRows = bySt[sk];
+            var stVal = sumRowsForProductAndBasis(sRows, ctx.prodKey, ctx.basis, ctx.isMtd);
+            var stName = sRows[sRows.length - 1]._store || sk;
+            hierRowsHTML += '<tr style="background:#faf9fb;color:#374151;font-size:10px;border-bottom:1px dashed #e5e7eb">' +
+              '<td dir="auto" style="padding:4px 10px 4px 48px;text-align:left">🏪 ' + mgrEsc(stName) + '</td>' +
+              '<td style="padding:4px 8px;text-align:center">1</td>' +
+              '<td style="padding:4px 8px;text-align:center;font-weight:700">' + fmtN(Math.round(stVal)) + '</td>' +
+              '<td style="padding:4px 8px;text-align:center;font-weight:700;color:#2563eb">' + (amDen > 0 ? (stVal / amDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+              '<td style="padding:4px 8px;text-align:center;font-weight:800;color:#7c3aed">' + (svDen > 0 ? (stVal / svDen * 100).toFixed(1) + '%' : '—') + '</td>' +
+              '<td style="padding:4px 8px;text-align:center;font-weight:800;color:#5E2D91;background:#f5f3ff">' + (regDen > 0 ? (stVal / regDen * 100).toFixed(2) + '%' : '—') + '</td>' +
+              '<td style="padding:4px 8px;text-align:center;color:#0f766e">' + (zoneDen > 0 ? (stVal / zoneDen * 100).toFixed(2) + '%' : '—') + '</td>' +
+              '<td style="padding:4px 8px;text-align:center;color:#b45309">' + (franDen > 0 ? (stVal / franDen * 100).toFixed(2) + '%' : '—') + '</td>' +
+            '</tr>';
+          });
+        }
+      });
+    });
+  });
+
+  var closeBtnHTML = isModal
+    ? '<button type="button" onclick="closeContributionExplorerModal()" style="background:none;border:none;font-size:22px;color:white;cursor:pointer;padding:0 6px">&times;</button>'
+    : ((isDedicatedTab || containerId === 'tab-contribution-body') ? '' : '<button type="button" onclick="toggleOverviewContribDrawer(false)" style="padding:4px 11px;border-radius:10px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;font-size:10.5px;font-weight:800;cursor:pointer">Hide ▲</button>');
+
+  box.innerHTML =
+    '<div dir="ltr" style="font-family:\'Inter\',sans-serif">' +
+      '<!-- Header -->' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:linear-gradient(135deg,#1e1b4b,#5E2D91,#0f766e);color:white;flex-wrap:wrap;gap:10px">' +
+        '<div>' +
+          '<div style="font-size:14px;font-weight:900"><i class="fas fa-chart-pie mr-2" style="color:#fbbf24"></i>Multi-Level Contribution Intelligence</div>' +
+          '<div style="font-size:10.5px;opacity:.9;margin-top:2px">Store / Area Mgr / Supervisor / Regional contribution across Area · Supervisor · Regional · Zone (E+W+Canal) · Franchise</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<button type="button" onclick="exportMultiLevelContributionExcel(this)" style="padding:5px 12px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-file-excel mr-1"></i>Export Excel</button>' +
+          closeBtnHTML +
+        '</div>' +
+      '</div>' +
+      '<!-- Controls Bar -->' +
+      '<div style="padding:12px 16px;background:var(--gray-bg);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<span style="font-size:10.5px;font-weight:800;color:var(--text-muted)">Source:</span>' +
+            '<div style="display:inline-flex;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card-bg)">' +
+              '<button type="button" onclick="onContribCustomFilterChange(\'source\',\'overview\')" style="padding:4px 11px;border:none;background:' + (!ctx.isMtd ? '#5E2D91' : 'transparent') + ';color:' + (!ctx.isMtd ? 'white' : 'var(--text-primary)') + ';font-size:10.5px;font-weight:800;cursor:pointer">Overview (YTD)</button>' +
+              '<button type="button" onclick="onContribCustomFilterChange(\'source\',\'mtd\')" style="padding:4px 11px;border:none;background:' + (ctx.isMtd ? '#c0392b' : 'transparent') + ';color:' + (ctx.isMtd ? 'white' : 'var(--text-primary)') + ';font-size:10.5px;font-weight:800;cursor:pointer">Live MTD</button>' +
+            '</div>' +
+            '<span style="font-size:10.5px;font-weight:800;color:var(--text-muted);margin-left:4px">Basis:</span>' +
+            '<div style="display:inline-flex;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card-bg)">' +
+              '<button type="button" onclick="setContribBasis(\'ach\')" style="padding:4px 11px;border:none;background:' + (ctx.basis === 'ach' ? '#5E2D91' : 'transparent') + ';color:' + (ctx.basis === 'ach' ? 'white' : 'var(--text-primary)') + ';font-size:10.5px;font-weight:800;cursor:pointer">From Ach</button>' +
+              '<button type="button" onclick="setContribBasis(\'target\')" style="padding:4px 11px;border:none;background:' + (ctx.basis === 'target' ? '#d97706' : 'transparent') + ';color:' + (ctx.basis === 'target' ? 'white' : 'var(--text-primary)') + ';font-size:10.5px;font-weight:800;cursor:pointer">From Target</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">' + prodBtnsHTML + '</div>' +
+        '</div>' +
+        '<!-- Level Entity Selectors -->' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;padding-top:6px;border-top:1px dashed var(--border)">' +
+          '<select onchange="onContribCustomFilterChange(\'rm\',this.value)" style="padding:5px 9px;border-radius:10px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">' +
+            '<option value="">All Regional Managers (' + rmList.length + ')</option>' +
+            rmList.map(function (rm) { return '<option value="' + mgrEsc(rm) + '"' + (CONTRIB_CUSTOM_RM === rm ? ' selected' : '') + '>' + mgrEsc(getFriendlyRegionLabel(rm, '')) + '</option>'; }).join('') +
+          '</select>' +
+          '<select onchange="onContribCustomFilterChange(\'sv\',this.value)" style="padding:5px 9px;border-radius:10px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">' +
+            '<option value="">All Supervisors (' + svList.length + ')</option>' +
+            svList.map(function (sv) { return '<option value="' + mgrEsc(sv) + '"' + (CONTRIB_CUSTOM_SV === sv ? ' selected' : '') + '>' + mgrEsc(sv) + '</option>'; }).join('') +
+          '</select>' +
+          '<select onchange="onContribCustomFilterChange(\'am\',this.value)" style="padding:5px 9px;border-radius:10px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">' +
+            '<option value="">All Area Managers (' + amList.length + ')</option>' +
+            amList.map(function (am) { return '<option value="' + mgrEsc(am) + '"' + (CONTRIB_CUSTOM_AM === am ? ' selected' : '') + '>' + mgrEsc(am) + '</option>'; }).join('') +
+          '</select>' +
+          '<select onchange="onContribCustomFilterChange(\'st\',this.value)" style="padding:5px 9px;border-radius:10px;border:1.5px solid var(--border);font-size:11px;font-weight:700;background:var(--card-bg);color:var(--text-primary);outline:none">' +
+            '<option value="">All Stores (' + stKeys.length + ')</option>' +
+            stKeys.map(function (sk) { return '<option value="' + mgrEsc(sk) + '"' + (CONTRIB_CUSTOM_ST === sk ? ' selected' : '') + '>' + mgrEsc(stMap[sk]) + ' [' + mgrEsc(sk) + ']</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<!-- Body Content -->' +
+      '<div style="padding:16px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">' +
+          '<div style="font-size:12.5px;font-weight:900;color:var(--we-purple)">Scope: <span style="color:#15803d">' + mgrEsc(ctx.entityTitle) + '</span> · Basis: <strong>' + (ctx.basis === 'target' ? 'From Target' : 'From Achievement') + '</strong></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px">' + waterfallCardsHTML + '</div>' +
+        '<!-- All 6 Products Table for Selected Entity -->' +
+        '<div style="font-size:12px;font-weight:800;color:var(--text-primary);margin-bottom:6px">All Products Contribution (' + (ctx.basis === 'target' ? 'From Target' : 'From Ach') + '):</div>' +
+        '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:16px">' +
+          '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
+            '<thead><tr style="background:#1e1b4b;color:white;font-size:10.5px;font-weight:800">' +
+              '<th style="padding:7px 10px;text-align:left">Product</th>' +
+              '<th style="padding:7px 10px;text-align:center">Entity ' + ctx.basisLabel + '</th>' +
+              '<th style="padding:7px 10px;text-align:center;background:#1d4ed8">% of Area Mgr</th>' +
+              '<th style="padding:7px 10px;text-align:center;background:#6d28d9">% of Supervisor</th>' +
+              '<th style="padding:7px 10px;text-align:center;background:#5E2D91">% of Regional (' + mgrEsc(ctx.shortReg) + ')</th>' +
+              '<th style="padding:7px 10px;text-align:center;background:#0f766e">% of Zone (E+W+Canal)</th>' +
+              '<th style="padding:7px 10px;text-align:center;background:#b45309">% of Franchise</th>' +
+            '</tr></thead>' +
+            '<tbody>' + allProdsRowsHTML + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<!-- Full Hierarchy Contribution Table -->' +
+        '<div style="font-size:12px;font-weight:800;color:var(--text-primary);margin-bottom:6px">Hierarchy Breakdown (Regional ▸ Supervisor ▸ Area Mgr ▸ Store):</div>' +
+        '<div style="overflow-x:auto;max-height:390px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">' +
+          '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',sans-serif">' +
+            '<thead style="position:sticky;top:0;z-index:2"><tr style="background:#111827;color:white;font-size:10.5px;font-weight:800">' +
+              '<th style="padding:7px 10px;text-align:left">Level / Entity Name</th>' +
+              '<th style="padding:7px 8px;text-align:center">Stores</th>' +
+              '<th style="padding:7px 8px;text-align:center">' + ctx.basisLabel + '</th>' +
+              '<th style="padding:7px 8px;text-align:center;background:#1d4ed8">% Area Mgr</th>' +
+              '<th style="padding:7px 8px;text-align:center;background:#6d28d9">% Supervisor</th>' +
+              '<th style="padding:7px 8px;text-align:center;background:#5E2D91">% Regional</th>' +
+              '<th style="padding:7px 8px;text-align:center;background:#0f766e">% Zone</th>' +
+              '<th style="padding:7px 8px;text-align:center;background:#b45309">% Franchise</th>' +
+            '</tr></thead>' +
+            '<tbody>' + hierRowsHTML + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// EXCEL EXPORT: MULTI-LEVEL CONTRIBUTION MATRIX SHEET
+// ────────────────────────────────────────────────────────────────────────────
+function populateMultiLevelContributionSheet(ws, sourceMode) {
+  var ctx = computeMultiLevelContributionContext(sourceMode || 'overview', 'mobile', null, true);
+  var u = ctx.enrichedUniverse;
+  var agg = getContribFastAgg(sourceMode || 'overview');
+  ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  var prodList = ctx.isMtd
+    ? [
+        { key: 'mobile', label: 'Mobile', color: '#5E2D91' },
+        { key: 'wallet', label: 'Wallet', color: '#E91E8C' },
+        { key: 'fbb',    label: 'FBB',    color: '#2563EB' },
+        { key: 'fixed',  label: 'Fixed',  color: '#16A34A' },
+        { key: 'fwa',    label: 'WE Air', color: '#0891B2' },
+        { key: 'gold',   label: 'WE Gold',color: '#F5A623' }
+      ]
+    : PRODUCTS;
+
+  var wCols = [34, 14, 8, 24, 24];
+  prodList.forEach(function () { wCols.push(12, 11, 11, 12, 12, 12); });
+  wCols.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  var N = wCols.length, r = 1;
+
+  ovWriteMergedBanner(ws, r++, 1, N,
+    'FAKHARANY360 — Multi-Level Contribution Matrix (' + (ctx.basis === 'target' ? 'From Target' : 'From Achievement') + ') · ' + ctx.entityTitle,
+    { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+  );
+  r++;
+
+  var h1 = [
+    { t: 'Entity / Level Name', rs: 2, al: 'l' },
+    { t: 'Level', rs: 2 },
+    { t: 'Stores', rs: 2 },
+    { t: 'Supervisor', rs: 2, al: 'l' },
+    { t: 'Regional', rs: 2, al: 'l' }
+  ];
+  var h2 = [];
+  prodList.forEach(function (p) {
+    h1.push({ t: p.label + ' Cont. (' + ctx.basisLabel + ')', cs: 6, bg: p.color });
+    h2.push(
+      { t: ctx.basisLabel, bg: '#6D3FA8' },
+      { t: '% Area', bg: '#1D4ED8' },
+      { t: '% Supervisor', bg: '#6D28D9' },
+      { t: '% Regional', bg: '#4C1D95' },
+      { t: '% Zone', bg: '#0F766E' },
+      { t: '% Franchise', bg: '#B45309' }
+    );
+  });
+  r = ovWriteTwoRowHeader(ws, r, h1, h2);
+
+  function writeContribMatrixRow(label, roleStr, rowsSub, kind, idx, indent, rmKey, svKey, amKey, zoneKey) {
+    var k = ovRowKindColors(kind, idx);
+    var isTot = (kind === 'total');
+    var stCnt = new Set(rowsSub.map(function (x) { return x._code || x._store; })).size;
+    var c = 1;
+    var c1 = ws.getCell(r, c++); c1.value = label; ovStyleCell(c1, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indent || 1 });
+    var c2 = ws.getCell(r, c++); c2.value = roleStr; ovStyleCell(c2, { bg: k.bg, fg: k.fg, b: k.b });
+    var c3 = ws.getCell(r, c++); c3.value = stCnt; ovStyleCell(c3, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+    var c4 = ws.getCell(r, c++); c4.value = svKey || '—'; ovStyleCell(c4, { bg: k.bg, fg: k.fg, b: false, al: 'l', indent: 1 });
+    var c5 = ws.getCell(r, c++); c5.value = getFriendlyRegionLabel(rmKey, ''); ovStyleCell(c5, { bg: k.bg, fg: k.fg, b: false, al: 'l', indent: 1 });
+
+    prodList.forEach(function (p) {
+      var val = sumRowsForProductAndBasis(rowsSub, p.key, ctx.basis, ctx.isMtd);
+      var dArea = (amKey && agg.byAm[amKey]) ? (agg.byAm[amKey][ctx.basis][p.key] || 0) : 0;
+      var dSup  = (svKey && agg.bySv[svKey]) ? (agg.bySv[svKey][ctx.basis][p.key] || 0) : 0;
+      var dReg  = (rmKey && agg.byRm[rmKey]) ? (agg.byRm[rmKey][ctx.basis][p.key] || 0) : 0;
+      var dZone = (zoneKey && agg.byZone[zoneKey]) ? (agg.byZone[zoneKey][ctx.basis][p.key] || 0) : (agg.fran[ctx.basis][p.key] || 0);
+      var dFran = agg.fran[ctx.basis][p.key] || 0;
+
+      var cv = ws.getCell(r, c++); cv.value = Math.round(val); ovStyleCell(cv, { bg: k.bg, fg: k.fg, b: true, numFmt: '#,##0' });
+
+      function putRatio(ratioVal, highlightRegion) {
+        var cell = ws.getCell(r, c++);
+        if (ratioVal !== null && ratioVal !== undefined && !isNaN(ratioVal)) {
+          cell.value = ratioVal;
+          var bgCell = isTot ? '#111827' : (highlightRegion ? '#EEF2FF' : k.bg);
+          var fgCell = isTot ? '#FFFFFF' : (highlightRegion ? '#3730A3' : k.fg);
+          ovStyleCell(cell, { bg: bgCell, fg: fgCell, b: highlightRegion || k.b, numFmt: '0.0%' });
+        } else {
+          cell.value = '–';
+          ovStyleCell(cell, { bg: k.bg, fg: '#9CA3AF', b: false });
+        }
+      }
+
+      putRatio(roleStr === 'Store' && dArea > 0 ? val / dArea : (roleStr === 'Area Mgr' ? 1 : null), false);
+      putRatio((roleStr === 'Store' || roleStr === 'Area Mgr') && dSup > 0 ? val / dSup : (roleStr === 'Supervisor' ? 1 : null), false);
+      putRatio(dReg > 0 ? val / dReg : null, true);
+      putRatio(dZone > 0 ? val / dZone : null, false);
+      putRatio(dFran > 0 ? val / dFran : null, false);
+    });
+
+    ws.getRow(r).height = (kind === 'total' || kind === 'sv' || kind === 'sub') ? 21 : 19;
+    r++;
+  }
+
+  var scoped = ctx.entityRows.length ? ctx.entityRows : u;
+  var rmGroups = {};
+  scoped.forEach(function (row) { (rmGroups[row._rm] = rmGroups[row._rm] || []).push(row); });
+  Object.keys(rmGroups).sort().forEach(function (rmKey) {
+    var rmRows = rmGroups[rmKey];
+    var zKey = (rmRows[0] && rmRows[0]._zone) || 'East & West Cairo & Canal';
+    writeContribMatrixRow('👔 ' + getFriendlyRegionLabel(rmKey, ''), 'Regional Mgr', rmRows, 'total', 0, 1, rmKey, '', '', zKey);
+
+    var svGroups = {};
+    rmRows.forEach(function (row) { (svGroups[row._sv] = svGroups[row._sv] || []).push(row); });
+    Object.keys(svGroups).sort().forEach(function (svKey) {
+      var svRows = svGroups[svKey];
+      writeContribMatrixRow('🧑‍💼 ' + svKey, 'Supervisor', svRows, 'sv', 0, 1, rmKey, svKey, '', zKey);
+
+      var amGroups = {};
+      svRows.forEach(function (row) { (amGroups[row._am] = amGroups[row._am] || []).push(row); });
+      Object.keys(amGroups).sort().forEach(function (amKey, ai) {
+        var amRows = amGroups[amKey];
+        writeContribMatrixRow('   📍 ' + amKey, 'Area Mgr', amRows, 'am', ai, 2, rmKey, svKey, amKey, zKey);
+
+        var stGroups = {};
+        amRows.forEach(function (row) { var sk = row._code || row._store; (stGroups[sk] = stGroups[sk] || []).push(row); });
+        Object.keys(stGroups).forEach(function (sk, si) {
+          var sRows = stGroups[sk];
+          writeContribMatrixRow('      🏪 ' + (sRows[sRows.length - 1]._store || sk), 'Store', sRows, 'store', si, 3, rmKey, svKey, amKey, zKey);
+        });
+      });
+    });
+  });
+}
+
+async function exportMultiLevelContributionExcel(btn) {
+  if (!(await mtdInsAuth())) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    var ws = wb.addWorksheet('Multi-Level Contribution');
+    populateMultiLevelContributionSheet(ws, CONTRIB_SOURCE_MODE);
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_MultiLevel_Contribution_' + CONTRIB_BASIS.toUpperCase() + '_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ Contribution Excel exported!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+// ── Hook into buildOverviewMasterWorkbook so every Overview Export also includes Sheet 7 (Multi-Level Contribution)
+// AND adds Default Region Contribution % to Sheet 5 (Branches Ranking)! ──
+(function () {
+  var _origBuildOverviewMasterWorkbook = buildOverviewMasterWorkbook;
+  buildOverviewMasterWorkbook = async function () {
+    var res = await _origBuildOverviewMasterWorkbook.apply(this, arguments);
+    try {
+      var wsContrib = res.wb.addWorksheet('7. Multi-Level Contribution');
+      populateMultiLevelContributionSheet(wsContrib, 'overview');
+
+      var allYearUniverse = Array.isArray(RAW_DATA) ? RAW_DATA : res.ctx.allYearRows;
+      var useTgt = (CONTRIB_BASIS === 'target');
+      var mField = useTgt ? 'mobileTarget' : 'mobileSubs';
+      var bLbl = useTgt ? 'Cont. % Regional (Tgt)' : 'Cont. % Regional (Ach)';
+
+      var ws5 = res.wb.getWorksheet('5. Branches Ranking & Matrix');
+      if (ws5) {
+        var nextCol5 = ws5.columnCount + 1;
+        ws5.getColumn(nextCol5).width = 16;
+        ws5.mergeCells(4, nextCol5, 5, nextCol5);
+        ovStyleCell(ws5.getCell(4, nextCol5), { hd: true, bg: '#3730A3', fg: '#FFFFFF', b: true, wrap: true });
+        ovStyleCell(ws5.getCell(5, nextCol5), { hd: true, bg: '#3730A3', fg: '#FFFFFF', b: true, wrap: true });
+        ws5.getCell(4, nextCol5).value = bLbl;
+
+        for (var rIdx = 6; rIdx <= ws5.rowCount; rIdx++) {
+          var codeVal = String(ws5.getCell(rIdx, 3).value || '').trim();
+          var rnkVal = String(ws5.getCell(rIdx, 1).value || '').trim();
+          var cell = ws5.getCell(rIdx, nextCol5);
+          if (rnkVal === 'TOTAL') {
+            var scopeVal = sum(res.ctx.allYearRows, mField);
+            var totUnivVal = sum(allYearUniverse, mField);
+            cell.value = totUnivVal > 0 ? (scopeVal / totUnivVal) : 1;
+            ovStyleCell(cell, { bg: '#111827', fg: '#C7D2FE', b: true, numFmt: '0.0%' });
+          } else if (codeVal && codeVal !== '—') {
+            var stRows = res.ctx.allYearRows.filter(function (x) { return (x.storeCode || '') === codeVal; });
+            var rmName = (stRows[0] && stRows[0].regionalManager) || '';
+            var regRows = allYearUniverse.filter(function (x) { return !rmName || x.regionalManager === rmName; });
+            var stVal = sum(stRows, mField);
+            var regVal = sum(regRows, mField);
+            cell.value = regVal > 0 ? (stVal / regVal) : 0;
+            ovStyleCell(cell, { bg: '#EEF2FF', fg: '#3730A3', b: true, numFmt: '0.00%' });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Overview Contrib Sheet Hook]', e);
+    }
+    return res;
+  };
+})();
 </script>
 
 </body>
