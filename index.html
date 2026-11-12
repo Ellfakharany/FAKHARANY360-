@@ -1147,10 +1147,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <i class="fas fa-chevron-down" id="mobile-filter-chevron" style="font-size:10px;margin-left:2px"></i>
       </button>
       <div style="display:flex;align-items:center;gap:5px">
-        <button class="dash-mode-act-btn" onclick="setDashMode('activation')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #e5e7eb;background:white;color:#6b7280">
+        <button class="dash-mode-act-btn" onclick="setDashMode('activation')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #5E2D91;background:#5E2D91;color:white">
           <i class="fas fa-bolt"></i> Act
         </button>
-        <button class="dash-mode-sal-btn" onclick="setDashMode('sales')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #c0392b;background:#c0392b;color:white">
+        <button class="dash-mode-sal-btn" onclick="setDashMode('sales')" style="padding:7px 11px;border-radius:10px;font-size:11.5px;font-weight:800;cursor:pointer;border:1.5px solid #e5e7eb;background:white;color:#6b7280">
           <i class="fas fa-shopping-cart"></i> Sales
         </button>
         <button onclick="resetFilters()" style="padding:7px 10px;border-radius:10px;border:1.5px solid #fca5a5;background:#fef2f2;color:#dc2626;font-size:11.5px;font-weight:800;cursor:pointer" title="إعادة ضبط الفلاتر">
@@ -1163,11 +1163,11 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="flex flex-wrap gap-2 items-center mb-2">
       <span class="filter-label" style="align-self:center">Data Type:</span>
       <button id="dash-mode-act" class="dash-mode-act-btn" onclick="setDashMode('activation')"
-        style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
+        style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #5E2D91;background:#5E2D91;color:white;transition:all .2s">
         <i class="fas fa-bolt mr-1"></i>Activation
       </button>
       <button id="dash-mode-sal" class="dash-mode-sal-btn" onclick="setDashMode('sales')"
-        style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #c0392b;background:#c0392b;color:white;transition:all .2s">
+        style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
         <i class="fas fa-shopping-cart mr-1"></i>Sales
       </button>
       <span style="font-size:10px;color:#9ca3af">(بيفرق بس في Mobile / Fixed / FBB — باقي المنتجات زي ما هي)</span>
@@ -1259,10 +1259,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- OVERVIEW TAB -->
     <div id="tab-overview" class="tab-content">
-      <!-- Overview Master Export + Quick Compare triggers -->
+      <!-- Overview Master Export + Send Overview Email + Quick Compare triggers -->
       <div style="float:right;margin-top:-2px;margin-bottom:8px;display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <button id="ov-master-export-btn" onclick="exportOverviewMasterReport(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 16px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28);transition:opacity .2s" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'" title="تصدير ملف إكسيل شامل للأداء بنفس تنسيق MTD Branch Achievements (6 شيتات: Overview + Area Managers + Quarters & Months + Branches with Area Manager per Month + Ranking Matrix + Packages)">
+        <button id="ov-master-export-btn" onclick="exportOverviewMasterReport(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.28);transition:opacity .2s" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'" title="تصدير ملف إكسيل شامل للأداء بنفس تنسيق MTD Branch Achievements (6 شيتات)">
           <i class="fas fa-file-excel"></i> Export Overview Excel
+        </button>
+        <button id="ov-master-email-btn" onclick="sendOverviewMasterEmail(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(37,99,235,0.28);transition:opacity .2s" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'" title="إرسال إيميل بتقرير الـ Overview في الـ Body مع إرفاق ملف الـ 6 شيتات إكسيل تلقائياً (.eml / Share)">
+          <i class="fas fa-paper-plane"></i> Send Overview Email
         </button>
         <button onclick="openQuickCompare()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;background:linear-gradient(135deg,#5E2D91,#7b3dbf);color:white;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(94,45,145,0.25);transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
           <i class="fas fa-exchange-alt"></i> Quick Compare
@@ -1304,11 +1307,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="section-title" style="margin-bottom:0"><i class="fas fa-sitemap mr-2"></i>Team Performance Pivot</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button id="tp-dash-mode-act" class="dash-mode-act-btn" onclick="setDashMode('activation')"
-            style="padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
+            style="padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #5E2D91;background:#5E2D91;color:white;transition:all .2s">
             <i class="fas fa-bolt mr-1"></i>Activation
           </button>
           <button id="tp-dash-mode-sal" class="dash-mode-sal-btn" onclick="setDashMode('sales')"
-            style="padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #c0392b;background:#c0392b;color:white;transition:all .2s">
+            style="padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
             <i class="fas fa-shopping-cart mr-1"></i>Sales
           </button>
           <span style="width:1px;height:20px;background:#e5e7eb;margin:0 2px"></span>
@@ -1583,7 +1586,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- TARIFF MIX TAB -->
     <div id="tab-tariff" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-layer-group mr-2"></i>Tariff Mix Analysis</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-layer-group mr-2"></i>Tariff Mix Analysis</div>
+        <button onclick="exportTariffMixMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)">
+          <i class="fas fa-file-excel"></i> Export Tariff Mix Excel
+        </button>
+      </div>
       <div style="font-size:10px;color:var(--text-muted);margin:-8px 0 10px">اضغط على أي كارت أو جزء من الدائرة عشان تشوف الفروع اللي عاملة الأرقام دي</div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="tariff-kpi-grid"></div>
       <div class="grid grid-cols-2 gap-3 mb-4">
@@ -1652,7 +1660,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- HEATMAP TAB -->
     <div id="tab-heatmap" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-th mr-2"></i>Performance Heatmap — Store × Product</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-th mr-2"></i>Performance Heatmap — Store × Product</div>
+        <button onclick="exportHeatmapMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)">
+          <i class="fas fa-file-excel"></i> Export Heatmap Excel
+        </button>
+      </div>
       <div class="mb-3 flex gap-4 items-center text-xs">
         <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-green-500 inline-block"></span> ≥100%</span>
         <span class="flex items-center gap-1"><span class="w-4 h-4 rounded bg-yellow-400 inline-block"></span> 90–99%</span>
@@ -1670,7 +1683,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- PACKAGE MIX TAB -->
     <div id="tab-packages" class="tab-content hidden">
-      <div class="section-title"><i class="fas fa-th-list mr-2"></i>Package Mix Breakdown</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="section-title" style="margin-bottom:0"><i class="fas fa-th-list mr-2"></i>Package Mix Breakdown</div>
+        <button onclick="exportPackageMixMasterExcel(this)" style="display:inline-flex;align-items:center;gap:6px;padding:6px 15px;background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:20px;font-size:11.5px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,0.25)" title="تصدير شيت الباقات الأساسية والباقات الفرعية (Kix 25..150 & Tazbeet 40..165) لكل فرع بتنسيق ExcelJS">
+          <i class="fas fa-file-excel"></i> Export Packages & Sub-Packages Excel
+        </button>
+      </div>
 
       <!-- Total Mobile Header Banner -->
       <div id="pkg-mobile-header" class="mb-4"></div>
@@ -2220,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 let RAW_DATA = []; // populated at runtime via fetchAllMonthsData() from data/manifest.json + data/*.json
-var DASH_MODE = 'sales'; // 'sales' | 'activation' — main dashboard Data Type toggle (Mobile/Fixed/FBB only)
+var DASH_MODE = 'activation'; // 'sales' | 'activation' — main dashboard Data Type toggle (Default: 'activation')
 
 // Backs up each row's Sales figure (the JSON default) and resolves its
 // Activation figure (falls back to Sales if the month has no IDLE split),
@@ -2237,6 +2255,9 @@ var DASH_MODE = 'sales'; // 'sales' | 'activation' — main dashboard Data Type 
 // the immutable _raw copy instead makes this function safe to call any
 // number of times, on any RAW_DATA state, with no risk of corruption.
 function backupSalesActivationFields(rows) {
+  if (typeof ensureDynamicYearMonthsRegistered === 'function') {
+    try { ensureDynamicYearMonthsRegistered(rows); } catch (e) {}
+  }
   rows.forEach(function(r){
     r._salesMobile = (r._rawMobileSubs !== undefined ? r._rawMobileSubs : r.mobileSubs) || 0;
     r._salesFixed  = (r._rawFixedSubs  !== undefined ? r._rawFixedSubs  : r.fixedSubs)  || 0;
@@ -2244,6 +2265,9 @@ function backupSalesActivationFields(rows) {
     r._actMobile = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ? r.mobileSubsAct : r._salesMobile;
     r._actFixed  = (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ? r.fixedSubsAct  : r._salesFixed;
     r._actFbb    = (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null) ? r.fbbSubsAct    : r._salesFbb;
+    r.mobileSubs = DASH_MODE === 'activation' ? r._actMobile : r._salesMobile;
+    r.fixedSubs  = DASH_MODE === 'activation' ? r._actFixed  : r._salesFixed;
+    r.fbbSubs    = DASH_MODE === 'activation' ? r._actFbb    : r._salesFbb;
   });
 }
 
@@ -18856,6 +18880,672 @@ async function exportOverviewMasterReport(btn) {
     }
   }
 }
+</script>
+
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  SYSTEM-WIDE UPGRADE MODULE (v18)
+//  1) Dynamic Multi-Year Support (2025, 2026, 2027, 2028+ auto-registration)
+//  2) Send Overview Email (.eml with formatted HTML summary tables + attached 6-sheet Excel)
+//  3) Dedicated Formatted ExcelJS Exports for Package Mix (with all Sub-Packages),
+//     Tariff Mix, and Heatmap Matrix
+//  4) Upgraded ExcelJS + Password Protection for all legacy sub-export buttons
+//     (exportMonthlyPerf, exportMTDTeamPivot, exportMTDStoreDetails,
+//      exportMTDAllProducts, exportMTDLowPerf, exportMTDLowPerfAll, mtdQcExportCompare)
+// ════════════════════════════════════════════════════════════════════════════
+
+var BASE_EN_MO_SHORT = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'};
+var BASE_EN_MO_FULL  = {'01':'January','02':'February','03':'March','04':'April','05':'May','06':'June','07':'July','08':'August','09':'September','10':'October','11':'November','12':'December'};
+var BASE_AR_MO_FULL  = {'01':'يناير','02':'فبراير','03':'مارس','04':'أبريل','05':'مايو','06':'يونيو','07':'يوليو','08':'أغسطس','09':'سبتمبر','10':'أكتوبر','11':'نوفمبر','12':'ديسمبر'};
+
+function registerSingleMonthYearCode(mCode) {
+  var s = String(mCode || '').trim();
+  var m = s.match(/^(0[1-9]|1[0-2])-(20\d{2})$/);
+  if (!m) return;
+  var mm = m[1], yr = m[2];
+  var hasMultipleYears = MONTH_ORDER.some(function (x) { return x.slice(3) !== yr; });
+  if (!MONTH_LABELS[s]) {
+    MONTH_LABELS[s] = (yr === '2026' && !hasMultipleYears) ? BASE_EN_MO_SHORT[mm] : (BASE_EN_MO_SHORT[mm] + ' ' + yr.slice(2));
+  }
+  if (typeof MONTH_EN_FULL !== 'undefined' && !MONTH_EN_FULL[s]) {
+    MONTH_EN_FULL[s] = BASE_EN_MO_FULL[mm] + ' ' + yr;
+  }
+  if (typeof MONTH_AR_NAMES !== 'undefined' && !MONTH_AR_NAMES[s]) {
+    MONTH_AR_NAMES[s] = BASE_AR_MO_FULL[mm] + ' ' + yr;
+  }
+  if (MONTH_ORDER.indexOf(s) < 0) {
+    MONTH_ORDER.push(s);
+    MONTH_ORDER.sort(function (a, b) {
+      var ya = a.slice(3), yb = b.slice(3);
+      if (ya !== yb) return ya.localeCompare(yb);
+      return a.slice(0, 2).localeCompare(b.slice(0, 2));
+    });
+  }
+  // Ensure OV_QUARTER_DEFS includes quarters for this year if yr !== '2026'
+  if (typeof OV_QUARTER_DEFS !== 'undefined' && yr !== '2026') {
+    var qPrefix = yr + '-Q';
+    if (!OV_QUARTER_DEFS.some(function (q) { return q.year === yr; })) {
+      OV_QUARTER_DEFS.push(
+        { key: 'Q1 ' + yr, year: yr, label: 'Q1 ' + yr + ' (Jan – Mar)', arLabel: 'الربع الأول Q1 ' + yr, months: ['01-' + yr, '02-' + yr, '03-' + yr] },
+        { key: 'Q2 ' + yr, year: yr, label: 'Q2 ' + yr + ' (Apr – Jun)', arLabel: 'الربع الثاني Q2 ' + yr, months: ['04-' + yr, '05-' + yr, '06-' + yr] },
+        { key: 'Q3 ' + yr, year: yr, label: 'Q3 ' + yr + ' (Jul – Sep)', arLabel: 'الربع الثالث Q3 ' + yr, months: ['07-' + yr, '08-' + yr, '09-' + yr] },
+        { key: 'Q4 ' + yr, year: yr, label: 'Q4 ' + yr + ' (Oct – Dec)', arLabel: 'الربع الرابع Q4 ' + yr, months: ['10-' + yr, '11-' + yr, '12-' + yr] }
+      );
+    }
+  }
+}
+
+function ensureDynamicYearMonthsRegistered(rows) {
+  // Pre-register all 12 months of 2026 and 2027 in lookup dictionaries so any 2027 upload works out of the box
+  ['2026', '2027'].forEach(function (yr) {
+    ['01','02','03','04','05','06','07','08','09','10','11','12'].forEach(function (mm) {
+      var code = mm + '-' + yr;
+      if (typeof MONTH_EN_FULL !== 'undefined' && !MONTH_EN_FULL[code]) MONTH_EN_FULL[code] = BASE_EN_MO_FULL[mm] + ' ' + yr;
+      if (typeof MONTH_AR_NAMES !== 'undefined' && !MONTH_AR_NAMES[code]) MONTH_AR_NAMES[code] = BASE_AR_MO_FULL[mm] + ' ' + yr;
+      if (!MONTH_LABELS[code]) MONTH_LABELS[code] = yr === '2026' ? BASE_EN_MO_SHORT[mm] : (BASE_EN_MO_SHORT[mm] + ' ' + yr.slice(2));
+    });
+  });
+  if (Array.isArray(rows)) {
+    rows.forEach(function (r) {
+      if (r && r.month) registerSingleMonthYearCode(r.month);
+    });
+  }
+}
+ensureDynamicYearMonthsRegistered([]);
+
+// ────────────────────────────────────────────────────────────────────────────
+// 2. SEND OVERVIEW EMAIL (.eml with inline Executive HTML Tables + Attached 6-Sheet Excel)
+// ────────────────────────────────────────────────────────────────────────────
+function ovBuildEmailHTMLDoc(ctx, yearAgg, tree) {
+  var f = 'font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1f2937;line-height:1.55';
+  var thSt = 'background:#5E2D91;color:#ffffff;font-weight:bold;font-size:12px;padding:7px 10px;border:1px solid #4c1d95;text-align:center';
+  var subThSt = 'background:#6d3fa8;color:#ffffff;font-weight:bold;font-size:11px;padding:5px 8px;border:1px solid #5E2D91;text-align:center';
+
+  // 1. Products Table HTML
+  var prodRowsHtml = PRODUCTS.map(function (p, i) {
+    var ps = yearAgg.prodStats[p.key];
+    var bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+    var tc = ovTierColors(ps.ratio);
+    var gapClr = ps.gap >= 0 ? '#15803d' : '#b91c1c';
+    var gapBg  = ps.gap >= 0 ? '#dcfce7' : '#fee2e2';
+    var gapTxt = (ps.gap > 0 ? '+' : '') + fmtN(Math.round(ps.gap));
+    var pctTxt = ps.ratio !== null ? (ps.ratio * 100).toFixed(1) + '%' : '–';
+    return '<tr bgcolor="' + bg + '" style="background:' + bg + ';font-size:12px">' +
+      '<td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:bold;color:' + p.color + '">' + mgrEsc(p.label) + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb">' + fmtN(yearAgg.storeCount) + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb">' + fmtN(Math.round(ps.target)) + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb;font-weight:bold">' + fmtN(Math.round(ps.ach)) + '</td>' +
+      '<td align="center" bgcolor="' + gapBg + '" style="padding:6px 8px;border:1px solid #e5e7eb;background:' + gapBg + ';color:' + gapClr + ';font-weight:bold">' + gapTxt + '</td>' +
+      '<td align="center" bgcolor="' + tc.bg + '" style="padding:6px 8px;border:1px solid #e5e7eb;background:' + tc.bg + ';color:' + tc.fg + ';font-weight:bold">' + pctTxt + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb;color:#a16207;font-weight:bold">' + ps.l100 + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb">' + ps.l90 + '</td>' +
+      '<td align="center" style="padding:6px 8px;border:1px solid #e5e7eb;color:#b91c1c;font-weight:bold">' + ps.l70 + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // 2. Supervisors & Area Managers Summary HTML
+  var supAreaRowsHtml = '';
+  var rmNames = Object.keys(tree).sort();
+  rmNames.forEach(function (rmName) {
+    var rmObj = tree[rmName];
+    var svNames = Object.keys(rmObj.supervisors).sort();
+    svNames.forEach(function (svName) {
+      var svObj = rmObj.supervisors[svName];
+      var svAgg = ovCalcRichGroup(svObj.rows);
+      var amNames = Object.keys(svObj.areaManagers).sort();
+      function buildEntityHtmlRow(label, gObj, bgHex, fgHex, isBold) {
+        var cells = PRODUCTS.map(function (p) {
+          var ps = gObj.prodStats[p.key];
+          var pctTxt = ps.ratio !== null ? Math.round(ps.ratio * 100) + '%' : '–';
+          var gapTxt = (ps.gap > 0 ? '+' : '') + fmtN(Math.round(ps.gap));
+          var tc = ovTierColors(ps.ratio);
+          var cBg = bgHex === '#111827' || bgHex === '#DBE8F7' ? bgHex : tc.bg;
+          var cFg = bgHex === '#111827' ? '#ffffff' : (bgHex === '#DBE8F7' ? '#1e3a5f' : tc.fg);
+          return '<td align="center" bgcolor="' + bgHex + '" style="padding:5px 7px;border:1px solid #e5e7eb;background:' + bgHex + ';color:' + fgHex + ';font-weight:' + (isBold ? 'bold' : 'normal') + '">' + fmtN(Math.round(ps.ach)) + ' / ' + fmtN(Math.round(ps.target)) + '</td>' +
+                 '<td align="center" bgcolor="' + cBg + '" style="padding:5px 7px;border:1px solid #e5e7eb;background:' + cBg + ';color:' + cFg + ';font-weight:bold">' + pctTxt + ' (' + gapTxt + ')</td>';
+        }).join('');
+        return '<tr bgcolor="' + bgHex + '" style="background:' + bgHex + ';color:' + fgHex + ';font-size:11.5px;font-weight:' + (isBold ? 'bold' : 'normal') + '">' +
+          '<td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:bold">' + mgrEsc(label) + '</td>' +
+          '<td align="center" style="padding:6px 7px;border:1px solid #e5e7eb;font-weight:bold">' + gObj.storeCount + '</td>' +
+          cells +
+        '</tr>';
+      }
+      supAreaRowsHtml += buildEntityHtmlRow('Supervisor: ' + svName, svAgg, '#DBE8F7', '#1E3A5F', true);
+      amNames.forEach(function (amName, ai) {
+        var amAgg = ovCalcRichGroup(svObj.areaManagers[amName]);
+        supAreaRowsHtml += buildEntityHtmlRow('   • ' + amName, amAgg, ai % 2 === 1 ? '#F3F4F6' : '#FFFFFF', '#1F2937', false);
+      });
+      supAreaRowsHtml += buildEntityHtmlRow('Total — ' + svName, svAgg, '#111827', '#FFFFFF', true);
+    });
+  });
+
+  var prodHeader1 = PRODUCTS.map(function (p) {
+    return '<th colspan="2" bgcolor="' + p.color + '" style="' + thSt + ';background:' + p.color + '">' + mgrEsc(p.label) + '</th>';
+  }).join('');
+  var prodHeader2 = PRODUCTS.map(function () {
+    return '<th bgcolor="#6d3fa8" style="' + subThSt + '">Ach / Tgt</th><th bgcolor="#6d3fa8" style="' + subThSt + '">% (Gap)</th>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="' + f + ';background:#ffffff;padding:18px;margin:0;direction:ltr;text-align:left">' +
+    '<p style="' + f + ';font-size:15px;margin:0 0 8px">Dear All,</p>' +
+    '<p style="' + f + ';font-size:13.5px;margin:0 0 16px">Kindly find below the <strong>Executive Performance Overview (' + mgrEsc(ctx.basis) + ' Basis)</strong> for <strong>' + mgrEsc(ctx.scopeLabel) + '</strong> across <strong>' + mgrEsc(ctx.periodLabel) + '</strong>, along with the complete <strong>6-Sheet Excel Report</strong> attached:</p>' +
+    '<div style="background:#5E2D91;color:#ffffff;font-weight:bold;font-size:13.5px;padding:8px 12px;border-radius:8px 8px 0 0;max-width:960px">1. Core 6 Products Performance & Gaps (' + mgrEsc(ctx.periodLabel) + ' · ' + yearAgg.storeCount + ' Stores)</div>' +
+    '<table cellspacing="0" cellpadding="0" border="0" width="960" style="border-collapse:collapse;width:960px;margin-bottom:20px;font-family:Calibri,Arial,sans-serif">' +
+      '<thead>' +
+        '<tr>' +
+          '<th rowspan="2" bgcolor="#5E2D91" style="' + thSt + ';text-align:left">Product</th>' +
+          '<th rowspan="2" bgcolor="#5E2D91" style="' + thSt + '">Stores</th>' +
+          '<th colspan="4" bgcolor="#5E2D91" style="' + thSt + '">Annual Performance & Gap (+ / -)</th>' +
+          '<th colspan="3" bgcolor="#5E2D91" style="' + thSt + '">Stores Below Target</th>' +
+        '</tr>' +
+        '<tr>' +
+          '<th bgcolor="#6d3fa8" style="' + subThSt + '">Target</th>' +
+          '<th bgcolor="#6d3fa8" style="' + subThSt + '">Ach</th>' +
+          '<th bgcolor="#6d3fa8" style="' + subThSt + '">Gap (+/-)</th>' +
+          '<th bgcolor="#6d3fa8" style="' + subThSt + '">Ach %</th>' +
+          '<th bgcolor="#fef3c7" style="' + subThSt + ';background:#fef3c7;color:#a16207">&lt; 100%</th>' +
+          '<th bgcolor="#fee2e2" style="' + subThSt + ';background:#fee2e2;color:#b91c1c">&lt; 90%</th>' +
+          '<th bgcolor="#ffffff" style="' + subThSt + ';background:#ffffff;color:#dc2626">&lt; 70%</th>' +
+        '</tr>' +
+      '</thead>' +
+      '<tbody>' + prodRowsHtml + '</tbody>' +
+    '</table>' +
+    '<div style="background:#5E2D91;color:#ffffff;font-weight:bold;font-size:13.5px;padding:8px 12px;border-radius:8px 8px 0 0;max-width:1180px">2. Supervisors & Area Managers Performance (' + mgrEsc(ctx.scopeLabel) + ')</div>' +
+    '<table cellspacing="0" cellpadding="0" border="0" width="1180" style="border-collapse:collapse;width:1180px;margin-bottom:18px;font-family:Calibri,Arial,sans-serif">' +
+      '<thead>' +
+        '<tr><th rowspan="2" bgcolor="#5E2D91" style="' + thSt + ';text-align:left">Supervisor / Area Manager</th><th rowspan="2" bgcolor="#5E2D91" style="' + thSt + '">Stores</th>' + prodHeader1 + '</tr>' +
+        '<tr>' + prodHeader2 + '</tr>' +
+      '</thead>' +
+      '<tbody>' + supAreaRowsHtml + '</tbody>' +
+    '</table>' +
+    '<p style="' + f + ';font-size:14px;font-weight:bold;color:#5E2D91;margin:14px 0">📎 Please find all 6 detailed sheets (Overview, Area Managers, Per Quarter & Month, Branches with Area Manager per Month, Ranking Matrix, and Packages) in the attached Excel workbook.</p>' +
+    '<p style="' + f + ';font-size:12.5px;color:#4b5563;border-top:1px solid #e5e7eb;padding-top:10px;margin-top:16px">Best Regards,<br><strong>East Cairo Team — Mohamed Elfakharany</strong><br><span style="color:#6b7280;font-size:11px">FAKHARANY³⁶⁰ · Performance Intelligence Platform</span></p>' +
+  '</body></html>';
+}
+
+async function sendOverviewMasterEmail(btn) {
+  var rowsCheck = (Array.isArray(filteredData) && filteredData.length) ? filteredData : RAW_DATA;
+  if (!rowsCheck || !rowsCheck.length) {
+    alert('⚠️ مفيش بيانات في العرض الحالي للإرسال');
+    return;
+  }
+  if (!(await mtdInsAuth())) return;
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Preparing Email...';
+  }
+  try {
+    var res = await buildOverviewMasterWorkbook();
+    var buf = await res.wb.xlsx.writeBuffer();
+    var now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var cleanScope = String(res.ctx.shortScopeName || 'Overview').replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_').slice(0, 35);
+    var xlsxName = 'FAKHARANY360_Overview_' + cleanScope + '_' + res.ctx.basis + '_' + stamp + '.xlsx';
+    var subject = 'FAKHARANY360 Executive Overview (' + res.ctx.basis + ') – ' + res.ctx.scopeLabel + ' – ' + res.ctx.periodLabel;
+
+    var yearAgg = ovCalcRichGroup(res.ctx.allYearRows);
+    var tree = buildTeamPivotTree(res.ctx.activeRows);
+    var htmlDoc = ovBuildEmailHTMLDoc(res.ctx, yearAgg, tree);
+
+    if (typeof mtdBAEmailIsMobile === 'function' && mtdBAEmailIsMobile() && navigator.share && navigator.canShare) {
+      var xFile = new File([buf], xlsxName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (navigator.canShare({ files: [xFile] })) {
+        await navigator.share({ title: subject, text: 'Kindly find attached the 6-Sheet Executive Overview Report for ' + res.ctx.scopeLabel, files: [xFile] });
+        if (typeof mgrToast === 'function') mgrToast('✅ تم فتح مشاركة الإيميل مع ملف الـ 6 شيتات المرفق!');
+        return;
+      }
+    }
+
+    var emlContent = mtdBAEml(subject, htmlDoc, { name: xlsxName, buffer: buf });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([emlContent], { type: 'message/rfc822' }));
+    a.download = 'FAKHARANY360_Overview_Email_' + cleanScope + '_' + stamp + '.eml';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') {
+      mgrToast('✅ تم تجهيز وتحميل الإيميل (.eml) شاملاً جداول الملخص في الـ Body وملف الـ 6 شيتات مرفقاً!');
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    console.error('[Send Overview Email]', err);
+    alert('❌ تعذر تجهيز الإيميل: ' + (err && err.message ? err.message : err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldHtml;
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 3. DEDICATED FORMATTED EXCELJS EXPORTS FOR PACKAGE MIX, TARIFF MIX & HEATMAP
+// ────────────────────────────────────────────────────────────────────────────
+async function exportPackageMixMasterExcel(btn) {
+  var rows = (Array.isArray(filteredData) && filteredData.length) ? filteredData : RAW_DATA;
+  if (!rows || !rows.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var ctx = ovGetFilterContext();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+
+    // Sheet 1: Package Families Summary per Supervisor -> Area Manager -> Store
+    var ws1 = wb.addWorksheet('1. Package Families Summary');
+    ws1.views = [{ state: 'frozen', xSplit: 1, ySplit: 4, showGridLines: false }];
+    ws1.properties.tabColor = { argb: 'FF5E2D91' };
+    var w1 = [34, 9];
+    PKG_GROUPS.forEach(function () { w1.push(11, 11, 11, 10); });
+    w1.forEach(function (w, i) { ws1.getColumn(i + 1).width = w; });
+    var N1 = w1.length, r1 = 1;
+
+    ovWriteMergedBanner(ws1, r1++, 1, N1, 'FAKHARANY360 — Package Families Breakdown · ' + ctx.scopeLabel + ' · ' + ctx.periodLabel,
+      { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r1++;
+    var h1_1 = [{ t: 'Supervisor / Area Manager / Store', rs: 2, al: 'l' }, { t: 'Stores', rs: 2 }];
+    var h1_2 = [];
+    PKG_GROUPS.forEach(function (pg) {
+      h1_1.push({ t: pg.label, cs: 4, bg: pg.color || '#5E2D91' });
+      h1_2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+    });
+    r1 = ovWriteTwoRowHeader(ws1, r1, h1_1, h1_2);
+
+    function writePkgRow(ws, rIdx, label, gRows, kind, idx, indent) {
+      var gObj = ovCalcRichGroup(gRows);
+      var k = ovRowKindColors(kind, idx);
+      var c = 1;
+      var cL = ws.getCell(rIdx, c++); cL.value = label; ovStyleCell(cL, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indent || 1 });
+      var cS = ws.getCell(rIdx, c++); cS.value = gObj.storeCount; ovStyleCell(cS, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      PKG_GROUPS.forEach(function (pg) {
+        c = ovPutProductMetrics(ws, rIdx, c, gObj.pkgStats[pg.key] || { target: 0, ach: 0, gap: 0, ratio: null }, kind, idx);
+      });
+      ws.getRow(rIdx).height = (kind === 'total' || kind === 'sv' || kind === 'sub') ? 21 : 19;
+    }
+
+    var tree = buildTeamPivotTree(rows);
+    Object.keys(tree).sort().forEach(function (rm) {
+      var svMap = tree[rm].supervisors;
+      Object.keys(svMap).sort().forEach(function (sv) {
+        var svObj = svMap[sv];
+        writePkgRow(ws1, r1++, '🧑‍💼 Supervisor: ' + sv, svObj.rows, 'sv', 0, 1);
+        Object.keys(svObj.areaManagers).sort().forEach(function (am, ai) {
+          var amRows = svObj.areaManagers[am];
+          writePkgRow(ws1, r1++, '   📍 ' + am, amRows, 'am', ai, 2);
+          var stMap = {};
+          amRows.forEach(function (r) { var k = r.storeCode || r.store; if (!stMap[k]) stMap[k] = []; stMap[k].push(r); });
+          Object.keys(stMap).forEach(function (sk, si) {
+            var sRows = stMap[sk];
+            writePkgRow(ws1, r1++, '      🏪 ' + (sRows[sRows.length - 1].store || sk), sRows, 'store', si, 3);
+          });
+        });
+        writePkgRow(ws1, r1++, '∑ Supervisor Total — ' + sv, svObj.rows, 'sub', 0, 1);
+      });
+    });
+    writePkgRow(ws1, r1++, '🏆 GRAND TOTAL', rows, 'total', 0, 1);
+
+    // Sheet 2: Detailed Sub-Packages (Kix 25..150 & Tazbeet 40..165) by Store
+    var ws2 = wb.addWorksheet('2. Sub-Packages by Store');
+    ws2.views = [{ state: 'frozen', xSplit: 3, ySplit: 4, showGridLines: false }];
+    ws2.properties.tabColor = { argb: 'FF2563EB' };
+    var kixSubs = (PKG_GROUPS.find(function (g) { return g.key === 'kix'; }) || {}).subs || [];
+    var tazSubs = (PKG_GROUPS.find(function (g) { return g.key === 'tazbeet'; }) || {}).subs || [];
+    var allSubs = kixSubs.concat(tazSubs);
+    var w2 = [28, 15, 24, 22, 12, 12].concat(allSubs.map(function () { return 10; }));
+    w2.forEach(function (w, i) { ws2.getColumn(i + 1).width = w; });
+    var N2 = w2.length, r2 = 1;
+
+    ovWriteMergedBanner(ws2, r2++, 1, N2, 'FAKHARANY360 — Detailed Sub-Packages (Kix 25..150 & Tazbeet 40..165) Per Store · ' + ctx.scopeLabel,
+      { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r2++;
+    var h2_1 = [
+      { t: 'Store Name', rs: 2, al: 'l' },
+      { t: 'Store Code', rs: 2 },
+      { t: 'Area Manager', rs: 2, al: 'l' },
+      { t: 'Supervisor', rs: 2, al: 'l' },
+      { t: 'Kix Total Ach', rs: 2, bg: '#5E2D91' },
+      { t: 'Tazbeet Total Ach', rs: 2, bg: '#2563EB' },
+      { t: 'Control Kix Sub-Packages Breakdown', cs: kixSubs.length, bg: '#5E2D91' },
+      { t: 'Control Tazbeet Sub-Packages Breakdown', cs: tazSubs.length, bg: '#2563EB' }
+    ];
+    var h2_2 = kixSubs.map(function (s) { return { t: s.label, bg: '#6D3FA8' }; })
+      .concat(tazSubs.map(function (s) { return { t: s.label, bg: '#1D4ED8' }; }));
+    r2 = ovWriteTwoRowHeader(ws2, r2, h2_1, h2_2);
+
+    var bySt = {};
+    rows.forEach(function (r) { var k = r.storeCode || r.store; if (!bySt[k]) bySt[k] = []; bySt[k].push(r); });
+    Object.keys(bySt).forEach(function (sk, idx) {
+      var sRows = bySt[sk];
+      var last = sRows[sRows.length - 1] || {};
+      var k = ovRowKindColors('am', idx);
+      var c = 1;
+      var c1 = ws2.getCell(r2, c++); c1.value = last.store || sk; ovStyleCell(c1, { bg: k.bg, fg: k.fg, b: true, al: 'l', indent: 1 });
+      var c2 = ws2.getCell(r2, c++); c2.value = last.storeCode || ''; ovStyleCell(c2, { bg: k.bg, fg: '#4B5563', b: false });
+      var c3 = ws2.getCell(r2, c++); c3.value = last.areaManager || ''; ovStyleCell(c3, { bg: k.bg, fg: '#1E3A8A', b: false, al: 'l', indent: 1 });
+      var c4 = ws2.getCell(r2, c++); c4.value = last.supervisor || ''; ovStyleCell(c4, { bg: k.bg, fg: '#374151', b: false, al: 'l', indent: 1 });
+      var c5 = ws2.getCell(r2, c++); c5.value = sum(sRows, 'kixSubs'); ovStyleCell(c5, { bg: '#F5F3FF', fg: '#5E2D91', b: true, numFmt: '#,##0' });
+      var c6 = ws2.getCell(r2, c++); c6.value = sum(sRows, 'tazbeetSubs'); ovStyleCell(c6, { bg: '#EFF6FF', fg: '#1D4ED8', b: true, numFmt: '#,##0' });
+      allSubs.forEach(function (sb) {
+        var cv = ws2.getCell(r2, c++);
+        cv.value = sum(sRows, sb.key);
+        ovStyleCell(cv, { bg: k.bg, fg: k.fg, b: cv.value > 0, numFmt: '#,##0' });
+      });
+      ws2.getRow(r2).height = 19;
+      r2++;
+    });
+
+    // Total row for Sub-Packages
+    var ct = 1;
+    ovStyleCell(ws2.getCell(r2, ct), { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', indent: 1 }); ws2.getCell(r2, ct++).value = 'GRAND TOTAL (' + Object.keys(bySt).length + ' Stores)';
+    for (var p = 0; p < 3; p++) { ovStyleCell(ws2.getCell(r2, ct), { bg: '#111827', fg: '#9CA3AF', b: true }); ws2.getCell(r2, ct++).value = '—'; }
+    var ck = ws2.getCell(r2, ct++); ck.value = sum(rows, 'kixSubs'); ovStyleCell(ck, { bg: '#111827', fg: '#E9D5FF', b: true, numFmt: '#,##0' });
+    var cz = ws2.getCell(r2, ct++); cz.value = sum(rows, 'tazbeetSubs'); ovStyleCell(cz, { bg: '#111827', fg: '#93C5FD', b: true, numFmt: '#,##0' });
+    allSubs.forEach(function (sb) {
+      var cv = ws2.getCell(r2, ct++); cv.value = sum(rows, sb.key);
+      ovStyleCell(cv, { bg: '#111827', fg: '#FFFFFF', b: true, numFmt: '#,##0' });
+    });
+    ws2.getRow(r2).height = 22;
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_Package_Mix_And_SubPackages_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ تم تصدير شيت الباقات الأساسية والفرعية بنجاح!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+async function exportTariffMixMasterExcel(btn) {
+  var rows = (Array.isArray(filteredData) && filteredData.length) ? filteredData : RAW_DATA;
+  if (!rows || !rows.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var ctx = ovGetFilterContext();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    var ws = wb.addWorksheet('Tariff Mix Analysis');
+    ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 4, showGridLines: false }];
+    ws.properties.tabColor = { argb: 'FF0F766E' };
+    var wCols = [34, 10, 14, 12, 14, 12, 14, 12, 14, 14];
+    wCols.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+    var N = wCols.length, r = 1;
+
+    ovWriteMergedBanner(ws, r++, 1, N, 'FAKHARANY360 — Tariff Mix Analysis (Low / Mid / High Tier & 12 PT) · ' + ctx.scopeLabel + ' · ' + ctx.periodLabel,
+      { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r++;
+    r = ovWriteTwoRowHeader(ws, r, [
+      { t: 'Supervisor / Area Manager / Store', rs: 2, al: 'l' },
+      { t: 'Stores', rs: 2 },
+      { t: 'Low Tier', cs: 2, bg: '#DC2626' },
+      { t: 'Mid Tier', cs: 2, bg: '#D97706' },
+      { t: 'High Tier', cs: 2, bg: '#16A34A' },
+      { t: 'Total Tiers', rs: 2, bg: '#5E2D91' },
+      { t: '12 PT (PAYG)', rs: 2, bg: '#0F766E' }
+    ], [
+      { t: 'Subs', bg: '#B91C1C' }, { t: 'Share %', bg: '#FEE2E2', fg: '#B91C1C' },
+      { t: 'Subs', bg: '#B45309' }, { t: 'Share %', bg: '#FEF3C7', fg: '#A16207' },
+      { t: 'Subs', bg: '#15803D' }, { t: 'Share %', bg: '#DCFCE7', fg: '#15803D' }
+    ]);
+
+    function writeTariffRow(label, gRows, kind, idx, indent) {
+      var g = ovCalcRichGroup(gRows);
+      var k = ovRowKindColors(kind, idx);
+      var isTot = (kind === 'total');
+      var totT = (g.lowT || 0) + (g.midT || 0) + (g.highT || 0);
+      var c = 1;
+      var c1 = ws.getCell(r, c++); c1.value = label; ovStyleCell(c1, { bg: k.bg, fg: k.fg, b: k.b, al: 'l', indent: indent || 1 });
+      var c2 = ws.getCell(r, c++); c2.value = g.storeCount; ovStyleCell(c2, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      var c3 = ws.getCell(r, c++); c3.value = g.lowT || 0; ovStyleCell(c3, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      var c4 = ws.getCell(r, c++); c4.value = g.lowRatio !== null ? g.lowRatio : 0; ovStyleCell(c4, { bg: isTot ? '#111827' : '#FEE2E2', fg: isTot ? '#FCA5A5' : '#B91C1C', b: true, numFmt: '0.0%' });
+      var c5 = ws.getCell(r, c++); c5.value = g.midT || 0; ovStyleCell(c5, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      var c6 = ws.getCell(r, c++); c6.value = g.midRatio !== null ? g.midRatio : 0; ovStyleCell(c6, { bg: isTot ? '#111827' : '#FEF3C7', fg: isTot ? '#FDE68A' : '#A16207', b: true, numFmt: '0.0%' });
+      var c7 = ws.getCell(r, c++); c7.value = g.highT || 0; ovStyleCell(c7, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      var c8 = ws.getCell(r, c++); c8.value = g.highRatio !== null ? g.highRatio : 0; ovStyleCell(c8, { bg: isTot ? '#111827' : '#DCFCE7', fg: isTot ? '#86EFAC' : '#15803D', b: true, numFmt: '0.0%' });
+      var c9 = ws.getCell(r, c++); c9.value = totT; ovStyleCell(c9, { bg: k.bg, fg: k.fg, b: true, numFmt: '#,##0' });
+      var c10 = ws.getCell(r, c++); c10.value = g.pt12 || 0; ovStyleCell(c10, { bg: k.bg, fg: k.fg, b: k.b, numFmt: '#,##0' });
+      ws.getRow(r).height = (kind === 'total' || kind === 'sv' || kind === 'sub') ? 21 : 19;
+      r++;
+    }
+
+    var tree = buildTeamPivotTree(rows);
+    Object.keys(tree).sort().forEach(function (rm) {
+      var svMap = tree[rm].supervisors;
+      Object.keys(svMap).sort().forEach(function (sv) {
+        var svObj = svMap[sv];
+        writeTariffRow('🧑‍💼 Supervisor: ' + sv, svObj.rows, 'sv', 0, 1);
+        Object.keys(svObj.areaManagers).sort().forEach(function (am, ai) {
+          var amRows = svObj.areaManagers[am];
+          writeTariffRow('   📍 ' + am, amRows, 'am', ai, 2);
+          var stMap = {};
+          amRows.forEach(function (row) { var sk = row.storeCode || row.store; if (!stMap[sk]) stMap[sk] = []; stMap[sk].push(row); });
+          Object.keys(stMap).forEach(function (sk, si) {
+            var sRows = stMap[sk];
+            writeTariffRow('      🏪 ' + (sRows[sRows.length - 1].store || sk), sRows, 'store', si, 3);
+          });
+        });
+        writeTariffRow('∑ Supervisor Total — ' + sv, svObj.rows, 'sub', 0, 1);
+      });
+    });
+    writeTariffRow('🏆 GRAND TOTAL', rows, 'total', 0, 1);
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_Tariff_Mix_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ تم تصدير شيت الـ Tariff Mix بنجاح!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+async function exportHeatmapMasterExcel(btn) {
+  var rows = (Array.isArray(filteredData) && filteredData.length) ? filteredData : RAW_DATA;
+  if (!rows || !rows.length) { alert('⚠️ مفيش بيانات في العرض الحالي للتصدير'); return; }
+  if (!(await mtdInsAuth())) return;
+
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var ctx = ovGetFilterContext();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    var ws = wb.addWorksheet('Store x Product Heatmap');
+    ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 4, showGridLines: false }];
+    ws.properties.tabColor = { argb: 'FFE91E8C' };
+    var wCols = [7, 28, 15, 24, 22];
+    PRODUCTS.forEach(function () { wCols.push(11, 11, 11, 10); });
+    wCols.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+    var N = wCols.length, r = 1;
+
+    ovWriteMergedBanner(ws, r++, 1, N, 'FAKHARANY360 — Store × Product Heatmap Matrix (' + ctx.basis + ' Basis) · ' + ctx.scopeLabel,
+      { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r++;
+    var h1 = [
+      { t: '#', rs: 2 },
+      { t: 'Store Name (الفرع)', rs: 2, al: 'l' },
+      { t: 'Store Code', rs: 2 },
+      { t: 'Area Manager', rs: 2, al: 'l' },
+      { t: 'Supervisor', rs: 2, al: 'l' }
+    ];
+    var h2 = [];
+    PRODUCTS.forEach(function (p) {
+      h1.push({ t: p.label, cs: 4, bg: p.color });
+      h2.push({ t: 'Target', bg: '#6D3FA8' }, { t: 'Ach', bg: '#6D3FA8' }, { t: 'Gap (+/-)', bg: '#6D3FA8' }, { t: 'Ach %', bg: '#6D3FA8' });
+    });
+    r = ovWriteTwoRowHeader(ws, r, h1, h2);
+
+    var bySt = {};
+    rows.forEach(function (row) { var sk = row.storeCode || row.store; if (!bySt[sk]) bySt[sk] = []; bySt[sk].push(row); });
+    var stKeys = Object.keys(bySt).sort(function (a, b) {
+      var ga = calcGroup(bySt[a]), gb = calcGroup(bySt[b]);
+      return (gb.mobileTarget > 0 ? gb.mobileSubs / gb.mobileTarget : 0) - (ga.mobileTarget > 0 ? ga.mobileSubs / ga.mobileTarget : 0);
+    });
+
+    stKeys.forEach(function (sk, idx) {
+      var sRows = bySt[sk];
+      var g = ovCalcRichGroup(sRows);
+      var last = sRows[sRows.length - 1] || {};
+      var k = ovRowKindColors('am', idx);
+      var c = 1;
+      var c0 = ws.getCell(r, c++); c0.value = idx + 1; ovStyleCell(c0, { bg: k.bg, fg: '#5E2D91', b: true });
+      var c1 = ws.getCell(r, c++); c1.value = last.store || sk; ovStyleCell(c1, { bg: k.bg, fg: k.fg, b: true, al: 'l', indent: 1 });
+      var c2 = ws.getCell(r, c++); c2.value = last.storeCode || ''; ovStyleCell(c2, { bg: k.bg, fg: '#4B5563', b: false });
+      var c3 = ws.getCell(r, c++); c3.value = last.areaManager || ''; ovStyleCell(c3, { bg: k.bg, fg: '#1E3A8A', b: false, al: 'l', indent: 1 });
+      var c4 = ws.getCell(r, c++); c4.value = last.supervisor || ''; ovStyleCell(c4, { bg: k.bg, fg: '#374151', b: false, al: 'l', indent: 1 });
+      PRODUCTS.forEach(function (p) {
+        c = ovPutProductMetrics(ws, r, c, g.prodStats[p.key], 'am', idx);
+      });
+      ws.getRow(r).height = 19.5;
+      r++;
+    });
+
+    var totG = ovCalcRichGroup(rows);
+    var ct = 1;
+    ovStyleCell(ws.getCell(r, ct), { bg: '#111827', fg: '#FFFFFF', b: true }); ws.getCell(r, ct++).value = 'TOTAL';
+    ovStyleCell(ws.getCell(r, ct), { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', indent: 1 }); ws.getCell(r, ct++).value = 'All Stores Total (' + stKeys.length + ' Stores)';
+    for (var pd = 0; pd < 3; pd++) { ovStyleCell(ws.getCell(r, ct), { bg: '#111827', fg: '#9CA3AF', b: true }); ws.getCell(r, ct++).value = '—'; }
+    PRODUCTS.forEach(function (p) {
+      ct = ovPutProductMetrics(ws, r, ct, totG.prodStats[p.key], 'total', 0);
+    });
+    ws.getRow(r).height = 22;
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_Heatmap_Matrix_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ تم تصدير مصفوفة الـ Heatmap بنجاح!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 4. UPGRADE ALL LEGACY SUB-EXPORT FUNCTIONS TO FORMATTED EXCELJS + PASSWORD GATE
+// ────────────────────────────────────────────────────────────────────────────
+exportMonthlyPerf = async function (btn) {
+  return exportOverviewMasterReport(btn);
+};
+
+exportTeamPivot = async function (btn) {
+  return exportOverviewMasterReport(btn);
+};
+
+// Generic helper to convert any SheetJS workbook (wb2) into a styled ExcelJS MTD-style workbook + password gate
+async function exportSheetJSWorkbookAsStyledExcelJS(wbSheetJS, baseName, titleBannerText) {
+  if (!(await mtdInsAuth())) return;
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    wbSheetJS.SheetNames.forEach(function (sname) {
+      var wsOld = wbSheetJS.Sheets[sname];
+      var aoa = XLSX.utils.sheet_to_json(wsOld, { header: 1, defval: '' });
+      var ws = wb.addWorksheet(sname.slice(0, 31));
+      ws.views = [{ showGridLines: false }];
+      ws.properties.tabColor = { argb: 'FF5E2D91' };
+      ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+      var maxCols = Math.max(4, aoa.reduce(function (m, row) { return Math.max(m, (row || []).length); }, 0));
+      for (var ci = 1; ci <= maxCols; ci++) {
+        ws.getColumn(ci).width = ci <= 3 ? 24 : 14;
+      }
+
+      var r = 1;
+      ovWriteMergedBanner(ws, r++, 1, maxCols, titleBannerText || ('FAKHARANY360 — ' + baseName + ' (' + sname + ')'),
+        { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 25 });
+      r++;
+
+      var headerDetected = false;
+      aoa.forEach(function (rowArr, rIdx) {
+        if (!rowArr || !rowArr.some(function (x) { return x !== '' && x !== null && x !== undefined; })) return;
+        var nonEmpty = rowArr.filter(function (x) { return x !== '' && x !== null && x !== undefined; });
+        if (!headerDetected && nonEmpty.length === 1 && rIdx === 0) {
+          ovWriteMergedBanner(ws, r++, 1, maxCols, String(nonEmpty[0]),
+            { bg: '#5E2D91', fg: '#FFFFFF', b: true, al: 'l', bd: '#5E2D91', sz: 11, h: 22 });
+          return;
+        }
+        var isHdr = !headerDetected;
+        if (isHdr) headerDetected = true;
+        var isTot = String(rowArr[0] || '').toUpperCase().indexOf('TOTAL') >= 0;
+        var bg = isHdr ? '#5E2D91' : (isTot ? '#111827' : (r % 2 === 0 ? '#FFFFFF' : '#F8FAFC'));
+        var fg = (isHdr || isTot) ? '#FFFFFF' : '#1F2937';
+
+        for (var c = 0; c < maxCols; c++) {
+          var val = rowArr[c];
+          var cell = ws.getCell(r, c + 1);
+          var cellBg = bg, cellFg = fg, isBold = isHdr || isTot || c === 0;
+          var numFmt = undefined;
+
+          if (!isHdr && typeof val === 'string' && /^-?\d+(\.\d+)?%$/.test(val.trim())) {
+            var numRatio = parseFloat(val) / 100;
+            val = numRatio;
+            numFmt = '0.0%';
+            if (!isTot) {
+              var tc = ovTierColors(numRatio);
+              cellBg = tc.bg; cellFg = tc.fg; isBold = true;
+            }
+          } else if (!isHdr && typeof val === 'number') {
+            numFmt = '#,##0';
+          }
+          cell.value = (val === undefined || val === null) ? '' : val;
+          ovStyleCell(cell, {
+            hd: isHdr,
+            bg: cellBg,
+            fg: cellFg,
+            b: isBold,
+            al: c === 0 ? 'l' : 'c',
+            bd: isHdr ? '#4C1D95' : '#E5E7EB',
+            numFmt: numFmt
+          });
+        }
+        ws.getRow(r).height = isHdr ? 22 : (isTot ? 21 : 19);
+        r++;
+      });
+    });
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date();
+    var dateSuffix = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = baseName + '_' + dateSuffix + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ تم تصدير ملف الإكسيل بالتنسيق الموحد بنجاح!');
+  } catch (err) {
+    console.error('[Styled Excel Export Fallback]', err);
+    var now2 = new Date();
+    var ds2 = now2.getFullYear() + String(now2.getMonth() + 1).padStart(2, '0') + String(now2.getDate()).padStart(2, '0');
+    XLSX.writeFile(wbSheetJS, baseName + '_' + ds2 + '.xlsx');
+  }
+}
+
+// Upgrade exportWithPassword so every export calling it automatically gets the styled ExcelJS formatting + password gate!
+exportWithPassword = async function (wb2, baseName) {
+  await exportSheetJSWorkbookAsStyledExcelJS(wb2, baseName, 'FAKHARANY360 — ' + baseName);
+};
 </script>
 
 </body>
