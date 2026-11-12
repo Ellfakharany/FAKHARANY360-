@@ -3518,12 +3518,13 @@ function mtdTpProductCellsHTML(k, valueColor) {
   var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
   return MTD_TP_PRODUCTS.map(function(p){
     var t = k[p.key].tgt||0;
-    var mainVal = isProj ? (k[p.key].proj||0) : (k[p.key].act||0);
+    var actVal = k[p.key].act||0;
+    var mainVal = isProj ? (k[p.key].proj||0) : actVal;
     var pc = t>0 ? Math.round(mainVal/t*100) : 0;
     var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
     if (MTD_TEAM_PIVOT_MODE === 'details') {
       return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(Math.round(t))+'</td>'+
-             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(Math.round(mainVal))+'</td>'+
+             '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(Math.round(actVal))+'</td>'+
              '<td style="padding:8px 10px;text-align:right;font-size:11.5px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
     }
     return '<td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:800;color:'+pctColor+';white-space:nowrap;border-right:1px solid #f1f1f4">'+pc+'%</td>';
@@ -3576,8 +3577,8 @@ function renderMTDTeamPivot() {
   var subHeaderCells = MTD_TEAM_PIVOT_MODE === 'details'
     ? MTD_TP_PRODUCTS.map(function(){
         return '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">TGT</th>'+
-               '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">'+(MTD_TEAM_PIVOT_METRIC==='proj'?'PROJ':'ACH')+'</th>'+
-               '<th style="padding:5px 10px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15)">'+(MTD_TEAM_PIVOT_METRIC==='proj'?'PROJ%':'%')+'</th>';
+               '<th style="padding:5px 8px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase">ACH</th>'+
+               '<th style="padding:5px 10px;font-size:9px;font-weight:700;color:#c4b5fd;text-align:right;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15)">'+(MTD_TEAM_PIVOT_METRIC==='proj'?'PROJ%':'ACH%')+'</th>';
       }).join('')
     : '';
 
@@ -3652,9 +3653,9 @@ function exportMTDTeamPivot() {
   var rmNames = Object.keys(tree).sort(function(a,b){ return mtdQcCalcGroup(tree[b].rows).mobile.tgt - mtdQcCalcGroup(tree[a].rows).mobile.tgt; });
 
   var aoa = [];
-  var metricLabel = MTD_TEAM_PIVOT_METRIC === 'proj' ? 'PROJ' : 'ACH';
+  var pctHdrLabel = MTD_TEAM_PIVOT_METRIC === 'proj' ? 'PROJ%' : 'ACH%';
   var headerRow = ['Regional Manager', 'Supervisor', 'Area Manager'];
-  MTD_TP_PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' '+metricLabel, p.label+' %'); });
+  MTD_TP_PRODUCTS.forEach(function(p){ headerRow.push(p.label+' TGT', p.label+' ACH', p.label+' '+pctHdrLabel); });
   aoa.push(['Team Performance Pivot (MTD) — ' + (MTD_TEAM_PIVOT_METRIC === 'proj' ? 'Projected Month-End' : 'Achievement So Far')]);
   aoa.push([]);
   aoa.push(headerRow);
@@ -3663,8 +3664,8 @@ function exportMTDTeamPivot() {
     var out = [];
     var isProj = MTD_TEAM_PIVOT_METRIC === 'proj';
     MTD_TP_PRODUCTS.forEach(function(p){
-      var t=k[p.key].tgt||0, v=isProj ? (k[p.key].proj||0) : (k[p.key].act||0);
-      out.push(Math.round(t), Math.round(v), (t>0?Math.round(v/t*100):0)+'%');
+      var t=k[p.key].tgt||0, actVal=k[p.key].act||0, v=isProj ? (k[p.key].proj||0) : actVal;
+      out.push(Math.round(t), Math.round(actVal), (t>0?Math.round(v/t*100):0)+'%');
     });
     return out;
   }
@@ -14725,9 +14726,13 @@ async function exportManagersPerfCSV() {
     <i class="fas fa-calendar-day"></i>
     <span>MTD Live</span>
   </button>
-  <button onclick="mobileNavSwitchTab('rankings')" id="mnav-rankings" class="mnav-btn">
-    <i class="fas fa-trophy"></i>
-    <span>Rankings</span>
+  <button onclick="mobileNavSwitchTab('contribution')" id="mnav-contribution" class="mnav-btn">
+    <i class="fas fa-percentage"></i>
+    <span>Cont.</span>
+  </button>
+  <button onclick="mobileNavSwitchTab('packages')" id="mnav-packages" class="mnav-btn">
+    <i class="fas fa-layer-group"></i>
+    <span>Packages</span>
   </button>
   <button onclick="mobileNavToggleFilters()" id="mnav-filters" class="mnav-btn">
     <i class="fas fa-sliders-h"></i>
@@ -15038,6 +15043,103 @@ html.dark select {
     width: auto !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   v22: RESPONSIVE 100%-FIT TABS BAR ACROSS ALL SCREENS (PC, TABLET, MOBILE)
+   Ensures all 9 tabs (including MTD) always fit within 100% of screen width
+   ════════════════════════════════════════════════════════════════════════════ */
+.we-header .tabs-bar {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 6px 8px 0 8px !important;
+  gap: 4px !important;
+  overflow: visible !important;
+}
+
+.we-header .tabs-bar .tab-btn {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 6px 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: clamp(9px, 1.02vw, 12px) !important;
+  line-height: 1.15 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  border-radius: 8px 8px 0 0 !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.we-header .tabs-bar .tab-btn i {
+  margin: 0 0 3px 0 !important;
+  font-size: clamp(11px, 1.2vw, 14px) !important;
+  display: block !important;
+}
+
+.we-header .tabs-bar .tab-btn span[style*="position:absolute"] {
+  top: 2px !important;
+  right: 3px !important;
+  font-size: 7px !important;
+  padding: 0px 3.5px !important;
+  line-height: 1.3 !important;
+  border-radius: 6px !important;
+}
+
+/* Wide Desktop Screens (>= 1280px): Single-line row with icon beside text */
+@media (min-width: 1280px) {
+  .we-header .tabs-bar {
+    padding: 6px 16px 0 16px !important;
+    gap: 6px !important;
+  }
+  .we-header .tabs-bar .tab-btn {
+    flex-direction: row !important;
+    gap: 6px !important;
+    padding: 8px 8px !important;
+    font-size: 12.5px !important;
+    white-space: nowrap !important;
+  }
+  .we-header .tabs-bar .tab-btn i {
+    margin: 0 !important;
+    font-size: 13px !important;
+    display: inline-block !important;
+  }
+}
+
+/* Narrow Mobile Portrait Screens (<= 640px): Ultra-compact fit so all 9 tabs stay on screen */
+@media (max-width: 640px) {
+  .we-header .tabs-bar {
+    padding: 4px 3px 0 3px !important;
+    gap: 2px !important;
+  }
+  .we-header .tabs-bar .tab-btn {
+    padding: 5px 1.5px !important;
+    font-size: 8px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -0.02em !important;
+    border-radius: 6px 6px 0 0 !important;
+  }
+  .we-header .tabs-bar .tab-btn i {
+    font-size: 10.5px !important;
+    margin: 0 0 2px 0 !important;
+  }
+  .we-header .tabs-bar .tab-btn span[style*="position:absolute"] {
+    top: 1px !important;
+    right: 1px !important;
+    font-size: 6px !important;
+    padding: 0 2px !important;
+  }
+}
+
 </style>
 
 <script>
