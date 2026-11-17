@@ -15571,7 +15571,7 @@ function syncMobileBottomNav(tabName) {
      2. ONE-CLICK MANAGER / STORE SCORECARD MODAL (BENTO CARD + PNG / WHATSAPP)
      ════════════════════════════════════════════════════════════════════════ -->
 <div id="scorecard-modal-overlay" style="display:none;position:fixed;inset:0;z-index:99980;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:14px;overflow-y:auto">
-  <div style="background:var(--card-bg);border-radius:20px;max-width:780px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.45);border:1px solid var(--border)">
+  <div style="background:var(--card-bg);border-radius:20px;max-width:920px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.45);border:1px solid var(--border)">
     <!-- Modal Toolbar -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px;background:var(--gray-bg);border-radius:20px 20px 0 0">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
@@ -16055,7 +16055,7 @@ function closeScorecardModal() {
   if (overlay) overlay.style.display = 'none';
 }
 
-function buildScorecardHTMLForManager(mgr, idx, model) {
+function buildScorecardHTMLForManager(mgr, idx, model, isExportCapture) {
   var g = mgr.agg;
   var s = mgr.sample || {};
   var evPct = g.evalScore !== null ? (g.evalScore * 100).toFixed(1) + '%' : '—';
@@ -16173,7 +16173,7 @@ function buildScorecardHTMLForManager(mgr, idx, model) {
     (model.hasRawProducts ? ('<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📦 أداء المنتجات والـ Gap (+ / -) — [' + (MGR_DATA_MODE === 'activation' ? '⚡ Activation' : '🛒 Sales') + ']:</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">' + prodCardsHTML + '</div>') : '') +
     '<!-- Monthly Trajectory -->' +
     '<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:800;color:#374151;margin-bottom:8px;line-height:1.6">📅 مسار الأداء الشهري (Month-by-Month):</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px">' + monthBarsHTML + pendingCardsHTML + '</div>' + pendingNoteCardHTML +
+    '<div style="display:grid;grid-template-columns:' + (isExportCapture ? ((mgr.monthEntries.length + pendingMonthsForCard.length) > 6 ? 'repeat(6,minmax(0,1fr))' : 'repeat(auto-fit,minmax(105px,1fr))') : 'repeat(auto-fit,minmax(88px,1fr))') + ';gap:8px">' + monthBarsHTML + pendingCardsHTML + '</div>' + pendingNoteCardHTML +
     '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;line-height:1.5">' +
       '<span>FAKHARANY³⁶⁰ · Performance Intelligence Platform</span>' +
       '<span>East Cairo Team · Mohamed Elfakharany</span>' +
@@ -16199,13 +16199,13 @@ async function captureScorecardPngForManager(mgr, idx, model) {
     try { await document.fonts.ready; } catch (e) {}
   }
   var cloneHost = document.createElement('div');
-  cloneHost.style.cssText = 'position:fixed;left:-10000px;top:0;width:880px;background:#ffffff;padding:26px;font-family:Cairo,Inter,Arial,sans-serif;line-height:1.55;z-index:-1';
-  cloneHost.innerHTML = buildScorecardHTMLForManager(mgr, idx, model);
+  cloneHost.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#ffffff;padding:24px;font-family:Cairo,Inter,Arial,sans-serif;line-height:1.55;z-index:-1';
+  cloneHost.innerHTML = buildScorecardHTMLForManager(mgr, idx, model, true);
   document.body.appendChild(cloneHost);
   try {
     var canvas = await html2canvas(cloneHost, {
       scale: 2,
-      width: 880,
+      width: 760,
       windowWidth: 1200,
       backgroundColor: '#ffffff',
       useCORS: true,
