@@ -1960,6 +1960,11 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="section-title"><i class="fas fa-boxes mr-2"></i>Product Performance — Actual · Perc% · Projection</div>
       <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-6" id="mtd-product-grid"></div>
 
+      <!-- ── 🎯 ON-TRACK RECOVERY & DAILY RUN-RATE PLANNER (MTD) ── -->
+      <div id="mtd-ontrack-wrap" class="chart-card mb-6" style="padding:0;overflow:hidden;border:1.5px solid #ddd6fe;border-radius:16px;box-shadow:0 6px 24px rgba(94,45,145,0.10)">
+        <div id="mtd-ontrack-container"></div>
+      </div>
+
       <!-- ── Team Performance Pivot (MTD) ── -->
       <div class="chart-card mb-6" style="padding:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
@@ -9061,6 +9066,7 @@ function renderMTD() {
     if (fcEl) fcEl.style.display = 'none';
     var pgParent = document.getElementById('mtd-product-grid');
     if (pgParent) pgParent.style.display = 'none';
+    var otW = document.getElementById('mtd-ontrack-wrap'); if (otW) otW.style.display = 'none';
     // Hide pkg mix (we show day pkg instead)
     var pmEl = document.getElementById('mtd-pkgmix-wrap');
     if (pmEl) pmEl.style.display = 'none';
@@ -9090,6 +9096,8 @@ function renderMTD() {
     renderMTDKPIs();
     renderMTDForecastBanner();
     renderMTDProductGrid();
+    var otNorm = document.getElementById('mtd-ontrack-wrap'); if (otNorm) otNorm.style.display = '';
+    if (typeof renderMTDOnTrackSection === 'function') renderMTDOnTrackSection();
     renderMTDDailyTrend();
     renderMTDLowPerf();
     renderMTDPkgMix();
@@ -21015,5 +21023,1959 @@ async function exportMultiLevelContributionExcel(btn) {
 })();
 </script>
 
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     9. MTD ON-TRACK RECOVERY & DAILY RUN-RATE PLANNER MODAL (WHATSAPP PREVIEW)
+     ════════════════════════════════════════════════════════════════════════ -->
+<div id="mtd-ontrack-wa-modal" onclick="if(event.target===this)closeMTDOnTrackWAModal()" style="display:none;position:fixed;inset:0;z-index:99992;background:rgba(15,23,42,0.72);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:14px">
+  <div style="background:var(--card-bg);border-radius:18px;max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.45);border:1.5px solid var(--border);font-family:'Cairo','Inter',sans-serif" dir="rtl">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 18px;background:linear-gradient(135deg,#15803d,#16a34a);color:white">
+      <div style="font-size:14px;font-weight:900"><i class="fab fa-whatsapp ml-1.5" style="font-size:16px"></i>خطة العودة للـ On-Track (جاهزة للإرسال على WhatsApp)</div>
+      <button type="button" onclick="closeMTDOnTrackWAModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="padding:16px">
+      <textarea id="mtd-ontrack-wa-textarea" rows="13" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-family:'Cairo','Inter',monospace;font-size:12.5px;line-height:1.65;resize:vertical;outline:none" dir="rtl"></textarea>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button type="button" onclick="copyMTDOnTrackWAText()" style="padding:8px 16px;border-radius:12px;border:1.5px solid #5E2D91;background:#f5f3ff;color:#5E2D91;font-size:12px;font-weight:800;cursor:pointer"><i class="fas fa-copy ml-1"></i>نسخ النص (Copy)</button>
+        <button type="button" onclick="sendMTDOnTrackWAViaApp()" style="padding:8px 18px;border-radius:12px;border:none;background:linear-gradient(135deg,#16a34a,#15803d);color:white;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(22,163,74,0.3)"><i class="fab fa-whatsapp ml-1"></i>فتح في WhatsApp مباشرةً</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  MTD ON-TRACK RECOVERY & DAILY RUN-RATE PLANNER (v29)
+//  • Recovery Horizon Selector: 1 Day, 3 Days, 5 Days, 7 Days (1 Week), 10 Days, 15 Days
+//  • Target Goal Selector: 100% On-Track (default) | 90% Safe Zone | 70% Min Line
+//  • Visual Standing: 6 SVG Speedometer Gauges + 6-Axis SVG Radar Chart
+//  • Multi-Level Drill: Hierarchy Tree (Regional ▸ Supervisor ▸ Area Mgr ▸ Store) or Flat Level tabs
+//  • WhatsApp Action Plan Generator + Styled Multi-Sheet ExcelJS Export (respecting active filters)
+// ════════════════════════════════════════════════════════════════════════════
+
+var MTD_ONTRACK_OPEN = true;
+var MTD_ONTRACK_DAYS = 5;            // 1 | 3 | 5 | 7 | 10 | 15
+var MTD_ONTRACK_GOAL_PCT = 100;      // 100 | 90 | 70
+var MTD_ONTRACK_LEVEL = 'hierarchy'; // 'hierarchy' | 'rm' | 'sv' | 'am' | 'store'
+var MTD_ONTRACK_CHART_MODE = 'radar'; // 'both' | 'speedo' | 'radar'
+var MTD_ONTRACK_FOCUS_KEY = '';      // '' = All Active Filtered Scope, or 'rm:...', 'sv:...', 'am:...', 'st:...'
+var MTD_ONTRACK_FOCUS_LABEL = '';
+var MTD_ONTRACK_SORT_PROD = 'mobile';
+
+var MTD_ONTRACK_HORIZONS = [
+  { days: 1,  en: '1 Day',       ar: 'يوم واحد (1d)' },
+  { days: 3,  en: '3 Days',      ar: '3 أيام (3d)' },
+  { days: 5,  en: '5 Days',      ar: '5 أيام (5d)' },
+  { days: 7,  en: '1 Week (7d)', ar: 'أسبوع (7d)' },
+  { days: 10, en: '10 Days',     ar: '10 أيام (10d)' },
+  { days: 15, en: '15 Days',     ar: '15 يوم (15d)' }
+];
+
+var MTD_ONTRACK_PRODUCTS = [
+  { key: 'mobile', label: 'Mobile',  icon: 'fa-mobile-alt',      color: '#5E2D91', tKey: 'mobileTarget', aKey: 'mobileSubs', projKey: 'mobileProj' },
+  { key: 'fbb',    label: 'FBB',     icon: 'fa-wifi',            color: '#2563eb', tKey: 'fbbTarget',    aKey: 'fbbSubs',    projKey: 'fbbProj' },
+  { key: 'fixed',  label: 'Fixed',   icon: 'fa-phone',           color: '#16a34a', tKey: 'fixedTarget',  aKey: 'fixedSubs',  projKey: 'fixedProj' },
+  { key: 'fwa',    label: 'WE Air',  icon: 'fa-broadcast-tower', color: '#0891b2', tKey: 'fwaTarget',    aKey: 'fwaSubs',    projKey: 'fwaProj' },
+  { key: 'gold',   label: 'WE Gold', icon: 'fa-star',            color: '#f5a623', tKey: 'goldTarget',   aKey: 'goldSubs',   projKey: 'goldProj' },
+  { key: 'wallet', label: 'Wallet',  icon: 'fa-wallet',          color: '#e91e8c', tKey: 'walletTarget', aKey: 'walletSales',projKey: 'walletProj' }
+];
+
+// Determine current elapsed day D and total days in month M from MTD dataset
+function getMTDOnTrackPaceMeta(rows) {
+  var sampleRows = (rows && rows.length) ? rows : ((typeof MTD_FILTERED !== 'undefined' && MTD_FILTERED.length) ? MTD_FILTERED : (typeof MTD_DATA !== 'undefined' ? MTD_DATA : []));
+  var dayCols = (typeof MTD_DAILY !== 'undefined' && MTD_DAILY && Array.isArray(MTD_DAILY.dayCols) && MTD_DAILY.dayCols.length) ? MTD_DAILY.dayCols : [];
+  var currentDay = dayCols.length ? Math.max.apply(null, dayCols) : null;
+
+  var now = new Date();
+  var yr = now.getFullYear();
+  var mo = now.getMonth() + 1;
+  var lbl = String((typeof MTD_MOBILE_DATE_LABEL !== 'undefined' && MTD_MOBILE_DATE_LABEL) || '');
+  var mMatch = lbl.match(/(\d{1,2})\s+\S+\s+(20\d{2})/);
+  if (mMatch) {
+    if (!currentDay) currentDay = Number(mMatch[1]) || null;
+    yr = Number(mMatch[2]) || yr;
+  }
+  var daysInMonth = new Date(yr, mo, 0).getDate() || 30;
+
+  // Fallback: infer elapsed pace from Actual / Projection ratio on Mobile
+  if (!currentDay && sampleRows && sampleRows.length) {
+    var totA = 0, totP = 0;
+    for (var i = 0; i < sampleRows.length; i++) {
+      totA += Number(sampleRows[i].mobileSubs) || 0;
+      totP += Number(sampleRows[i].mobileProj) || 0;
+    }
+    if (totP > 0 && totA > 0 && totA <= totP) {
+      currentDay = Math.max(1, Math.min(daysInMonth, Math.round((totA / totP) * daysInMonth)));
+    }
+  }
+  if (!currentDay) currentDay = Math.max(1, Math.min(daysInMonth, now.getDate()));
+  var paceRatio = Math.min(1, Math.max(1 / daysInMonth, currentDay / daysInMonth));
+  var remDays = Math.max(1, daysInMonth - currentDay);
+
+  return {
+    currentDay: currentDay,
+    daysInMonth: daysInMonth,
+    remDays: remDays,
+    paceRatio: paceRatio
+  };
+}
+
+// Compute On-Track metrics for a group of rows across all 6 products for a given horizon K days and goalPct (100 / 90 / 70)
+function calcMTDOnTrackForRows(rows, paceMeta, horizonDays, goalPct) {
+  var pm = paceMeta || getMTDOnTrackPaceMeta(rows);
+  var K = Math.max(1, Number(horizonDays || MTD_ONTRACK_DAYS || 5));
+  var gRatio = Number(goalPct || MTD_ONTRACK_GOAL_PCT || 100) / 100;
+  var D = pm.currentDay;
+  var M = pm.daysInMonth;
+  var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+
+  var out = {
+    storesCount: 0,
+    products: {}
+  };
+  var stSet = new Set();
+
+  MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+    out.products[p.key] = {
+      key: p.key,
+      label: p.label,
+      color: p.color,
+      icon: p.icon,
+      tgt: 0,
+      act: 0,
+      proj: 0
+    };
+  });
+
+  for (var i = 0; i < (rows || []).length; i++) {
+    var r = rows[i];
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    stSet.add(code || r.store || i);
+    var w = (typeof WALLET_DATA !== 'undefined' && code && WALLET_DATA[code]) ? WALLET_DATA[code] : r;
+
+    for (var j = 0; j < MTD_ONTRACK_PRODUCTS.length; j++) {
+      var prod = MTD_ONTRACK_PRODUCTS[j];
+      var src = (prod.key === 'wallet') ? w : r;
+      var t = Number(src[prod.tKey]) || 0;
+      var a = Number(src[prod.aKey]) || 0;
+      var pr = Number(src[prod.projKey]) || (pm.paceRatio > 0 ? (a / pm.paceRatio) : a);
+      var bucket = out.products[prod.key];
+      bucket.tgt += t;
+      bucket.act += a;
+      bucket.proj += pr;
+    }
+  }
+
+  out.storesCount = stSet.size;
+
+  MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+    var b = out.products[p.key];
+    var T = b.tgt;
+    var A = b.act;
+    var P = b.proj > 0 ? b.proj : (pm.paceRatio > 0 ? (A / pm.paceRatio) : A);
+
+    // Goal-adjusted target (e.g. 100% of T, 90% of T, or 70% of T)
+    var goalT = T * gRatio;
+    var normalDaily = goalT / M;
+
+    // Derive exact elapsed ratio for this product from A / P when available, else D / M
+    var effPaceRatio = (P > 0 && A > 0) ? Math.min(1, A / P) : pm.paceRatio;
+    var expectedToday = goalT * effPaceRatio;
+
+    // Current deficit right now to be on-track today (at Day D)
+    var deficitNow = Math.max(0, expectedToday - A);
+    var surplusNow = Math.max(0, A - expectedToday);
+
+    // Target expected after K days (at Day D + K, capped at full month target goalT)
+    var futureRatio = Math.min(1, effPaceRatio + (K / M));
+    var expectedAfterK = goalT * futureRatio;
+    var totalNeededOverK = Math.max(0, expectedAfterK - A);
+
+    // Catch-up per day (to close current deficit over K days) + Normal daily target = Total Required / Day for next K days
+    var catchUpPerDay = deficitNow / K;
+    var reqPerDay = totalNeededOverK / K;
+    var currPerDay = D > 0 ? (A / D) : 0;
+
+    var achPct = T > 0 ? (A / T * 100) : 0;
+    var projPct = T > 0 ? (P / T * 100) : 0;
+    var isOnTrack = (projPct >= (gRatio * 100 - 0.05)) || (deficitNow < 0.5);
+
+    b.achPct = achPct;
+    b.projPct = projPct;
+    b.goalT = goalT;
+    b.normalDaily = normalDaily;
+    b.expectedToday = expectedToday;
+    b.deficitNow = deficitNow;
+    b.surplusNow = surplusNow;
+    b.catchUpPerDay = catchUpPerDay;
+    b.reqPerDay = isOnTrack ? normalDaily : reqPerDay;
+    b.currPerDay = currPerDay;
+    b.extraPerDay = Math.max(0, b.reqPerDay - currPerDay);
+    b.isOnTrack = isOnTrack;
+  });
+
+  return out;
+}
+
+function toggleMTDOnTrackSection() {
+  MTD_ONTRACK_OPEN = !MTD_ONTRACK_OPEN;
+  renderMTDOnTrackSection();
+}
+
+function setMTDOnTrackDays(days) {
+  MTD_ONTRACK_DAYS = Number(days) || 5;
+  renderMTDOnTrackSection();
+}
+
+function setMTDOnTrackGoal(pct) {
+  MTD_ONTRACK_GOAL_PCT = Number(pct) || 100;
+  renderMTDOnTrackSection();
+}
+
+function setMTDOnTrackLevel(lv) {
+  MTD_ONTRACK_LEVEL = lv || 'hierarchy';
+  renderMTDOnTrackSection();
+}
+
+function setMTDOnTrackChartMode(m) {
+  MTD_ONTRACK_CHART_MODE = m || 'both';
+  renderMTDOnTrackSection();
+}
+
+function setMTDOnTrackFocus(key, label) {
+  if (MTD_ONTRACK_FOCUS_KEY === key) {
+    MTD_ONTRACK_FOCUS_KEY = '';
+    MTD_ONTRACK_FOCUS_LABEL = '';
+  } else {
+    MTD_ONTRACK_FOCUS_KEY = key || '';
+    MTD_ONTRACK_FOCUS_LABEL = label || '';
+  }
+  renderMTDOnTrackSection();
+}
+
+// Build an SVG Speedometer Gauge for a single product
+function buildSpeedometerSVGCardHTML(prodStats, horizonDays, goalPct) {
+  var pct = Math.max(0, prodStats.projPct || 0);
+  var cappedPct = Math.min(130, pct);
+  // Map 0..130% to angle -90deg..+90deg (or radians PI..0)
+  var angleDeg = -90 + (cappedPct / 130) * 180;
+  var rad = (180 - (cappedPct / 130) * 180) * Math.PI / 180;
+  var cx = 80, cy = 74, r = 56;
+
+  function polar(deg) {
+    var a = deg * Math.PI / 180;
+    return (cx + r * Math.cos(a)).toFixed(1) + ',' + (cy - r * Math.sin(a)).toFixed(1);
+  }
+  // Zones: 0-70% (Red: 180deg -> 83deg), 70-90% (Amber: 83deg -> 55deg), 90-100% (Blue: 55deg -> 41.5deg), 100-130% (Green: 41.5deg -> 0deg)
+  var p0 = polar(180), p70 = polar(83.1), p90 = polar(55.4), p100 = polar(41.5), p130 = polar(0);
+  var nx = (cx + (r - 8) * Math.cos(rad)).toFixed(1);
+  var ny = (cy - (r - 8) * Math.sin(rad)).toFixed(1);
+
+  var statusClr = pct >= 100 ? '#16a34a' : (pct >= 90 ? '#2563eb' : (pct >= 70 ? '#d97706' : '#dc2626'));
+  var isOk = prodStats.isOnTrack;
+
+  var actionBadgeHTML = isOk
+    ? '<div style="margin-top:6px;padding:6px 8px;border-radius:9px;background:#dcfce7;border:1px solid #86efac;color:#15803d;font-size:10.5px;font-weight:900;text-align:center">' +
+        '✅ On Track! (+' + fmtN(Math.round(prodStats.surplusNow)) + ' Ahead)<br>' +
+        '<span style="font-size:9.5px;font-weight:700;color:#166534">Maintain Pace: ' + fmtN(Math.ceil(prodStats.normalDaily)) + ' / day</span>' +
+      '</div>'
+    : '<div style="margin-top:6px;padding:6px 8px;border-radius:9px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;text-align:center">' +
+        '<div style="font-size:9.5px;font-weight:800;color:#b91c1c">Deficit Now: -' + fmtN(Math.ceil(prodStats.deficitNow)) + ' · Curr: ' + fmtN(Math.round(prodStats.currPerDay)) + '/d</div>' +
+        '<div style="font-size:12px;font-weight:900;color:#dc2626;margin-top:2px">🎯 Need ' + fmtN(Math.ceil(prodStats.reqPerDay)) + ' / day <span style="font-size:9.5px;font-weight:800">(' + horizonDays + 'd)</span></div>' +
+        '<div style="font-size:9px;font-weight:700;color:#7f1d1d;margin-top:1px">Normal ' + fmtN(Math.ceil(prodStats.normalDaily)) + '/d + Catch-up +' + fmtN(Math.ceil(prodStats.catchUpPerDay)) + '/d</div>' +
+      '</div>';
+
+  return '<div style="background:var(--card-bg);border:1.5px solid var(--border);border-top:3.5px solid ' + prodStats.color + ';border-radius:14px;padding:10px 10px 11px;box-shadow:0 2px 8px rgba(0,0,0,0.04);display:flex;flex-direction:column;justify-content:space-between">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">' +
+      '<span style="font-size:11.5px;font-weight:900;color:var(--text-primary)"><i class="fas ' + prodStats.icon + '" style="color:' + prodStats.color + ';margin-right:4px"></i>' + prodStats.label + '</span>' +
+      '<span style="font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:8px;background:' + (isOk ? '#dcfce7;color:#15803d' : '#fee2e2;color:#dc2626') + '">' + (isOk ? 'ON TRACK' : 'NEEDS PUSH') + '</span>' +
+    '</div>' +
+    '<div style="text-align:center;position:relative">' +
+      '<svg viewBox="0 0 160 88" style="width:100%;max-width:155px;height:auto;overflow:visible;margin:0 auto;display:block">' +
+        '<path d="M ' + p0 + ' A ' + r + ' ' + r + ' 0 0 1 ' + p70 + '" fill="none" stroke="#fca5a5" stroke-width="11" stroke-linecap="butt"/>' +
+        '<path d="M ' + p70 + ' A ' + r + ' ' + r + ' 0 0 1 ' + p90 + '" fill="none" stroke="#fde047" stroke-width="11" stroke-linecap="butt"/>' +
+        '<path d="M ' + p90 + ' A ' + r + ' ' + r + ' 0 0 1 ' + p100 + '" fill="none" stroke="#93c5fd" stroke-width="11" stroke-linecap="butt"/>' +
+        '<path d="M ' + p100 + ' A ' + r + ' ' + r + ' 0 0 1 ' + p130 + '" fill="none" stroke="#4ade80" stroke-width="11" stroke-linecap="butt"/>' +
+        '<line x1="' + cx + '" y1="' + cy + '" x2="' + nx + '" y2="' + ny + '" stroke="#1e1b4b" stroke-width="3" stroke-linecap="round"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#5E2D91" stroke="white" stroke-width="1.5"/>' +
+        '<text x="16" y="84" font-size="8" font-weight="700" fill="#9ca3af">0%</text>' +
+        '<text x="120" y="22" font-size="8" font-weight="800" fill="#15803d">100%</text>' +
+        '<text x="134" y="84" font-size="8" font-weight="700" fill="#9ca3af">130%</text>' +
+      '</svg>' +
+      '<div style="margin-top:-8px">' +
+        '<span style="font-size:18px;font-weight:900;color:' + statusClr + '">' + pct.toFixed(1) + '%</span>' +
+        '<span style="font-size:9.5px;color:var(--text-muted);font-weight:700;margin-left:4px">Proj</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--text-muted);font-weight:700">Ach: <b style="color:var(--text-primary)">' + fmtN(Math.round(prodStats.act)) + '</b> / ' + fmtN(Math.round(prodStats.tgt)) + '</div>' +
+    '</div>' +
+    actionBadgeHTML +
+  '</div>';
+}
+
+// Build a 6-Axis SVG Radar Chart comparing Current Standing (Proj %) vs Goal (100% On-Track)
+function buildOnTrackRadarSVGHTML(calcObj, goalPct, scopeTitle) {
+  var size = 270, cx = 135, cy = 135, maxR = 88, maxScale = 125;
+  var prods = MTD_ONTRACK_PRODUCTS;
+  var N = prods.length;
+
+  function ptAt(idx, valPct) {
+    var cVal = Math.max(0, Math.min(maxScale, valPct || 0));
+    var rr = (cVal / maxScale) * maxR;
+    var ang = (-Math.PI / 2) + (idx * 2 * Math.PI / N);
+    return [cx + rr * Math.cos(ang), cy + rr * Math.sin(ang)];
+  }
+
+  var ringsHTML = [25, 50, 75, 100, 125].map(function (lvl) {
+    var pts = prods.map(function (_, i) { return ptAt(i, lvl).map(function (v) { return v.toFixed(1); }).join(','); }).join(' ');
+    var isGoal = (lvl === Number(goalPct || 100));
+    return '<polygon points="' + pts + '" fill="none" stroke="' + (isGoal ? '#16a34a' : '#e5e7eb') + '" stroke-width="' + (isGoal ? '2' : '1') + '"' + (isGoal ? ' stroke-dasharray="4,3"' : '') + '/>';
+  }).join('');
+
+  var axesHTML = prods.map(function (p, i) {
+    var outer = ptAt(i, maxScale);
+    var lblPt = ptAt(i, maxScale + 34);
+    var st = calcObj.products[p.key];
+    var pct = st ? st.projPct : 0;
+    var clr = pct >= 100 ? '#16a34a' : (pct >= 90 ? '#2563eb' : (pct >= 70 ? '#d97706' : '#dc2626'));
+    return '<line x1="' + cx + '" y1="' + cy + '" x2="' + outer[0].toFixed(1) + '" y2="' + outer[1].toFixed(1) + '" stroke="#cbd5e1" stroke-width="1"/>' +
+      '<text x="' + lblPt[0].toFixed(1) + '" y="' + (lblPt[1] - 3).toFixed(1) + '" text-anchor="middle" font-size="10" font-weight="800" fill="#1e1b4b">' + p.label + '</text>' +
+      '<text x="' + lblPt[0].toFixed(1) + '" y="' + (lblPt[1] + 9).toFixed(1) + '" text-anchor="middle" font-size="9.5" font-weight="900" fill="' + clr + '">' + pct.toFixed(0) + '%</text>';
+  }).join('');
+
+  var goalPts = prods.map(function (_, i) { return ptAt(i, Number(goalPct || 100)).map(function (v) { return v.toFixed(1); }).join(','); }).join(' ');
+  var actualPts = prods.map(function (p, i) {
+    var st = calcObj.products[p.key];
+    return ptAt(i, st ? st.projPct : 0).map(function (v) { return v.toFixed(1); }).join(',');
+  }).join(' ');
+
+  var dotsHTML = prods.map(function (p, i) {
+    var st = calcObj.products[p.key];
+    var pt = ptAt(i, st ? st.projPct : 0);
+    var ok = st && st.isOnTrack;
+    return '<circle cx="' + pt[0].toFixed(1) + '" cy="' + pt[1].toFixed(1) + '" r="4.5" fill="' + (ok ? '#16a34a' : '#dc2626') + '" stroke="white" stroke-width="1.5"/>';
+  }).join('');
+
+  return '<div style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:265px">' +
+    '<div style="font-size:11.5px;font-weight:900;color:var(--we-purple);margin-bottom:2px;text-align:center"><i class="fas fa-compass mr-1"></i>6-Product Standing Radar</div>' +
+    '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-bottom:4px;text-align:center">' + mgrEsc(scopeTitle) + '</div>' +
+    '<svg viewBox="0 0 ' + size + ' ' + size + '" style="width:100%;max-width:255px;height:auto;overflow:visible">' +
+      ringsHTML +
+      axesHTML +
+      '<polygon points="' + goalPts + '" fill="rgba(22,163,74,0.06)" stroke="#16a34a" stroke-width="2" stroke-dasharray="4,3"/>' +
+      '<polygon points="' + actualPts + '" fill="rgba(94,45,145,0.22)" stroke="#5E2D91" stroke-width="2.5"/>' +
+      dotsHTML +
+    '</svg>' +
+    '<div style="display:flex;gap:12px;font-size:10px;font-weight:800;margin-top:2px">' +
+      '<span style="color:#5E2D91">● Current Proj %</span>' +
+      '<span style="color:#16a34a">--- ' + goalPct + '% Target Benchmark</span>' +
+    '</div>' +
+  '</div>';
+}
+
+// Get rows for focused entity or full active MTD filter scope
+function getMTDOnTrackFocusedRows(allActiveRows) {
+  if (!MTD_ONTRACK_FOCUS_KEY) return { rows: allActiveRows, label: 'All Active Filter Scope (' + allActiveRows.length + ' Stores)' };
+  var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+  var parts = MTD_ONTRACK_FOCUS_KEY.split(':');
+  var type = parts[0], val = parts.slice(1).join(':');
+  var filtered = allActiveRows.filter(function (r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    if (type === 'rm') return (r.regionalManager || h.rm || r.region || 'Unassigned') === val;
+    if (type === 'sv') return (r.supervisor || h.sv || 'Unassigned') === val;
+    if (type === 'am') return (r.areaManager || h.am || 'Unassigned') === val;
+    if (type === 'st') return (code === val || r.store === val);
+    return true;
+  });
+  return {
+    rows: filtered.length ? filtered : allActiveRows,
+    label: MTD_ONTRACK_FOCUS_LABEL || val
+  };
+}
+
+// Main Renderer for the MTD On-Track Recovery Section
+function renderMTDOnTrackSection() {
+  var container = document.getElementById('mtd-ontrack-container');
+  if (!container) return;
+
+  var activeRows = (typeof MTD_FILTERED !== 'undefined' && Array.isArray(MTD_FILTERED)) ? MTD_FILTERED : ((typeof getMTDFiltered === 'function') ? getMTDFiltered() : []);
+  if (!activeRows.length) {
+    container.innerHTML = '';
+    return;
+  }
+
+  var pm = getMTDOnTrackPaceMeta(activeRows);
+  var K = MTD_ONTRACK_DAYS;
+  var goalPct = MTD_ONTRACK_GOAL_PCT;
+
+  var headerBarHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:linear-gradient(135deg,#1e1b4b,#5E2D91,#be185d);color:white;flex-wrap:wrap;gap:10px">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<span style="font-size:14px;font-weight:900"><i class="fas fa-tachometer-alt mr-2" style="color:#fbbf24"></i>ON-TRACK RECOVERY &amp; DAILY RUN-RATE PLANNER</span>' +
+        '<span style="background:rgba(255,255,255,0.16);padding:3px 10px;border-radius:12px;font-size:10.5px;font-weight:800">📅 Day ' + pm.currentDay + ' of ' + pm.daysInMonth + ' (Pace: ' + (pm.paceRatio * 100).toFixed(1) + '% · Rem: ' + pm.remDays + 'd)</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">' +
+        '<button type="button" onclick="openMTDOnTrackWAModal()" style="padding:5px 12px;border-radius:12px;border:none;background:#16a34a;color:white;font-size:11px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fab fa-whatsapp"></i>WhatsApp Plan</button>' +
+        '<button type="button" onclick="exportMTDOnTrackExcel(this)" style="padding:5px 12px;border-radius:12px;border:none;background:#0f766e;color:white;font-size:11px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-file-excel"></i>Export Excel</button>' +
+        '<button type="button" onclick="toggleMTDOnTrackSection()" style="padding:5px 11px;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.14);color:white;font-size:11px;font-weight:800;cursor:pointer">' +
+          (MTD_ONTRACK_OPEN ? '<i class="fas fa-eye-slash mr-1"></i>Hide' : '<i class="fas fa-eye mr-1"></i>Show') +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+  if (!MTD_ONTRACK_OPEN) {
+    container.innerHTML = headerBarHTML;
+    return;
+  }
+
+  // Horizon Buttons (1d, 3d, 5d, 7d, 10d, 15d)
+  var horizonBtnsHTML = MTD_ONTRACK_HORIZONS.map(function (h) {
+    var act = (K === h.days);
+    return '<button type="button" onclick="setMTDOnTrackDays(' + h.days + ')" style="padding:5px 12px;border-radius:12px;border:' + (act ? 'none' : '1.5px solid var(--border)') + ';background:' + (act ? '#5E2D91' : 'var(--card-bg)') + ';color:' + (act ? 'white' : 'var(--text-primary)') + ';font-size:11px;font-weight:800;cursor:pointer;transition:all .15s">' + h.en + '</button>';
+  }).join('');
+
+  // Goal % Buttons (100% On-Track, 90%, 70%)
+  var goalBtnsHTML = [
+    { p: 100, lbl: '🎯 100% On-Track', clr: '#16a34a' },
+    { p: 90,  lbl: '🟡 90% Safe Zone', clr: '#d97706' },
+    { p: 70,  lbl: '🔴 70% Min Line',  clr: '#dc2626' }
+  ].map(function (g) {
+    var act = (goalPct === g.p);
+    return '<button type="button" onclick="setMTDOnTrackGoal(' + g.p + ')" style="padding:4px 10px;border-radius:10px;border:none;background:' + (act ? g.clr : 'transparent') + ';color:' + (act ? 'white' : 'var(--text-muted)') + ';font-size:10.5px;font-weight:800;cursor:pointer">' + g.lbl + '</button>';
+  }).join('');
+
+  // Level Switcher Buttons
+  var levelBtnsHTML = [
+    { k: 'hierarchy', lbl: '🌳 Full Hierarchy' },
+    { k: 'rm',        lbl: '👔 Regional' },
+    { k: 'sv',        lbl: '🧑‍💼 Supervisor' },
+    { k: 'am',        lbl: '📍 Area Mgr' },
+    { k: 'store',     lbl: '🏪 Branch' }
+  ].map(function (lv) {
+    var act = (MTD_ONTRACK_LEVEL === lv.k);
+    return '<button type="button" onclick="setMTDOnTrackLevel(\'' + lv.k + '\')" style="padding:5px 11px;border-radius:10px;border:none;background:' + (act ? '#1e1b4b' : 'transparent') + ';color:' + (act ? 'white' : 'var(--text-muted)') + ';font-size:10.5px;font-weight:800;cursor:pointer">' + lv.lbl + '</button>';
+  }).join('');
+
+  // Chart Mode Switcher
+  var chartModeBtnsHTML = [
+    { k: 'both',   lbl: '⏱️ Gauges + Radar' },
+    { k: 'speedo', lbl: '⏱️ Speedometers' },
+    { k: 'radar',  lbl: '🕸️ Radar Only' }
+  ].map(function (cm) {
+    var act = (MTD_ONTRACK_CHART_MODE === cm.k);
+    return '<button type="button" onclick="setMTDOnTrackChartMode(\'' + cm.k + '\')" style="padding:4px 9px;border-radius:9px;border:none;background:' + (act ? '#5E2D91' : 'transparent') + ';color:' + (act ? 'white' : 'var(--text-muted)') + ';font-size:10px;font-weight:800;cursor:pointer">' + cm.lbl + '</button>';
+  }).join('');
+
+  // Compute Speedometer & Radar stats for the focused entity (or all active filtered rows)
+  var focusObj = getMTDOnTrackFocusedRows(activeRows);
+  var focusStats = calcMTDOnTrackForRows(focusObj.rows, pm, K, goalPct);
+
+  var speedoCardsHTML = MTD_ONTRACK_PRODUCTS.map(function (p) {
+    return buildSpeedometerSVGCardHTML(focusStats.products[p.key], K, goalPct);
+  }).join('');
+
+  var radarHTML = buildOnTrackRadarSVGHTML(focusStats, goalPct, focusObj.label);
+
+  var visualSectionHTML = '';
+  if (MTD_ONTRACK_CHART_MODE === 'both') {
+    visualSectionHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:16px;align-items:stretch">' +
+        '<div style="grid-column:span 2;display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px">' + speedoCardsHTML + '</div>' +
+        radarHTML +
+      '</div>';
+  } else if (MTD_ONTRACK_CHART_MODE === 'speedo') {
+    visualSectionHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-bottom:16px">' + speedoCardsHTML + '</div>';
+  } else {
+    visualSectionHTML = '<div style="max-width:420px;margin:0 auto 16px">' + radarHTML + '</div>';
+  }
+
+  // Build Multi-Level Table
+  var tableHTML = buildMTDOnTrackTableHTML(activeRows, pm, K, goalPct);
+
+  var resetFocusBtnHTML = MTD_ONTRACK_FOCUS_KEY
+    ? '<button type="button" onclick="setMTDOnTrackFocus(\'\',\'\')" style="padding:3px 9px;border-radius:8px;border:1px solid #dc2626;background:#fef2f2;color:#dc2626;font-size:10px;font-weight:800;cursor:pointer">✕ Reset Focus (' + mgrEsc(focusObj.label) + ')</button>'
+    : '<span style="font-size:10.5px;color:var(--text-muted);font-weight:700">💡 Click any Regional, Supervisor, Area Manager, or Branch row below to focus the Speedometers &amp; Radar on it</span>';
+
+  container.innerHTML =
+    headerBarHTML +
+    '<!-- Controls Bar -->' +
+    '<div style="padding:12px 16px;background:var(--gray-bg);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<span style="font-size:11px;font-weight:900;color:var(--we-purple)"><i class="fas fa-bolt mr-1"></i>Return On-Track Within:</span>' +
+          horizonBtnsHTML +
+        '</div>' +
+        '<div style="display:inline-flex;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;padding:2px;gap:2px">' +
+          goalBtnsHTML +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:6px;border-top:1px dashed var(--border)">' +
+        '<div style="display:inline-flex;background:var(--card-bg);border:1.5px solid var(--border);border-radius:12px;padding:2px;gap:2px;flex-wrap:wrap">' +
+          levelBtnsHTML +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          resetFocusBtnHTML +
+          '<div style="display:inline-flex;background:var(--card-bg);border:1.5px solid var(--border);border-radius:11px;padding:2px;gap:2px">' +
+            chartModeBtnsHTML +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<!-- Body -->' +
+    '<div style="padding:14px 16px">' +
+      visualSectionHTML +
+      tableHTML +
+    '</div>';
+}
+
+function buildMTDOnTrackTableRowHTML(label, roleTag, fKey, rowsSub, pm, K, goalPct, styleObj) {
+  var st = calcMTDOnTrackForRows(rowsSub, pm, K, goalPct);
+  var isFocused = (MTD_ONTRACK_FOCUS_KEY && MTD_ONTRACK_FOCUS_KEY === fKey);
+  var bg = isFocused ? '#ede9fe' : (styleObj.bg || '#ffffff');
+  var fg = styleObj.fg || '#1f2937';
+  var padL = styleObj.padL || 12;
+
+  var cells = MTD_ONTRACK_PRODUCTS.map(function (p) {
+    var ps = st.products[p.key];
+    if (!(ps.tgt > 0)) {
+      return '<td style="padding:6px 6px;text-align:center;color:#9ca3af;font-size:10px;border-right:1px solid #f1f5f9">—</td>' +
+             '<td style="padding:6px 6px;text-align:center;color:#9ca3af;font-size:10px;border-right:1px solid #e2e8f0">—</td>';
+    }
+    var pClr = ps.projPct >= 100 ? '#15803d' : (ps.projPct >= 90 ? '#1d4ed8' : (ps.projPct >= 70 ? '#b45309' : '#b91c1c'));
+    var reqCellHTML = ps.isOnTrack
+      ? '<span style="display:inline-block;padding:2px 7px;border-radius:8px;background:#dcfce7;color:#15803d;font-size:10px;font-weight:900">✅ On Track (' + fmtN(Math.ceil(ps.normalDaily)) + '/d)</span>'
+      : '<div style="line-height:1.2">' +
+          '<span style="display:inline-block;padding:2px 7px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-size:10.5px;font-weight:900">🎯 ' + fmtN(Math.ceil(ps.reqPerDay)) + ' /d</span>' +
+          '<div style="font-size:8.5px;color:#6b7280;font-weight:700;margin-top:1px">Gap: -' + fmtN(Math.ceil(ps.deficitNow)) + ' (+' + fmtN(Math.ceil(ps.catchUpPerDay)) + '/d)</div>' +
+        '</div>';
+
+    return '<td style="padding:6px 6px;text-align:center;font-size:10.5px;font-weight:800;color:' + (styleObj.isTotal ? '#ffffff' : pClr) + ';white-space:nowrap;border-right:1px solid rgba(226,232,240,0.6)">' +
+        ps.projPct.toFixed(0) + '%' +
+        '<div style="font-size:8.5px;font-weight:600;opacity:.8">' + fmtN(Math.round(ps.act)) + '/' + fmtN(Math.round(ps.tgt)) + '</div>' +
+      '</td>' +
+      '<td style="padding:6px 8px;text-align:center;white-space:nowrap;border-right:1px solid #cbd5e1">' + reqCellHTML + '</td>';
+  }).join('');
+
+  var safeKey = String(fKey || '').replace(/'/g, "\\'");
+  var safeLbl = String(label || '').replace(/'/g, "\\'");
+
+  return '<tr onclick="setMTDOnTrackFocus(\'' + safeKey + '\',\'' + safeLbl + '\')" style="background:' + bg + ';color:' + fg + ';border-bottom:1px solid #e5e7eb;cursor:pointer;transition:background .12s">' +
+    '<td style="padding:7px 10px 7px ' + padL + 'px;font-size:' + (styleObj.fs || 11.5) + 'px;font-weight:' + (styleObj.fw || 800) + ';white-space:nowrap;position:sticky;left:0;background:' + bg + ';z-index:1">' +
+      mgrEsc(label) +
+    '</td>' +
+    '<td style="padding:6px 6px;text-align:center;font-size:10.5px;font-weight:800">' + st.storesCount + '</td>' +
+    cells +
+    '<td style="padding:6px 8px;text-align:center;white-space:nowrap" onclick="event.stopPropagation();openMTDOnTrackWAModalForEntity(\'' + safeKey + '\',\'' + safeLbl + '\')">' +
+      '<button type="button" style="padding:3px 8px;border-radius:8px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;font-size:10px;font-weight:800;cursor:pointer" title="WhatsApp Action Plan for ' + mgrEsc(label) + '"><i class="fab fa-whatsapp"></i> Plan</button>' +
+    '</td>' +
+  '</tr>';
+}
+
+function buildMTDOnTrackTableHTML(activeRows, pm, K, goalPct) {
+  var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+  var prodHeaders = MTD_ONTRACK_PRODUCTS.map(function (p) {
+    return '<th colspan="2" style="padding:7px 8px;font-size:10.5px;font-weight:900;color:white;text-align:center;background:' + p.color + ';border-right:1px solid rgba(255,255,255,0.2)">' + p.label + '</th>';
+  }).join('');
+
+  var subHeaders = MTD_ONTRACK_PRODUCTS.map(function () {
+    return '<th style="padding:5px 6px;font-size:9px;font-weight:800;color:#e9d5ff;text-align:center;background:#2a2448">Proj%</th>' +
+           '<th style="padding:5px 8px;font-size:9px;font-weight:800;color:#fef08a;text-align:center;background:#2a2448;border-right:1px solid rgba(255,255,255,0.18)">Req/Day (' + K + 'd)</th>';
+  }).join('');
+
+  var bodyHTML = '';
+  var enriched = activeRows.map(function (r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    return {
+      raw: r,
+      code: code || r.store || '',
+      store: r.store || code || '—',
+      am: r.areaManager || h.am || 'Unassigned',
+      sv: r.supervisor || h.sv || 'Unassigned',
+      rm: r.regionalManager || h.rm || r.region || 'Unassigned'
+    };
+  });
+
+  if (MTD_ONTRACK_LEVEL === 'hierarchy') {
+    var byRm = {};
+    enriched.forEach(function (x) { (byRm[x.rm] = byRm[x.rm] || []).push(x); });
+    Object.keys(byRm).sort().forEach(function (rm) {
+      var rmItems = byRm[rm];
+      bodyHTML += buildMTDOnTrackTableRowHTML('👔 ' + rm, 'Regional', 'rm:' + rm, rmItems.map(function (x) { return x.raw; }), pm, K, goalPct, { bg: '#f3e8ff', fg: '#4c1d95', fw: 900, fs: 12, padL: 10 });
+
+      var bySv = {};
+      rmItems.forEach(function (x) { (bySv[x.sv] = bySv[x.sv] || []).push(x); });
+      Object.keys(bySv).sort().forEach(function (sv) {
+        var svItems = bySv[sv];
+        bodyHTML += buildMTDOnTrackTableRowHTML('🧑‍💼 ' + sv, 'Supervisor', 'sv:' + sv, svItems.map(function (x) { return x.raw; }), pm, K, goalPct, { bg: '#dbe8f7', fg: '#1e3a5f', fw: 800, fs: 11.5, padL: 24 });
+
+        var byAm = {};
+        svItems.forEach(function (x) { (byAm[x.am] = byAm[x.am] || []).push(x); });
+        Object.keys(byAm).sort().forEach(function (am, ai) {
+          var amItems = byAm[am];
+          bodyHTML += buildMTDOnTrackTableRowHTML('📍 ' + am, 'Area Mgr', 'am:' + am, amItems.map(function (x) { return x.raw; }), pm, K, goalPct, { bg: ai % 2 === 0 ? '#ffffff' : '#f8fafc', fg: '#1f2937', fw: 700, fs: 11, padL: 40 });
+
+          if (enriched.length <= 45) {
+            amItems.forEach(function (stItem) {
+              bodyHTML += buildMTDOnTrackTableRowHTML('🏪 ' + stItem.store, 'Branch', 'st:' + stItem.code, [stItem.raw], pm, K, goalPct, { bg: '#faf9fb', fg: '#4b5563', fw: 600, fs: 10.5, padL: 58 });
+            });
+          }
+        });
+      });
+    });
+  } else {
+    var groupKey = MTD_ONTRACK_LEVEL === 'rm' ? 'rm' : (MTD_ONTRACK_LEVEL === 'sv' ? 'sv' : (MTD_ONTRACK_LEVEL === 'am' ? 'am' : 'store'));
+    var pref = groupKey === 'rm' ? 'rm:' : (groupKey === 'sv' ? 'sv:' : (groupKey === 'am' ? 'am:' : 'st:'));
+    var icon = groupKey === 'rm' ? '👔 ' : (groupKey === 'sv' ? '🧑‍💼 ' : (groupKey === 'am' ? '📍 ' : '🏪 '));
+    var groups = {};
+    enriched.forEach(function (x) {
+      var k = groupKey === 'store' ? (x.code || x.store) : x[groupKey];
+      if (!groups[k]) groups[k] = { label: groupKey === 'store' ? x.store : k, rows: [] };
+      groups[k].rows.push(x.raw);
+    });
+    Object.keys(groups).sort().forEach(function (gk, idx) {
+      var g = groups[gk];
+      bodyHTML += buildMTDOnTrackTableRowHTML(icon + g.label, groupKey, pref + gk, g.rows, pm, K, goalPct, {
+        bg: idx % 2 === 0 ? '#ffffff' : '#f8fafc',
+        fg: '#1f2937',
+        fw: 700,
+        fs: 11,
+        padL: 12
+      });
+    });
+  }
+
+  bodyHTML += buildMTDOnTrackTableRowHTML('TOTAL ACTIVE SCOPE', 'Total', '', activeRows, pm, K, goalPct, {
+    bg: '#111827',
+    fg: '#ffffff',
+    fw: 900,
+    fs: 12,
+    padL: 12,
+    isTotal: true
+  });
+
+  return '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px;max-height:460px;overflow-y:auto">' +
+    '<table style="width:100%;border-collapse:collapse;font-family:\'Inter\',\'Cairo\',sans-serif">' +
+      '<thead style="position:sticky;top:0;z-index:3">' +
+        '<tr style="background:#111827;color:white">' +
+          '<th rowspan="2" style="padding:8px 12px;font-size:10.5px;font-weight:900;text-align:left;position:sticky;left:0;background:#111827;z-index:4">Level / Entity Name</th>' +
+          '<th rowspan="2" style="padding:8px 6px;font-size:10px;font-weight:800;text-align:center">Stores</th>' +
+          prodHeaders +
+          '<th rowspan="2" style="padding:8px 8px;font-size:10px;font-weight:800;text-align:center;background:#14532d">WhatsApp</th>' +
+        '</tr>' +
+        '<tr>' + subHeaders + '</tr>' +
+      '</thead>' +
+      '<tbody>' + bodyHTML + '</tbody>' +
+    '</table>' +
+  '</div>';
+}
+
+// ── WhatsApp Action Plan Formatter & Modal ──
+function buildMTDOnTrackWAText(rows, titleLabel, pm, K, goalPct) {
+  var st = calcMTDOnTrackForRows(rows, pm, K, goalPct);
+  var lines = [
+    '🎯 *خطة العودة للـ On-Track (' + goalPct + '%) خلال ' + K + ' أيام*',
+    '📍 *النطاق:* ' + titleLabel + ' (' + st.storesCount + ' فرع)',
+    '📅 *تاريخ المتابعة:* يوم ' + pm.currentDay + ' من ' + pm.daysInMonth + ' (المتبقي: ' + pm.remDays + ' يوم)',
+    '━━━━━━━━━━━━━━━━━━━━'
+  ];
+
+  MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+    var ps = st.products[p.key];
+    if (!(ps.tgt > 0)) return;
+    if (ps.isOnTrack) {
+      lines.push('✅ *' + p.label + ':* On-Track (' + ps.projPct.toFixed(1) + '% Proj) | المحقق: ' + fmtN(Math.round(ps.act)) + '/' + fmtN(Math.round(ps.tgt)) + ' | الاستمرار بمعدل *' + fmtN(Math.ceil(ps.normalDaily)) + '/يوم*');
+    } else {
+      lines.push(
+        '🔴 *' + p.label + ':* واقف عند *' + ps.projPct.toFixed(1) + '% Proj* (المحقق ' + fmtN(Math.round(ps.act)) + ' من ' + fmtN(Math.round(ps.tgt)) + ')',
+        '   ⬅️ عجز الـ Pace الحالي: *-' + fmtN(Math.ceil(ps.deficitNow)) + '*',
+        '   🚀 *المطلوب يومياً لمدة ' + K + ' أيام:* *' + fmtN(Math.ceil(ps.reqPerDay)) + ' / يوم* (تارجت يومي ' + fmtN(Math.ceil(ps.normalDaily)) + ' + تعويض +' + fmtN(Math.ceil(ps.catchUpPerDay)) + '/يوم)'
+      );
+    }
+  });
+
+  lines.push('━━━━━━━━━━━━━━━━━━━━', '⚡ *FAKHARANY³⁶⁰ · On-Track Intelligence*');
+  return lines.join('\n');
+}
+
+function openMTDOnTrackWAModal() {
+  var activeRows = (typeof MTD_FILTERED !== 'undefined' && Array.isArray(MTD_FILTERED)) ? MTD_FILTERED : ((typeof getMTDFiltered === 'function') ? getMTDFiltered() : []);
+  var pm = getMTDOnTrackPaceMeta(activeRows);
+  var focusObj = getMTDOnTrackFocusedRows(activeRows);
+  var txt = buildMTDOnTrackWAText(focusObj.rows, focusObj.label, pm, MTD_ONTRACK_DAYS, MTD_ONTRACK_GOAL_PCT);
+  var ta = document.getElementById('mtd-ontrack-wa-textarea');
+  if (ta) ta.value = txt;
+  var md = document.getElementById('mtd-ontrack-wa-modal');
+  if (md) md.style.display = 'flex';
+}
+
+function openMTDOnTrackWAModalForEntity(fKey, label) {
+  var activeRows = (typeof MTD_FILTERED !== 'undefined' && Array.isArray(MTD_FILTERED)) ? MTD_FILTERED : ((typeof getMTDFiltered === 'function') ? getMTDFiltered() : []);
+  var pm = getMTDOnTrackPaceMeta(activeRows);
+  var prevKey = MTD_ONTRACK_FOCUS_KEY, prevLbl = MTD_ONTRACK_FOCUS_LABEL;
+  MTD_ONTRACK_FOCUS_KEY = fKey;
+  MTD_ONTRACK_FOCUS_LABEL = label;
+  var focusObj = getMTDOnTrackFocusedRows(activeRows);
+  MTD_ONTRACK_FOCUS_KEY = prevKey;
+  MTD_ONTRACK_FOCUS_LABEL = prevLbl;
+
+  var txt = buildMTDOnTrackWAText(focusObj.rows, label || focusObj.label, pm, MTD_ONTRACK_DAYS, MTD_ONTRACK_GOAL_PCT);
+  var ta = document.getElementById('mtd-ontrack-wa-textarea');
+  if (ta) ta.value = txt;
+  var md = document.getElementById('mtd-ontrack-wa-modal');
+  if (md) md.style.display = 'flex';
+}
+
+function closeMTDOnTrackWAModal() {
+  var md = document.getElementById('mtd-ontrack-wa-modal');
+  if (md) md.style.display = 'none';
+}
+
+function copyMTDOnTrackWAText() {
+  var ta = document.getElementById('mtd-ontrack-wa-textarea');
+  if (!ta) return;
+  ta.select();
+  navigator.clipboard.writeText(ta.value);
+  if (typeof mgrToast === 'function') mgrToast('✅ تم نسخ خطة الـ On-Track للواتساب!');
+}
+
+function sendMTDOnTrackWAViaApp() {
+  var ta = document.getElementById('mtd-ontrack-wa-textarea');
+  if (!ta) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(ta.value), '_blank');
+}
+
+// ── Styled Multi-Sheet ExcelJS Exporter for On-Track Recovery Plan (Respects Active MTD Filters) ──
+async function exportMTDOnTrackExcel(btn) {
+  if (!(await mtdInsAuth())) return;
+  var activeRows = (typeof MTD_FILTERED !== 'undefined' && Array.isArray(MTD_FILTERED)) ? MTD_FILTERED : ((typeof getMTDFiltered === 'function') ? getMTDFiltered() : []);
+  if (!activeRows.length) return;
+
+  var oldHTML = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Exporting...'; }
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    var pm = getMTDOnTrackPaceMeta(activeRows);
+    var K = MTD_ONTRACK_DAYS;
+    var goalPct = MTD_ONTRACK_GOAL_PCT;
+    var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+
+    var enriched = activeRows.map(function (r) {
+      var code = String(r.storeCode || '').trim().toUpperCase();
+      var h = (code && hierMap[code]) || {};
+      return {
+        raw: r,
+        code: code || r.store || '',
+        store: r.store || code || '—',
+        am: r.areaManager || h.am || 'Unassigned',
+        sv: r.supervisor || h.sv || 'Unassigned',
+        rm: r.regionalManager || h.rm || r.region || 'Unassigned'
+      };
+    });
+
+    // Helper to build a level sheet (Sheet 1: Summary & Horizons, Sheet 2: Regionals & Supers, Sheet 3: Area Managers, Sheet 4: Branches)
+    function buildLevelSheet(sheetName, modeType) {
+      var ws = wb.addWorksheet(sheetName);
+      ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
+      ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+      var wCols = [34, 14, 9];
+      MTD_ONTRACK_PRODUCTS.forEach(function () { wCols.push(11, 11, 10, 11, 12, 13); });
+      wCols.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+      var N = wCols.length, r = 1;
+
+      ovWriteMergedBanner(ws, r++, 1, N,
+        'FAKHARANY360 — MTD On-Track Recovery Plan (Return to ' + goalPct + '% Within ' + K + ' Days) · Day ' + pm.currentDay + ' of ' + pm.daysInMonth,
+        { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 }
+      );
+      r++;
+
+      var h1 = [
+        { t: 'Entity / Level Name', rs: 2, al: 'l' },
+        { t: 'Level', rs: 2 },
+        { t: 'Stores', rs: 2 }
+      ];
+      var h2 = [];
+      MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+        h1.push({ t: p.label + ' — On-Track in ' + K + ' Days', cs: 6, bg: p.color });
+        h2.push(
+          { t: 'Target', bg: '#4C1D95' },
+          { t: 'Actual', bg: '#4C1D95' },
+          { t: 'Proj %', bg: '#4C1D95' },
+          { t: 'Pace Deficit', bg: '#991B1B' },
+          { t: 'Normal/Day', bg: '#1E3A8A' },
+          { t: 'Req/Day (' + K + 'd)', bg: '#15803D' }
+        );
+      });
+      r = ovWriteTwoRowHeader(ws, r, h1, h2);
+
+      function writeRow(label, roleStr, rowsSub, kind, idx, indent) {
+        var kClr = ovRowKindColors(kind, idx);
+        var st = calcMTDOnTrackForRows(rowsSub, pm, K, goalPct);
+        var c = 1;
+        var c1 = ws.getCell(r, c++); c1.value = label; ovStyleCell(c1, { bg: kClr.bg, fg: kClr.fg, b: kClr.b, al: 'l', indent: indent || 1 });
+        var c2 = ws.getCell(r, c++); c2.value = roleStr; ovStyleCell(c2, { bg: kClr.bg, fg: kClr.fg, b: kClr.b });
+        var c3 = ws.getCell(r, c++); c3.value = st.storesCount; ovStyleCell(c3, { bg: kClr.bg, fg: kClr.fg, b: kClr.b, numFmt: '#,##0' });
+
+        MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+          var ps = st.products[p.key];
+          var cT = ws.getCell(r, c++); cT.value = Math.round(ps.tgt); ovStyleCell(cT, { bg: kClr.bg, fg: kClr.fg, b: false, numFmt: '#,##0' });
+          var cA = ws.getCell(r, c++); cA.value = Math.round(ps.act); ovStyleCell(cA, { bg: kClr.bg, fg: kClr.fg, b: true, numFmt: '#,##0' });
+          var cP = ws.getCell(r, c++); cP.value = ps.tgt > 0 ? (ps.projPct / 100) : null;
+          var tc = ovTierColors(ps.projPct / 100);
+          ovStyleCell(cP, { bg: kind === 'total' ? '#111827' : tc.bg, fg: kind === 'total' ? '#FFFFFF' : tc.fg, b: true, numFmt: '0.0%' });
+
+          var cD = ws.getCell(r, c++);
+          cD.value = ps.isOnTrack ? 0 : -Math.ceil(ps.deficitNow);
+          ovStyleCell(cD, { bg: kClr.bg, fg: ps.isOnTrack ? '#15803D' : '#DC2626', b: true, numFmt: '#,##0' });
+
+          var cN = ws.getCell(r, c++); cN.value = Math.ceil(ps.normalDaily);
+          ovStyleCell(cN, { bg: kClr.bg, fg: kClr.fg, b: false, numFmt: '#,##0' });
+
+          var cR = ws.getCell(r, c++); cR.value = Math.ceil(ps.reqPerDay);
+          ovStyleCell(cR, {
+            bg: kind === 'total' ? '#111827' : (ps.isOnTrack ? '#DCFCE7' : '#FEE2E2'),
+            fg: kind === 'total' ? '#86EFAC' : (ps.isOnTrack ? '#15803D' : '#991B1B'),
+            b: true,
+            numFmt: '#,##0'
+          });
+        });
+        ws.getRow(r).height = (kind === 'total' || kind === 'sv') ? 21 : 19;
+        r++;
+      }
+
+      var byRm = {};
+      enriched.forEach(function (x) { (byRm[x.rm] = byRm[x.rm] || []).push(x); });
+      Object.keys(byRm).sort().forEach(function (rm) {
+        var rmItems = byRm[rm];
+        writeRow('👔 ' + rm, 'Regional Mgr', rmItems.map(function (x) { return x.raw; }), 'total', 0, 1);
+        var bySv = {};
+        rmItems.forEach(function (x) { (bySv[x.sv] = bySv[x.sv] || []).push(x); });
+        Object.keys(bySv).sort().forEach(function (sv) {
+          var svItems = bySv[sv];
+          writeRow('🧑‍💼 ' + sv, 'Supervisor', svItems.map(function (x) { return x.raw; }), 'sv', 0, 1);
+          if (modeType === 'areas' || modeType === 'stores') {
+            var byAm = {};
+            svItems.forEach(function (x) { (byAm[x.am] = byAm[x.am] || []).push(x); });
+            Object.keys(byAm).sort().forEach(function (am, ai) {
+              var amItems = byAm[am];
+              writeRow('   📍 ' + am, 'Area Mgr', amItems.map(function (x) { return x.raw; }), 'am', ai, 2);
+              if (modeType === 'stores') {
+                amItems.forEach(function (stItem, si) {
+                  writeRow('      🏪 ' + stItem.store, 'Branch', [stItem.raw], 'store', si, 3);
+                });
+              }
+            });
+          }
+        });
+      });
+      writeRow('GRAND TOTAL (ACTIVE SCOPE)', 'Total', activeRows, 'total', 0, 0);
+    }
+
+    buildLevelSheet('1. Regionals & Supervisors', 'supers');
+    buildLevelSheet('2. Per Area Manager', 'areas');
+    buildLevelSheet('3. All Branches On-Track', 'stores');
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date(), stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_MTD_OnTrack_' + K + 'Days_' + stamp + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('✅ On-Track Recovery Excel exported!');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHTML; }
+  }
+}
+</script>
+
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     10. "FAKI فاكي" — GUIDED AI PERFORMANCE COACH ("الزيتونة" Edition v34)
+     • Hidden before login; compact corner welcome card on first login, minimizes on ✕
+     • Top Filters: [🔴 Live MTD | 📅 Full Year YTD] · [⚡ Activation | 🛒 Sales] · [1d..15d]
+     • Exact 4-Step Guided Flow:
+         1) Know Me (Role / Name / Branch)
+         2) Executive Summary + Egyptian-Arabic Verdict + 6 Clickable Product Cards ("عايز أساعدك في أنهي Product؟")
+         3) Product Deep-Dive + Smart Buttons ("مين موقعني؟" | "مين On Track؟" | "خطة الرجوع على كام يوم؟")
+         4) Cascaded Daily Action Plan (divided across Supervisors -> Area Mgrs -> Branches)
+            + Faki Smart AI Notes + Export (WhatsApp | Save PNG | Send Email)
+     ════════════════════════════════════════════════════════════════════════ -->
+<style>
+@keyframes fakiFloat34 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes fakiWave34 {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-16deg); }
+  60% { transform: rotate(8deg); }
+}
+@keyframes fakiMsgIn34 {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+#faki-fab-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 99985;
+  display: none;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255,255,255,0.45);
+  background: linear-gradient(135deg, #0f172a 0%, #5C2D91 58%, #e91e8c 100%);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(92,45,145,0.45);
+  animation: fakiFloat34 3.4s ease-in-out infinite;
+  font-family: 'Inter', 'Cairo', sans-serif;
+}
+#faki-welcome-popover {
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  z-index: 99986;
+  width: 345px;
+  max-width: calc(100vw - 24px);
+  display: none;
+  background: var(--card-bg);
+  border: 1.5px solid #c4b5fd;
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(15,23,42,0.38);
+  overflow: hidden;
+  font-family: 'Inter', 'Cairo', sans-serif;
+  animation: fakiMsgIn34 0.25s ease-out;
+}
+@media (max-width: 768px) {
+  #faki-fab-btn { bottom: 72px; right: 12px; }
+  #faki-welcome-popover { bottom: 132px; right: 12px; width: 320px; }
+  .faki-ws-grid { grid-template-columns: 1fr !important; }
+  .faki-char-panel { display: none !important; }
+}
+.faki-msg-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  animation: fakiMsgIn34 0.22s ease-out;
+}
+.faki-msg-row.user { justify-content: flex-end; }
+.faki-bubble-bot {
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 4px 16px 16px 16px;
+  padding: 13px 15px;
+  width: 100%;
+  box-shadow: 0 3px 12px rgba(15,23,42,0.05);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+.faki-bubble-user {
+  background: linear-gradient(135deg, #5C2D91, #7c3aed);
+  color: white;
+  border-radius: 16px 4px 16px 16px;
+  padding: 8px 14px;
+  max-width: 82%;
+  font-size: 12px;
+  font-weight: 700;
+}
+.faki-prod-pick-card {
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--gray-bg);
+  cursor: pointer;
+  transition: all 0.16s;
+  text-align: left;
+}
+.faki-prod-pick-card:hover {
+  border-color: #5C2D91;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 14px rgba(92,45,145,0.14);
+}
+.faki-action-pill {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #5C2D91;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.faki-action-pill:hover {
+  background: #5C2D91;
+  color: white;
+  border-color: #5C2D91;
+}
+</style>
+
+<!-- Corner Floating Button -->
+<button type="button" id="faki-fab-btn" onclick="openFakiAssistantModal()" title="FAKI — AI Performance Coach">
+  <div style="width:36px;height:46px;flex-shrink:0;margin-top:-3px" id="faki-fab-avatar"></div>
+  <div style="text-align:left;line-height:1.2" dir="ltr">
+    <div style="font-size:12px;font-weight:900">FAKI <span style="color:#fbbf24">AI</span></div>
+    <div style="font-size:9px;color:#e9d5ff;font-weight:700">Performance Coach</div>
+  </div>
+</button>
+
+<!-- Compact Post-Login Welcome Bubble -->
+<div id="faki-welcome-popover" dir="ltr">
+  <div style="background:linear-gradient(135deg,#0f172a,#3b1d63,#5C2D91);color:white;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:48px;height:62px;flex-shrink:0" id="faki-pop-avatar"></div>
+      <div>
+        <div style="font-size:13px;font-weight:900">👋 Hello! I am Faki (فاكي)</div>
+        <div style="font-size:10.5px;color:#e9d5ff;font-weight:700">صديقك الذكي في منصة Fakharany360</div>
+        <div style="font-size:10px;color:#fef08a;font-weight:700;margin-top:1px" dir="rtl">عرفني بنفسك وخليني أجبلك الزيتونة!</div>
+      </div>
+    </div>
+    <button type="button" onclick="minimizeFakiWelcomePopover()" title="Minimize" style="background:rgba(255,255,255,0.18);border:none;color:white;width:26px;height:26px;border-radius:50%;font-size:15px;cursor:pointer;line-height:26px;text-align:center">&times;</button>
+  </div>
+  <div style="padding:12px 14px;display:flex;flex-direction:column;gap:7px">
+    <button type="button" onclick="openFakiAssistantModal()" style="width:100%;padding:9px 12px;border-radius:10px;border:none;background:linear-gradient(135deg,#5C2D91,#7c3aed);color:white;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+      <i class="fas fa-comments"></i><span>عرفني بنفسك وابدأ التحليل</span>
+    </button>
+    <div style="display:flex;gap:6px">
+      <button type="button" onclick="FAKI_DATA_SCOPE='mtd';openFakiAssistantModal()" style="flex:1;padding:6px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:10.5px;font-weight:800;cursor:pointer">🔴 Live MTD</button>
+      <button type="button" onclick="FAKI_DATA_SCOPE='ytd';openFakiAssistantModal()" style="flex:1;padding:6px;border-radius:8px;border:1px solid #ddd6fe;background:#f5f3ff;color:#5C2D91;font-size:10.5px;font-weight:800;cursor:pointer">📅 Full Year YTD</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main Guided Faki Workspace Modal -->
+<div id="faki-modal-overlay" onclick="if(event.target===this)closeFakiAssistantModal()" style="display:none;position:fixed;inset:0;z-index:99995;background:rgba(15,23,42,0.74);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:12px" dir="ltr">
+  <div style="background:var(--gray-bg);border-radius:20px;max-width:1080px;width:100%;height:90vh;max-height:790px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 70px rgba(0,0,0,0.5);border:1.5px solid var(--border);font-family:'Inter','Cairo',sans-serif">
+    <!-- Top Control & Filter Bar (MTD / YTD + Activation / Sales) -->
+    <div style="background:linear-gradient(135deg,#0f172a,#3b1d63,#5C2D91);color:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:14px;font-weight:900">🤖 FAKI · <span style="color:#fbbf24">Performance Coach</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <!-- Scope Filter: Live MTD vs Full Year YTD -->
+        <div style="display:inline-flex;background:rgba(0,0,0,0.3);padding:2.5px;border-radius:10px;border:1px solid rgba(255,255,255,0.2)">
+          <button type="button" id="faki-scope-mtd-btn" onclick="setFakiDataScope('mtd')" style="padding:4px 10px;border-radius:7px;border:none;background:#dc2626;color:white;font-size:10.5px;font-weight:800;cursor:pointer">🔴 Live MTD</button>
+          <button type="button" id="faki-scope-ytd-btn" onclick="setFakiDataScope('ytd')" style="padding:4px 10px;border-radius:7px;border:none;background:transparent;color:white;font-size:10.5px;font-weight:800;cursor:pointer">📅 Full Year YTD</button>
+        </div>
+        <!-- Data Mode Filter: Activation vs Sales -->
+        <div style="display:inline-flex;background:rgba(0,0,0,0.3);padding:2.5px;border-radius:10px;border:1px solid rgba(255,255,255,0.2)">
+          <button type="button" id="faki-mode-act-btn" onclick="setFakiDataMode('activation')" style="padding:4px 10px;border-radius:7px;border:none;background:#f5a623;color:#111827;font-size:10.5px;font-weight:900;cursor:pointer">⚡ Activation</button>
+          <button type="button" id="faki-mode-sales-btn" onclick="setFakiDataMode('sales')" style="padding:4px 10px;border-radius:7px;border:none;background:transparent;color:white;font-size:10.5px;font-weight:800;cursor:pointer">🛒 Sales</button>
+        </div>
+        <button type="button" onclick="resetFakiConversation()" title="Switch Person / New Chat" style="padding:4px 10px;border-radius:9px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-redo mr-1"></i>New Chat</button>
+        <button type="button" onclick="closeFakiAssistantModal()" style="background:rgba(255,255,255,0.16);border:none;color:white;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer">&times;</button>
+      </div>
+    </div>
+
+    <!-- Split Workspace: Left Standing Robot + Profile | Right Guided Chat Stream -->
+    <div class="faki-ws-grid" style="display:grid;grid-template-columns:255px 1fr;flex:1;min-height:0;overflow:hidden">
+      <!-- Left Panel -->
+      <div class="faki-char-panel" style="background:linear-gradient(180deg,#1e1b4b 0%,#0f172a 100%);color:white;padding:16px 14px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;border-right:1px solid rgba(255,255,255,0.1);overflow-y:auto">
+        <div style="text-align:center;width:100%">
+          <div id="faki-stage-avatar" style="margin:4px auto 6px;display:flex;justify-content:center;animation:fakiFloat34 3.2s ease-in-out infinite"></div>
+          <div id="faki-state-pill" style="display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:999px;background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.4);color:#7dd3fc;font-size:10px;font-weight:800">● Ready</div>
+        </div>
+        <div id="faki-profile-card" style="width:100%;margin-top:12px"></div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;min-height:0;background:var(--gray-bg)">
+        <div id="faki-chat-stream" style="flex:1;overflow-y:auto;padding:16px 18px"></div>
+        <div style="background:var(--card-bg);border-top:1.5px solid var(--border);padding:9px 14px;flex-shrink:0">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="faki-chat-input" onkeydown="if(event.key==='Enter')sendFakiUserMessage()" placeholder="Ask Faki anything (e.g. Top branches in Mobile, Critical stores, Compare Supervisors)..." style="flex:1;padding:8px 12px;border-radius:11px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:12px;font-weight:600;outline:none"/>
+            <button type="button" onclick="sendFakiUserMessage()" style="padding:8px 15px;border-radius:11px;border:none;background:linear-gradient(135deg,#5C2D91,#7c3aed);color:white;font-size:12px;font-weight:800;cursor:pointer"><i class="fas fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+//  "FAKI فاكي" — GUIDED "الزيتونة" PERFORMANCE COACH ENGINE (v34)
+// ════════════════════════════════════════════════════════════════════════════
+var FAKI_DATA_SCOPE = 'mtd';          // 'mtd' | 'ytd'
+var FAKI_DATA_MODE  = 'activation';   // 'activation' | 'sales'
+var FAKI_SELECTED_IDENTITY = null;
+var FAKI_SELECTED_PRODUCT  = 'mobile';
+var FAKI_HORIZON_DAYS = 5;
+var FAKI_ROBOT_STATE = 'welcome';
+var FAKI_MESSAGES = [];
+var FAKI_CHART_INSTANCES = [];
+var FAKI_WELCOME_SHOWN_SESSION = false;
+var FAKI_ONBOARD_ROLE = 'all';
+var FAKI_ONBOARD_QUERY = '';
+var FAKI_LAST_PLAN_DATA = null;
+
+function getFakiRobotSVG(heightPx, state) {
+  var h = heightPx || 120;
+  var w = Math.round(h * 0.78);
+  var st = state || 'welcome';
+  var eyeClr = st === 'thinking' ? '#fbbf24' : (st === 'analyzing' ? '#c084fc' : (st === 'success' ? '#4ade80' : '#38bdf8'));
+  var mouthPath = st === 'thinking'
+    ? '<line x1="60" y1="53" x2="80" y2="53" stroke="#fbbf24" stroke-width="2.8" stroke-linecap="round"/>'
+    : '<path d="M 59 50 Q 70 58 81 50" stroke="#4ade80" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  var uid = 'fk34_' + Math.floor(Math.random() * 100000);
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 140 185" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">' +
+    '<defs>' +
+      '<radialGradient id="prl_' + uid + '" cx="35%" cy="25%" r="75%"><stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#e2e8f0"/><stop offset="100%" stop-color="#94a3b8"/></radialGradient>' +
+      '<linearGradient id="arm_' + uid + '" x1="20" y1="20" x2="120" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7c3aed"/><stop offset="55%" stop-color="#5C2D91"/><stop offset="100%" stop-color="#1e1b4b"/></linearGradient>' +
+      '<linearGradient id="gld_' + uid + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f5a623"/><stop offset="100%" stop-color="#e91e8c"/></linearGradient>' +
+    '</defs>' +
+    '<ellipse cx="70" cy="176" rx="36" ry="6" fill="rgba(92,45,145,0.45)"/>' +
+    '<ellipse cx="70" cy="176" rx="22" ry="3.5" fill="' + eyeClr + '" opacity="0.45"/>' +
+    '<rect x="49" y="135" width="14" height="27" rx="6" fill="url(#prl_' + uid + ')" stroke="#64748b" stroke-width="1.4"/>' +
+    '<rect x="77" y="135" width="14" height="27" rx="6" fill="url(#prl_' + uid + ')" stroke="#64748b" stroke-width="1.4"/>' +
+    '<circle cx="56" cy="148" r="3" fill="' + eyeClr + '"/><circle cx="84" cy="148" r="3" fill="' + eyeClr + '"/>' +
+    '<path d="M 43 158 C 43 153 65 153 65 158 L 67 170 L 41 170 Z" fill="url(#arm_' + uid + ')" stroke="#e2e8f0" stroke-width="1.4"/>' +
+    '<path d="M 75 158 C 75 153 97 153 97 158 L 99 170 L 73 170 Z" fill="url(#arm_' + uid + ')" stroke="#e2e8f0" stroke-width="1.4"/>' +
+    '<g style="transform-origin:33px 86px;animation:fakiWave34 2.8s ease-in-out infinite">' +
+      '<circle cx="33" cy="86" r="8" fill="url(#gld_' + uid + ')" stroke="#ffffff" stroke-width="1.4"/>' +
+      '<path d="M 28 84 Q 12 70 15 52" stroke="url(#prl_' + uid + ')" stroke-width="11" stroke-linecap="round" fill="none"/>' +
+      '<circle cx="15" cy="49" r="6.5" fill="url(#arm_' + uid + ')" stroke="' + eyeClr + '" stroke-width="1.8"/>' +
+    '</g>' +
+    '<circle cx="107" cy="86" r="8" fill="url(#gld_' + uid + ')" stroke="#ffffff" stroke-width="1.4"/>' +
+    '<path d="M 111 88 Q 124 104 118 122" stroke="url(#prl_' + uid + ')" stroke-width="11" stroke-linecap="round" fill="none"/>' +
+    '<circle cx="117" cy="125" r="6.5" fill="url(#arm_' + uid + ')" stroke="' + eyeClr + '" stroke-width="1.8"/>' +
+    '<rect x="35" y="74" width="70" height="58" rx="19" fill="url(#prl_' + uid + ')" stroke="#cbd5e1" stroke-width="1.8"/>' +
+    '<rect x="42" y="81" width="56" height="43" rx="12" fill="url(#arm_' + uid + ')" stroke="' + eyeClr + '" stroke-width="1.6"/>' +
+    '<rect x="47" y="86" width="46" height="22" rx="7" fill="#0f172a" stroke="#f5a623" stroke-width="1.4"/>' +
+    '<text x="70" y="101" text-anchor="middle" font-size="13.5" font-weight="900" fill="#fbbf24" letter-spacing="1.2" font-family="Inter,Arial,sans-serif">FAKI</text>' +
+    '<rect x="50" y="113" width="11" height="4" rx="2" fill="' + eyeClr + '"/><rect x="64.5" y="113" width="11" height="4" rx="2" fill="#4ade80"/><rect x="79" y="113" width="11" height="4" rx="2" fill="#e91e8c"/>' +
+    '<line x1="70" y1="8" x2="70" y2="19" stroke="#f5a623" stroke-width="3.5" stroke-linecap="round"/>' +
+    '<circle cx="70" cy="6" r="5" fill="' + eyeClr + '" stroke="#fef08a" stroke-width="1.8"/>' +
+    '<rect x="27" y="34" width="7" height="19" rx="3.5" fill="url(#gld_' + uid + ')"/><rect x="106" y="34" width="7" height="19" rx="3.5" fill="url(#gld_' + uid + ')"/>' +
+    '<rect x="33" y="17" width="74" height="51" rx="22" fill="url(#prl_' + uid + ')" stroke="#ffffff" stroke-width="2"/>' +
+    '<rect x="41" y="27" width="58" height="33" rx="14" fill="#0f172a" stroke="' + eyeClr + '" stroke-width="1.6"/>' +
+    '<circle cx="56" cy="41" r="6" fill="' + eyeClr + '"/><circle cx="54" cy="39" r="2" fill="#ffffff"/>' +
+    '<circle cx="84" cy="41" r="6" fill="' + eyeClr + '"/><circle cx="82" cy="39" r="2" fill="#ffffff"/>' +
+    mouthPath +
+  '</svg>';
+}
+
+function setFakiRobotState(st) {
+  FAKI_ROBOT_STATE = st || 'welcome';
+  var stage = document.getElementById('faki-stage-avatar');
+  var pill  = document.getElementById('faki-state-pill');
+  if (stage) stage.innerHTML = getFakiRobotSVG(132, FAKI_ROBOT_STATE);
+  if (pill) {
+    var map = {
+      welcome:   { txt: '● Ready to Help', bg: 'rgba(56,189,248,0.18)', clr: '#7dd3fc' },
+      thinking:  { txt: '◌ Thinking...', bg: 'rgba(251,191,36,0.2)', clr: '#fde047' },
+      analyzing: { txt: '◈ Analyzing...', bg: 'rgba(192,132,252,0.2)', clr: '#e9d5ff' },
+      success:   { txt: '✓ Plan Ready', bg: 'rgba(74,222,128,0.2)', clr: '#86efac' }
+    };
+    var cfg = map[FAKI_ROBOT_STATE] || map.welcome;
+    pill.textContent = cfg.txt;
+    pill.style.background = cfg.bg;
+    pill.style.color = cfg.clr;
+  }
+}
+
+function isUserLoggedInForFaki() {
+  var loginSc = document.getElementById('login-screen');
+  if (!loginSc) return true;
+  if (loginSc.style.display === 'none' || loginSc.classList.contains('hidden')) return true;
+  var comp = window.getComputedStyle ? window.getComputedStyle(loginSc) : null;
+  return comp ? (comp.display === 'none' || comp.visibility === 'hidden') : false;
+}
+
+function syncFakiVisibilityWithAuth() {
+  var fab = document.getElementById('faki-fab-btn');
+  var pop = document.getElementById('faki-welcome-popover');
+  var ov  = document.getElementById('faki-modal-overlay');
+  var fabAv = document.getElementById('faki-fab-avatar');
+  var popAv = document.getElementById('faki-pop-avatar');
+  if (fabAv && !fabAv.innerHTML) fabAv.innerHTML = getFakiRobotSVG(44, 'welcome');
+  if (popAv && !popAv.innerHTML) popAv.innerHTML = getFakiRobotSVG(60, 'welcome');
+
+  var loggedIn = isUserLoggedInForFaki() && Array.isArray(RAW_DATA) && RAW_DATA.length > 0;
+  if (!loggedIn) {
+    if (fab) fab.style.display = 'none';
+    if (pop) pop.style.display = 'none';
+    if (ov)  ov.style.display  = 'none';
+    return;
+  }
+  if (fab) fab.style.display = 'flex';
+  if (!FAKI_WELCOME_SHOWN_SESSION) {
+    FAKI_WELCOME_SHOWN_SESSION = true;
+    if (pop) pop.style.display = 'block';
+  }
+}
+
+function minimizeFakiWelcomePopover() {
+  var pop = document.getElementById('faki-welcome-popover');
+  if (pop) pop.style.display = 'none';
+}
+
+function openFakiAssistantModal() {
+  var pop = document.getElementById('faki-welcome-popover');
+  if (pop) pop.style.display = 'none';
+  if (FAKI_DATA_SCOPE === 'mtd' && (!Array.isArray(MTD_DATA) || !MTD_DATA.length)) FAKI_DATA_SCOPE = 'ytd';
+  var ov = document.getElementById('faki-modal-overlay');
+  if (ov) ov.style.display = 'flex';
+  if (!FAKI_MESSAGES.length) initFakiWelcomeConversation();
+  renderFakiWorkspace();
+}
+
+function closeFakiAssistantModal() {
+  var ov = document.getElementById('faki-modal-overlay');
+  if (ov) ov.style.display = 'none';
+}
+
+function setFakiDataScope(scope) {
+  FAKI_DATA_SCOPE = (scope === 'ytd') ? 'ytd' : 'mtd';
+  if (FAKI_SELECTED_IDENTITY) {
+    FAKI_MESSAGES = [{ sender: 'user', text: FAKI_SELECTED_IDENTITY.label + ' (' + FAKI_SELECTED_IDENTITY.roleLabel + ')' }];
+    pushFakiSummaryAndProducts(FAKI_SELECTED_IDENTITY);
+  } else {
+    renderFakiWorkspace();
+  }
+}
+
+function setFakiDataMode(mode) {
+  FAKI_DATA_MODE = (mode === 'sales') ? 'sales' : 'activation';
+  if (FAKI_SELECTED_IDENTITY) {
+    FAKI_MESSAGES = [{ sender: 'user', text: FAKI_SELECTED_IDENTITY.label + ' (' + FAKI_SELECTED_IDENTITY.roleLabel + ')' }];
+    pushFakiSummaryAndProducts(FAKI_SELECTED_IDENTITY);
+  } else {
+    renderFakiWorkspace();
+  }
+}
+
+function resetFakiConversation() {
+  FAKI_SELECTED_IDENTITY = null;
+  FAKI_MESSAGES = [];
+  initFakiWelcomeConversation();
+  renderFakiWorkspace();
+}
+
+function getFakiActiveDatasets() {
+  var rawAll = Array.isArray(RAW_DATA) ? RAW_DATA : [];
+  // Apply Activation vs Sales on RAW_DATA safely (without mutating global RAW_DATA)
+  var ytdRows = rawAll.map(function (r) {
+    if (FAKI_DATA_MODE === 'sales' && r._salesMobile !== undefined) {
+      return Object.assign({}, r, {
+        mobileSubs: r._salesMobile,
+        fixedSubs: r._salesFixed !== undefined ? r._salesFixed : r.fixedSubs,
+        fbbSubs: r._salesFbb !== undefined ? r._salesFbb : r.fbbSubs
+      });
+    }
+    if (FAKI_DATA_MODE === 'activation' && r._actMobile !== undefined) {
+      return Object.assign({}, r, {
+        mobileSubs: r._actMobile,
+        fixedSubs: r._actFixed !== undefined ? r._actFixed : r.fixedSubs,
+        fbbSubs: r._actFbb !== undefined ? r._actFbb : r.fbbSubs
+      });
+    }
+    return r;
+  });
+  var mtdRows = (FAKI_DATA_MODE === 'sales' && Array.isArray(MTD_SALES_DATA) && MTD_SALES_DATA.length) ? MTD_SALES_DATA : (Array.isArray(MTD_DATA) ? MTD_DATA : []);
+  return { ytdAll: ytdRows, mtdAll: mtdRows };
+}
+
+function buildFakiDirectory() {
+  var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+  var ds = getFakiActiveDatasets();
+  var allRows = ds.ytdAll.concat(ds.mtdAll);
+
+  var rmMap = {}, svMap = {}, amMap = {}, stMap = {}, smMap = {};
+  allRows.forEach(function (r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    var stName = r.store || code || '';
+    var stKey = code || stName;
+    var am = r.areaManager || h.am || '';
+    var sv = r.supervisor || h.sv || '';
+    var rm = r.regionalManager || h.rm || '';
+
+    if (rm && rm !== 'Unassigned') {
+      if (!rmMap[rm]) rmMap[rm] = { type: 'rm', key: rm, label: rm, roleLabel: 'Regional Manager', roleIcon: '👔', stores: new Set(), sub: getFriendlyRegionLabel(rm, r.region || h.region || '') };
+      if (stKey) rmMap[rm].stores.add(stKey);
+    }
+    if (sv && sv !== 'Unassigned') {
+      if (!svMap[sv]) svMap[sv] = { type: 'sv', key: sv, label: sv, roleLabel: 'Supervisor', roleIcon: '🧑‍💼', stores: new Set(), sub: rm || '' };
+      if (stKey) svMap[sv].stores.add(stKey);
+    }
+    if (am && am !== 'Unassigned') {
+      if (!amMap[am]) amMap[am] = { type: 'am', key: am, label: am, roleLabel: 'Area Manager', roleIcon: '📍', stores: new Set(), sub: sv ? ('Sup: ' + sv) : (rm || '') };
+      if (stKey) amMap[am].stores.add(stKey);
+    }
+    if (stKey && stName) {
+      if (!stMap[stKey]) stMap[stKey] = { type: 'store', key: stKey, label: stName, code: code, roleLabel: 'Branch', roleIcon: '🏪', stores: new Set([stKey]), sub: (am ? 'AM: ' + am : '') + (code ? ' [' + code + ']' : '') };
+    }
+  });
+
+  try {
+    var mgrModel = (typeof MGR_LAST_MODEL !== 'undefined' && MGR_LAST_MODEL) ? MGR_LAST_MODEL : (typeof buildManagersModel === 'function' ? buildManagersModel() : null);
+    if (mgrModel && Array.isArray(mgrModel.byManager)) {
+      mgrModel.byManager.forEach(function (m) {
+        if (!m || !m.label || m.label === 'Unassigned') return;
+        smMap[m.key] = {
+          type: 'sm', key: m.key, label: m.label, oracleId: m.oracleId || '',
+          roleLabel: 'Store Manager', roleIcon: '👨‍💼', stores: new Set(m.uniqueBranchNames || []),
+          sub: (m.uniqueBranchNames || []).join(' ➔ '), mgrObj: m
+        };
+      });
+    }
+  } catch (e) {}
+
+  return [].concat(Object.values(rmMap)).concat(Object.values(svMap)).concat(Object.values(amMap)).concat(Object.values(smMap)).concat(Object.values(stMap));
+}
+
+function getFakiEntityRows(ident) {
+  var hierMap = (typeof getFastHierMap === 'function') ? getFastHierMap() : {};
+  var ds = getFakiActiveDatasets();
+  var smCodes = new Set(), smNames = new Set();
+  if (ident.type === 'sm' && ident.mgrObj) {
+    (ident.mgrObj.rows || []).forEach(function (r) {
+      if (r.storeCode) smCodes.add(String(r.storeCode).trim().toUpperCase());
+      if (r.store) smNames.add(String(r.store).trim());
+    });
+  }
+  function matchRow(r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    var st = String(r.store || '').trim();
+    var am = r.areaManager || h.am || '';
+    var sv = r.supervisor || h.sv || '';
+    var rm = r.regionalManager || h.rm || '';
+    if (ident.type === 'rm') return rm === ident.key;
+    if (ident.type === 'sv') return sv === ident.key;
+    if (ident.type === 'am') return am === ident.key;
+    if (ident.type === 'store') return (code === ident.key || st === ident.key || st === ident.label);
+    if (ident.type === 'sm') return (code && smCodes.has(code)) || (st && smNames.has(st));
+    return true;
+  }
+  var ytdRows = ds.ytdAll.filter(matchRow);
+  var mtdRows = ds.mtdAll.filter(matchRow);
+  if (!mtdRows.length && ident.type === 'sm' && ident.mgrObj && ident.mgrObj.monthEntries && ident.mgrObj.monthEntries.length) {
+    var lastEntry = ident.mgrObj.monthEntries[ident.mgrObj.monthEntries.length - 1];
+    var lastSample = (lastEntry && lastEntry.agg && lastEntry.agg.sample) || {};
+    var lastCode = String(lastSample.storeCode || '').trim().toUpperCase();
+    if (lastCode) mtdRows = ds.mtdAll.filter(function (r) { return String(r.storeCode || '').trim().toUpperCase() === lastCode; });
+  }
+  var isMtd = (FAKI_DATA_SCOPE === 'mtd' && mtdRows.length > 0);
+  var activeRows = isMtd ? mtdRows : ytdRows;
+  return { ytdRows: ytdRows, mtdRows: mtdRows, activeRows: activeRows, isMtd: isMtd, hierMap: hierMap };
+}
+
+function calcFakiProdMetricsForRows(rows, prodKey, isMtd, pm, K) {
+  var pDef = MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === prodKey; }) || MTD_ONTRACK_PRODUCTS[0];
+  if (isMtd) {
+    var calc = calcMTDOnTrackForRows(rows, pm, K, 100);
+    var mp = calc.products[prodKey];
+    return {
+      key: prodKey, label: pDef.label, color: pDef.color, icon: pDef.icon,
+      tgt: mp.tgt, act: mp.act, proj: mp.proj,
+      achPct: mp.achPct, projPct: mp.projPct,
+      gap: mp.isOnTrack ? mp.surplusNow : -mp.deficitNow,
+      deficitNow: mp.deficitNow,
+      reqPerDay: mp.reqPerDay, normalDaily: mp.normalDaily, catchUpPerDay: mp.catchUpPerDay,
+      isOnTrack: mp.isOnTrack
+    };
+  } else {
+    var yp = PRODUCTS.find(function (x) { return x.key === prodKey; }) || pDef;
+    var t = sum(rows, yp.tKey), a = sum(rows, yp.aKey);
+    var pct = t > 0 ? (a / t * 100) : 0;
+    var rem = Math.max(0, t - a);
+    return {
+      key: prodKey, label: pDef.label, color: pDef.color, icon: pDef.icon,
+      tgt: t, act: a, proj: a,
+      achPct: pct, projPct: pct,
+      gap: a - t, deficitNow: rem,
+      reqPerDay: Math.ceil(rem / K), normalDaily: Math.ceil(t / 30), catchUpPerDay: Math.ceil(rem / K),
+      isOnTrack: pct >= 100
+    };
+  }
+}
+
+// ── STEP 1: ONBOARDING ──
+function initFakiWelcomeConversation() {
+  FAKI_MESSAGES = [{ sender: 'faki', type: 'onboarding' }];
+  setFakiRobotState('welcome');
+}
+
+function selectFakiOnboardIdentity(idx) {
+  var list = window._FAKI_ONBOARD_LIST || [];
+  var ident = list[idx];
+  if (!ident) return;
+  FAKI_SELECTED_IDENTITY = ident;
+  FAKI_MESSAGES.push({ sender: 'user', text: ident.label + ' (' + ident.roleLabel + ')' });
+  pushFakiSummaryAndProducts(ident);
+}
+
+// ── STEP 2: EXECUTIVE SUMMARY + EGYPTIAN ARABIC VERDICT + 6 PRODUCT CARDS ──
+function pushFakiSummaryAndProducts(ident) {
+  setFakiRobotState('analyzing');
+  var rData = getFakiEntityRows(ident);
+  var pm = getMTDOnTrackPaceMeta(rData.activeRows);
+  var prods = MTD_ONTRACK_PRODUCTS.map(function (p) {
+    return calcFakiProdMetricsForRows(rData.activeRows, p.key, rData.isMtd, pm, FAKI_HORIZON_DAYS);
+  });
+  var mob = prods[0];
+  var stCount = new Set(rData.activeRows.map(function (r) { return r.storeCode || r.store; })).size || 1;
+  var scopeTxt = (rData.isMtd ? ('Live MTD · Day ' + pm.currentDay + '/' + pm.daysInMonth) : 'Full Year YTD') + ' · ' + (FAKI_DATA_MODE === 'sales' ? 'Sales' : 'Activation');
+
+  // Egyptian Arabic Punchy Coaching Line
+  var verdictAr = '';
+  if (mob.projPct >= 100) {
+    verdictAr = 'الله ينور عليك! أنت مكسر الدنيا ' + (rData.isMtd ? 'الشهر ده' : 'السنة دي') + ' 🔥 ومحقق في الـ Mobile نسبة <b>' + mob.projPct.toFixed(1) + '%</b>. خلينا نشوف لو في منتج محتاج زقة بسيطة.';
+  } else if (mob.projPct >= 90) {
+    verdictAr = 'أوبااا! أنت قريب جداً من الـ 100% 💪 واقف عند <b>' + mob.projPct.toFixed(1) + '%</b> (عجز ' + fmtN(Math.round(Math.abs(mob.gap))) + ')؛ زقة صغيرة في كام فرع وهتقفل التارجت بالزيادة!';
+  } else {
+    verdictAr = 'أوبااا! أنت ماشي وحش أوي ومحتاج ترجع بسرعة 🚨 واقف عند <b>' + mob.projPct.toFixed(1) + '%</b> ومعجز على <b>' + fmtN(Math.round(Math.abs(mob.gap))) + '</b> خط — اختار المنتج اللي عايزني أجبلك الزيتونة فيه ونطلع بخطة رجوع فورية!';
+  }
+
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'summary_products',
+    ident: ident,
+    scopeTxt: scopeTxt,
+    stCount: stCount,
+    verdictAr: verdictAr,
+    prods: prods
+  });
+  setFakiRobotState('success');
+  renderFakiWorkspace();
+}
+
+// ── STEP 3: PRODUCT DEEP DIVE + SMART ACTION CHOICES ──
+function onFakiSelectProduct(prodKey) {
+  if (!FAKI_SELECTED_IDENTITY) return;
+  FAKI_SELECTED_PRODUCT = prodKey || 'mobile';
+  var pLabel = prodKey === 'all' ? 'All Products (كله)' : (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === prodKey; }) || { label: 'Mobile' }).label;
+  FAKI_MESSAGES.push({ sender: 'user', text: 'ساعدني في: ' + pLabel });
+
+  var rData = getFakiEntityRows(FAKI_SELECTED_IDENTITY);
+  var pm = getMTDOnTrackPaceMeta(rData.activeRows);
+  var metrics = prodKey === 'all'
+    ? MTD_ONTRACK_PRODUCTS.map(function (p) { return calcFakiProdMetricsForRows(rData.activeRows, p.key, rData.isMtd, pm, FAKI_HORIZON_DAYS); })
+    : [calcFakiProdMetricsForRows(rData.activeRows, prodKey, rData.isMtd, pm, FAKI_HORIZON_DAYS)];
+
+  var subLabel = FAKI_SELECTED_IDENTITY.type === 'rm' ? 'Supervisors & Area Mgrs' : (FAKI_SELECTED_IDENTITY.type === 'sv' ? 'Area Managers & Branches' : 'Branches');
+
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'product_deepdive',
+    prodKey: prodKey,
+    pLabel: pLabel,
+    isMtd: rData.isMtd,
+    pm: pm,
+    metrics: metrics,
+    subLabel: subLabel,
+    isSingleStore: (FAKI_SELECTED_IDENTITY.type === 'store' || FAKI_SELECTED_IDENTITY.type === 'sm')
+  });
+  renderFakiWorkspace();
+}
+
+// ── STEP 3B: "مين موقعني؟" OR "مين On Track؟" ──
+function pushFakiSubBreakdown(prodKey, showLaggingOnly) {
+  if (!FAKI_SELECTED_IDENTITY) return;
+  var pKey = (prodKey && prodKey !== 'all') ? prodKey : 'mobile';
+  var pLabel = (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
+  FAKI_MESSAGES.push({ sender: 'user', text: showLaggingOnly ? ('مين موقعني في ' + pLabel + '؟') : ('مين On Track في ' + pLabel + '؟') });
+
+  var rData = getFakiEntityRows(FAKI_SELECTED_IDENTITY);
+  var pm = getMTDOnTrackPaceMeta(rData.activeRows);
+  var hierMap = rData.hierMap;
+  var ident = FAKI_SELECTED_IDENTITY;
+
+  // Smart Role-Aware Grouping:
+  // If Regional -> group by Area Manager (and Supervisor); If Supervisor -> group by Area Manager + Branches; If Area Mgr -> group by Branch
+  var amGroups = {}, stGroups = {};
+  rData.activeRows.forEach(function (r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    var am = r.areaManager || h.am || 'Unassigned';
+    var sv = r.supervisor || h.sv || 'Unassigned';
+    var st = r.store || code || '—';
+    var stKey = code || st;
+    if (!amGroups[am]) amGroups[am] = { name: am, sub: sv, rows: [] };
+    amGroups[am].rows.push(r);
+    if (!stGroups[stKey]) stGroups[stKey] = { name: st, sub: am, rows: [] };
+    stGroups[stKey].rows.push(r);
+  });
+
+  function mapStats(grpMap) {
+    return Object.values(grpMap).map(function (g) {
+      var m = calcFakiProdMetricsForRows(g.rows, pKey, rData.isMtd, pm, FAKI_HORIZON_DAYS);
+      return Object.assign({ name: g.name, sub: g.sub }, m);
+    }).filter(function (x) {
+      return showLaggingOnly ? !x.isOnTrack : x.isOnTrack;
+    }).sort(function (a, b) {
+      return showLaggingOnly ? (a.gap - b.gap) : (b.projPct - a.projPct);
+    });
+  }
+
+  var amList = (ident.type === 'rm' || ident.type === 'sv') ? mapStats(amGroups) : [];
+  var stList = mapStats(stGroups);
+
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'sub_breakdown',
+    pKey: pKey,
+    pLabel: pLabel,
+    showLaggingOnly: showLaggingOnly,
+    amList: amList,
+    stList: stList.slice(0, 12)
+  });
+  renderFakiWorkspace();
+}
+
+// ── STEP 4A: ASK "تحب نحط خطة الرجوع على كام يوم؟" ──
+function pushFakiAskHorizon(prodKey) {
+  FAKI_SELECTED_PRODUCT = prodKey || FAKI_SELECTED_PRODUCT || 'mobile';
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'ask_horizon',
+    prodKey: FAKI_SELECTED_PRODUCT
+  });
+  renderFakiWorkspace();
+}
+
+// ── STEP 4B: GENERATE CASCADED DAILY RECOVERY PLAN + SMART AI NOTES + EXPORT ──
+function generateFakiCascadedPlan(days, prodKey) {
+  if (!FAKI_SELECTED_IDENTITY) return;
+  FAKI_HORIZON_DAYS = Number(days) || 5;
+  var pKey = prodKey || FAKI_SELECTED_PRODUCT || 'mobile';
+  var pLabel = pKey === 'all' ? 'All Products' : (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
+
+  FAKI_MESSAGES.push({ sender: 'user', text: 'اعمل خطة الرجوع في ' + pLabel + ' على ' + FAKI_HORIZON_DAYS + ' أيام' });
+  setFakiRobotState('analyzing');
+
+  var rData = getFakiEntityRows(FAKI_SELECTED_IDENTITY);
+  var pm = getMTDOnTrackPaceMeta(rData.activeRows);
+  var hierMap = rData.hierMap;
+  var ident = FAKI_SELECTED_IDENTITY;
+  var K = FAKI_HORIZON_DAYS;
+
+  var focusProd = (pKey === 'all') ? 'mobile' : pKey;
+  var totalMetrics = calcFakiProdMetricsForRows(rData.activeRows, focusProd, rData.isMtd, pm, K);
+  var allProdMetrics = MTD_ONTRACK_PRODUCTS.map(function (p) { return calcFakiProdMetricsForRows(rData.activeRows, p.key, rData.isMtd, pm, K); });
+
+  // Build Cascaded Hierarchy Breakdown (Supervisor -> Area Manager -> Branches)
+  var tree = {};
+  rData.activeRows.forEach(function (r) {
+    var code = String(r.storeCode || '').trim().toUpperCase();
+    var h = (code && hierMap[code]) || {};
+    var sv = r.supervisor || h.sv || 'Unassigned';
+    var am = r.areaManager || h.am || 'Unassigned';
+    var st = r.store || code || '—';
+    var stKey = code || st;
+    if (!tree[sv]) tree[sv] = { name: sv, rows: [], ams: {} };
+    tree[sv].rows.push(r);
+    if (!tree[sv].ams[am]) tree[sv].ams[am] = { name: am, rows: [], stores: {} };
+    tree[sv].ams[am].rows.push(r);
+    if (!tree[sv].ams[am].stores[stKey]) tree[sv].ams[am].stores[stKey] = { name: st, rows: [] };
+    tree[sv].ams[am].stores[stKey].rows.push(r);
+  });
+
+  var cascadedList = [];
+  var branchFlat = [];
+  Object.values(tree).forEach(function (svObj) {
+    var svM = calcFakiProdMetricsForRows(svObj.rows, focusProd, rData.isMtd, pm, K);
+    var amArr = [];
+    Object.values(svObj.ams).forEach(function (amObj) {
+      var amM = calcFakiProdMetricsForRows(amObj.rows, focusProd, rData.isMtd, pm, K);
+      var stArr = Object.values(amObj.stores).map(function (stObj) {
+        var stM = calcFakiProdMetricsForRows(stObj.rows, focusProd, rData.isMtd, pm, K);
+        var obj = Object.assign({ name: stObj.name, am: amObj.name }, stM);
+        branchFlat.push(obj);
+        return obj;
+      }).sort(function (a, b) { return a.projPct - b.projPct; });
+      amArr.push(Object.assign({ name: amObj.name, stores: stArr }, amM));
+    });
+    amArr.sort(function (a, b) { return a.projPct - b.projPct; });
+    cascadedList.push(Object.assign({ name: svObj.name, ams: amArr }, svM));
+  });
+
+  // Smart Faki AI Notes (Egyptian Arabic + English KPIs)
+  var laggingSt = branchFlat.filter(function (b) { return !b.isOnTrack; }).sort(function (a, b) { return a.gap - b.gap; });
+  var highOppSt = branchFlat.filter(function (b) { return b.projPct >= 92 && b.projPct < 105; }).sort(function (a, b) { return b.tgt - a.tgt; });
+  var smartNotes = [];
+  if (laggingSt.length) {
+    var top2Lag = laggingSt.slice(0, 2).map(function (b) { return '<b>' + mgrEsc(b.name) + '</b> (' + b.projPct.toFixed(0) + '% · مطلوب ' + fmtN(Math.ceil(b.reqPerDay)) + '/يوم)'; }).join(' و');
+    smartNotes.push('🎯 <b>أولوية الإنقاذ:</b> ركّز متابعتك اليومية على ' + top2Lag + ' لأنهم شايلين الجزء الأكبر من العجز.');
+  }
+  if (highOppSt.length) {
+    smartNotes.push('⚡ <b>فرصة سريعة (Quick Win):</b> فرع <b>' + mgrEsc(highOppSt[0].name) + '</b> قريب من الـ 100% (' + highOppSt[0].projPct.toFixed(0) + '%) وعنده فرصة يكسر التارجت ويعمل رقم أعلى يعوض باقي الفريق.');
+  }
+  var lowT = sum(rData.ytdRows, 'lowT'), midT = sum(rData.ytdRows, 'midT'), highT = sum(rData.ytdRows, 'highT');
+  var totT = (lowT + midT + highT) || 1;
+  var lowPct = (lowT / totT) * 100;
+  if (lowPct > 33) {
+    smartNotes.push('💎 <b>ملاحظة الشرائح (Tariff Mix):</b> شريحة <b>Low Tier</b> عندك ' + lowPct.toFixed(1) + '% — حاول توجّه الفروع لترقية العملاء لشرائح <b>Mid / High (40+)</b> عشان تأمّن الـ Mix 30% في التقييم.');
+  } else {
+    smartNotes.push('💎 <b>جودة الشرائح ممتازة:</b> نسبة <b>Mid + High Tier</b> عندك ' + (100 - lowPct).toFixed(1) + '%، استمر بنفس التوزيع.');
+  }
+
+  var planObj = {
+    ident: ident,
+    pKey: pKey,
+    focusProd: focusProd,
+    pLabel: pLabel,
+    K: K,
+    isMtd: rData.isMtd,
+    pm: pm,
+    totalMetrics: totalMetrics,
+    allProdMetrics: allProdMetrics,
+    cascadedList: cascadedList,
+    branchFlat: branchFlat,
+    smartNotes: smartNotes
+  };
+  FAKI_LAST_PLAN_DATA = planObj;
+
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'cascaded_plan',
+    planId: 'faki_plan_card_' + Date.now(),
+    plan: planObj
+  });
+  setFakiRobotState('success');
+  renderFakiWorkspace();
+}
+
+// ── EXPORTS: WHATSAPP / SAVE PNG / SEND EMAIL ──
+function buildFakiPlanText(plan) {
+  if (!plan) return '';
+  var lines = [
+    '🤖 *FAKI AI Action Plan · FAKHARANY³⁶⁰*',
+    '👤 *' + plan.ident.label + '* (' + plan.ident.roleLabel + ')',
+    '📦 *Focus:* ' + plan.pLabel + ' | *Horizon:* ' + plan.K + ' Days (' + (plan.isMtd ? 'Live MTD' : 'YTD') + ')',
+    '━━━━━━━━━━━━━━━━━━━━',
+    '🎯 *Required Daily Target:* *' + fmtN(Math.ceil(plan.totalMetrics.reqPerDay)) + ' / day* (Standing: ' + plan.totalMetrics.projPct.toFixed(1) + '% · Gap: ' + fmtN(Math.round(plan.totalMetrics.gap)) + ')'
+  ];
+  if (plan.pKey === 'all') {
+    lines.push('', '📊 *Per-Product Daily Needed:*');
+    plan.allProdMetrics.forEach(function (m) {
+      if (m.tgt > 0) lines.push('• ' + m.label + ': ' + m.projPct.toFixed(1) + '% ➔ *' + fmtN(Math.ceil(m.reqPerDay)) + '/day*');
+    });
+  }
+  if (plan.branchFlat.length > 1) {
+    lines.push('', '🏪 *Branch / Area Breakdown (' + plan.K + 'd Plan):*');
+    plan.branchFlat.filter(function (b) { return !b.isOnTrack; }).slice(0, 10).forEach(function (b) {
+      lines.push('• ' + b.name + ' (' + b.projPct.toFixed(0) + '%): *' + fmtN(Math.ceil(b.reqPerDay)) + ' / day*');
+    });
+  }
+  lines.push('', '💡 *Faki Notes:*');
+  plan.smartNotes.forEach(function (n) { lines.push('- ' + n.replace(/<[^>]+>/g, '')); });
+  return lines.join('\n');
+}
+
+function copyFakiPlanWhatsApp() {
+  if (!FAKI_LAST_PLAN_DATA) return;
+  navigator.clipboard.writeText(buildFakiPlanText(FAKI_LAST_PLAN_DATA));
+  if (typeof mgrToast === 'function') mgrToast('✅ تم نسخ الخطة للواتساب بنجاح!');
+}
+
+function sendFakiPlanEmail() {
+  if (!FAKI_LAST_PLAN_DATA) return;
+  var plan = FAKI_LAST_PLAN_DATA;
+  var subj = 'FAKHARANY360 Action Plan (' + plan.K + ' Days) — ' + plan.ident.label + ' [' + plan.pLabel + ']';
+  var body = buildFakiPlanText(plan).replace(/\*/g, '');
+  window.location.href = 'mailto:?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body);
+}
+
+async function saveFakiPlanAsPNG(planCardId) {
+  var el = document.getElementById(planCardId);
+  if (!el) return;
+  try {
+    if (typeof mtdBALoadH2C === 'function') await mtdBALoadH2C();
+    var canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    var a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'FAKI_Action_Plan_' + (FAKI_SELECTED_IDENTITY ? FAKI_SELECTED_IDENTITY.label.replace(/\s+/g, '_') : 'Team') + '.png';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); }, 800);
+    if (typeof mgrToast === 'function') mgrToast('📸 تم حفظ صورة الخطة بنجاح!');
+  } catch (e) {
+    alert('تعذر حفظ الصورة: ' + e.message);
+  }
+}
+
+// ── FREE-TEXT Q&A IN CHAT INPUT ──
+function sendFakiUserMessage() {
+  var inp = document.getElementById('faki-chat-input');
+  var txt = String(inp ? inp.value : '').trim();
+  if (!txt) return;
+  inp.value = '';
+  FAKI_MESSAGES.push({ sender: 'user', text: txt });
+  var q = txt.toLowerCase();
+
+  if (FAKI_SELECTED_IDENTITY) {
+    if (q.indexOf('موقع') >= 0 || q.indexOf('lag') >= 0 || q.indexOf('worst') >= 0) { pushFakiSubBreakdown(FAKI_SELECTED_PRODUCT, true); return; }
+    if (q.indexOf('track') >= 0 || q.indexOf('اون تراك') >= 0) { pushFakiSubBreakdown(FAKI_SELECTED_PRODUCT, false); return; }
+    if (q.indexOf('plan') >= 0 || q.indexOf('خطه') >= 0 || q.indexOf('خطة') >= 0) { pushFakiAskHorizon(FAKI_SELECTED_PRODUCT); return; }
+  }
+
+  var ds = getFakiActiveDatasets();
+  var isMtd = (FAKI_DATA_SCOPE === 'mtd' && ds.mtdAll.length > 0);
+  var rows = isMtd ? ds.mtdAll : ds.ytdAll;
+  var prodKey = 'mobile', prodLabel = 'Mobile', tKey = 'mobileTarget', aKey = 'mobileSubs';
+  if (q.indexOf('fbb') >= 0 || q.indexOf('adsl') >= 0) { prodKey = 'fbb'; prodLabel = 'FBB'; tKey = 'fbbTarget'; aKey = 'fbbSubs'; }
+  else if (q.indexOf('wallet') >= 0 || q.indexOf('pay') >= 0) { prodKey = 'wallet'; prodLabel = 'Wallet'; tKey = 'walletTarget'; aKey = 'walletSales'; }
+  else if (q.indexOf('fixed') >= 0) { prodKey = 'fixed'; prodLabel = 'Fixed'; tKey = 'fixedTarget'; aKey = 'fixedSubs'; }
+  var groupField = q.indexOf('super') >= 0 ? 'supervisor' : (q.indexOf('area') >= 0 ? 'areaManager' : 'store');
+  var isBottom = (q.indexOf('low') >= 0 || q.indexOf('worst') >= 0 || q.indexOf('critical') >= 0 || q.indexOf('اقل') >= 0 || q.indexOf('واقع') >= 0);
+
+  var mapG = {};
+  rows.forEach(function (r) {
+    var k = r[groupField] || r.store || '—';
+    if (!k || k === 'Unassigned') return;
+    if (!mapG[k]) mapG[k] = { name: k, t: 0, a: 0 };
+    if (isMtd && prodKey === 'wallet') {
+      var code = String(r.storeCode || '').trim().toUpperCase();
+      var w = (typeof WALLET_DATA !== 'undefined' && WALLET_DATA[code]) || r;
+      mapG[k].t += Number(w.walletTarget) || 0; mapG[k].a += Number(w.walletSales) || 0;
+    } else {
+      mapG[k].t += Number(r[tKey]) || 0; mapG[k].a += Number(r[aKey]) || 0;
+    }
+  });
+  var ranked = Object.values(mapG).filter(function (x) { return x.t > 0; }).map(function (x) {
+    x.pct = (x.a / x.t) * 100; x.gap = x.a - x.t; return x;
+  }).sort(function (a, b) { return isBottom ? (a.pct - b.pct) : (b.pct - a.pct); }).slice(0, 6);
+
+  FAKI_MESSAGES.push({
+    sender: 'faki',
+    type: 'qa',
+    title: (isBottom ? 'Lowest ' : 'Top ') + (groupField === 'supervisor' ? 'Supervisors' : (groupField === 'areaManager' ? 'Area Managers' : 'Branches')) + ' in ' + prodLabel,
+    items: ranked
+  });
+  renderFakiWorkspace();
+}
+
+// ── RENDER WORKSPACE ──
+function renderFakiWorkspace() {
+  var mBtn = document.getElementById('faki-scope-mtd-btn');
+  var yBtn = document.getElementById('faki-scope-ytd-btn');
+  var aBtn = document.getElementById('faki-mode-act-btn');
+  var sBtn = document.getElementById('faki-mode-sales-btn');
+  if (mBtn) mBtn.style.background = FAKI_DATA_SCOPE === 'mtd' ? '#dc2626' : 'transparent';
+  if (yBtn) yBtn.style.background = FAKI_DATA_SCOPE === 'ytd' ? '#7c3aed' : 'transparent';
+  if (aBtn) { aBtn.style.background = FAKI_DATA_MODE === 'activation' ? '#f5a623' : 'transparent'; aBtn.style.color = FAKI_DATA_MODE === 'activation' ? '#111827' : 'white'; }
+  if (sBtn) { sBtn.style.background = FAKI_DATA_MODE === 'sales' ? '#f5a623' : 'transparent'; sBtn.style.color = FAKI_DATA_MODE === 'sales' ? '#111827' : 'white'; }
+
+  setFakiRobotState(FAKI_ROBOT_STATE);
+  var profEl = document.getElementById('faki-profile-card');
+  if (profEl) {
+    if (!FAKI_SELECTED_IDENTITY) {
+      profEl.innerHTML = '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);border-radius:12px;padding:10px;text-align:center;font-size:11px;color:#e9d5ff">Select your Role &amp; Name in the chat to start.</div>';
+    } else {
+      profEl.innerHTML =
+        '<div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:11px">' +
+          '<div style="font-size:10px;font-weight:800;color:#fbbf24">' + FAKI_SELECTED_IDENTITY.roleIcon + ' ' + mgrEsc(FAKI_SELECTED_IDENTITY.roleLabel) + '</div>' +
+          '<div dir="auto" style="font-size:13px;font-weight:900;color:white;margin-top:2px">' + mgrEsc(FAKI_SELECTED_IDENTITY.label) + '</div>' +
+          '<div style="font-size:10px;color:#cbd5e1;margin-top:2px">' + (FAKI_SELECTED_IDENTITY.stores ? FAKI_SELECTED_IDENTITY.stores.size : 1) + ' Stores</div>' +
+          '<button type="button" onclick="resetFakiConversation()" style="width:100%;margin-top:9px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.1);color:white;font-size:10.5px;font-weight:800;cursor:pointer">Switch Person</button>' +
+        '</div>';
+    }
+  }
+
+  var stream = document.getElementById('faki-chat-stream');
+  if (!stream) return;
+
+  stream.innerHTML = FAKI_MESSAGES.map(function (m) {
+    if (m.sender === 'user') {
+      return '<div class="faki-msg-row user"><div class="faki-bubble-user" dir="auto">' + mgrEsc(m.text) + '</div></div>';
+    }
+
+    if (m.type === 'onboarding') {
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="font-size:13.5px;font-weight:900;color:#5C2D91;margin-bottom:3px">👋 Hello! I am Faki (فاكي) — Your AI Performance Coach</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:9px" dir="rtl">عرفني بنفسك — اختار دورك واسمك أو فرعك عشان أجبلك الزيتونة وخطتك فوراً:</div>' +
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">' +
+          ['all', 'rm', 'sv', 'am', 'sm', 'store'].map(function (rk) {
+            var lbls = { all: 'All', rm: '👔 Regional', sv: '🧑‍💼 Supervisor', am: '📍 Area Mgr', sm: '👨‍💼 Store Mgr', store: '🏪 Branch' };
+            var act = FAKI_ONBOARD_ROLE === rk;
+            return '<button type="button" onclick="FAKI_ONBOARD_ROLE=\'' + rk + '\';renderFakiOnboardList()" style="padding:4px 10px;border-radius:999px;border:1px solid ' + (act ? '#5C2D91' : 'var(--border)') + ';background:' + (act ? '#5C2D91' : 'var(--gray-bg)') + ';color:' + (act ? 'white' : 'var(--text-muted)') + ';font-size:10.5px;font-weight:800;cursor:pointer">' + lbls[rk] + '</button>';
+          }).join('') +
+        '</div>' +
+        '<input type="text" id="faki-onboard-search" value="' + mgrEsc(FAKI_ONBOARD_QUERY) + '" oninput="FAKI_ONBOARD_QUERY=this.value;renderFakiOnboardList()" placeholder="🔍 Search Name, Branch, or Oracle ID..." style="width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid #c4b5fd;background:var(--gray-bg);font-size:12px;font-weight:700;outline:none;margin-bottom:8px"/>' +
+        '<div id="faki-onboard-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;max-height:230px;overflow-y:auto"></div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'summary_products') {
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+          '<span style="font-size:13px;font-weight:900;color:#5C2D91">📊 Performance Summary — ' + mgrEsc(m.ident.label) + '</span>' +
+          '<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;background:#ede9fe;color:#5C2D91">' + m.scopeTxt + ' · ' + m.stCount + ' Stores</span>' +
+        '</div>' +
+        '<div dir="rtl" style="padding:9px 12px;border-radius:10px;background:#f5f3ff;border-right:4px solid #5C2D91;font-size:12.5px;color:#1e1b4b;margin-bottom:10px;line-height:1.6">' + m.verdictAr + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+          '<span style="font-size:12px;font-weight:800;color:var(--text-primary)" dir="rtl">👇 عايزني أساعدك في أنهي Product ولا عايز كله؟ (دوس على الكارت)</span>' +
+          '<button type="button" onclick="onFakiSelectProduct(\'all\')" style="padding:4px 11px;border-radius:8px;border:none;background:#1e1b4b;color:white;font-size:10.5px;font-weight:800;cursor:pointer">All Products (كله)</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">' +
+          m.prods.map(function (p) {
+            var c = p.projPct >= 100 ? '#16a34a' : (p.projPct >= 90 ? '#2563eb' : '#dc2626');
+            return '<div class="faki-prod-pick-card" onclick="onFakiSelectProduct(\'' + p.key + '\')" style="border-top:3px solid ' + p.color + '">' +
+              '<div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:900"><span style="color:' + p.color + '"><i class="fas ' + p.icon + ' mr-1"></i>' + p.label + '</span><span style="color:' + c + '">' + p.projPct.toFixed(1) + '%</span></div>' +
+              '<div style="font-size:10px;color:var(--text-muted);font-weight:700;margin-top:3px">Ach: <b>' + fmtN(Math.round(p.act)) + '</b> / ' + fmtN(Math.round(p.tgt)) + '</div>' +
+              '<div style="font-size:10px;font-weight:800;color:' + (p.gap >= 0 ? '#16a34a' : '#dc2626') + ';margin-top:2px">Gap: ' + (p.gap >= 0 ? '+' : '') + fmtN(Math.round(p.gap)) + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'product_deepdive') {
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="font-size:13px;font-weight:900;color:#5C2D91;margin-bottom:8px">🔍 Deep-Dive: ' + mgrEsc(m.pLabel) + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin-bottom:10px">' +
+          m.metrics.map(function (mt) {
+            var c = mt.projPct >= 100 ? '#16a34a' : (mt.projPct >= 90 ? '#2563eb' : '#dc2626');
+            return '<div style="padding:9px 11px;border-radius:10px;background:var(--gray-bg);border:1px solid var(--border);border-top:3px solid ' + mt.color + '">' +
+              '<div style="font-size:11px;font-weight:900;color:' + mt.color + '">' + mt.label + '</div>' +
+              '<div style="font-size:11px;margin-top:3px">Target: <b>' + fmtN(Math.round(mt.tgt)) + '</b> · Ach: <b>' + fmtN(Math.round(mt.act)) + '</b></div>' +
+              '<div style="font-size:11px;margin-top:2px">Ach%: <b>' + mt.achPct.toFixed(1) + '%</b> · Proj%: <b style="color:' + c + '">' + mt.projPct.toFixed(1) + '%</b></div>' +
+              '<div style="font-size:11px;font-weight:900;color:' + (mt.gap >= 0 ? '#16a34a' : '#dc2626') + ';margin-top:2px">' + (mt.gap >= 0 ? '✅ Surplus: +' + fmtN(Math.round(mt.gap)) : '🚨 Deficit: ' + fmtN(Math.round(mt.gap))) + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div style="display:flex;gap:7px;flex-wrap:wrap">' +
+          (!m.isSingleStore ? '<button type="button" class="faki-action-pill" onclick="pushFakiSubBreakdown(\'' + m.prodKey + '\', true)">🚨 مين موقعني؟ (' + m.subLabel + ')</button>' : '') +
+          (!m.isSingleStore ? '<button type="button" class="faki-action-pill" onclick="pushFakiSubBreakdown(\'' + m.prodKey + '\', false)">🌟 مين On Track؟</button>' : '') +
+          '<button type="button" class="faki-action-pill" style="background:#5C2D91;color:white;border-color:#5C2D91" onclick="pushFakiAskHorizon(\'' + m.prodKey + '\')">🚀 اعملي خطة الرجوع</button>' +
+        '</div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'sub_breakdown') {
+      var renderRows = function (arr) {
+        if (!arr.length) return '<div style="font-size:11px;color:var(--text-muted)">No items in this category.</div>';
+        return arr.map(function (x) {
+          var c = x.isOnTrack ? '#16a34a' : '#dc2626';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 9px;border-radius:8px;background:var(--gray-bg);border:1px solid var(--border);margin-bottom:4px;font-size:11px">' +
+            '<div><b dir="auto">' + mgrEsc(x.name) + '</b> <span style="font-size:9.5px;color:var(--text-muted)">(' + mgrEsc(x.sub) + ')</span></div>' +
+            '<div style="font-weight:800;color:' + c + '">' + fmtN(Math.round(x.act)) + '/' + fmtN(Math.round(x.tgt)) + ' · ' + x.projPct.toFixed(0) + '% (Gap: ' + (x.gap >= 0 ? '+' : '') + fmtN(Math.round(x.gap)) + ')</div>' +
+          '</div>';
+        }).join('');
+      };
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="font-size:12.5px;font-weight:900;color:' + (m.showLaggingOnly ? '#dc2626' : '#16a34a') + ';margin-bottom:8px">' + (m.showLaggingOnly ? '🚨 مين موقعني في ' + m.pLabel : '🌟 مين On Track في ' + m.pLabel) + '</div>' +
+        (m.amList.length ? '<div style="font-size:11px;font-weight:800;margin-bottom:4px">📍 Area Managers:</div>' + renderRows(m.amList) : '') +
+        '<div style="font-size:11px;font-weight:800;margin:6px 0 4px">🏪 Branches:</div>' + renderRows(m.stList) +
+        '<div style="margin-top:8px"><button type="button" class="faki-action-pill" style="background:#5C2D91;color:white" onclick="pushFakiAskHorizon(\'' + m.pKey + '\')">🚀 اعملي خطة الرجوع دلوقتي</button></div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'ask_horizon') {
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="font-size:13px;font-weight:900;color:#5C2D91;margin-bottom:6px" dir="rtl">⏱️ تحب نحط خطة الرجوع على كام يوم؟</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          [1, 3, 5, 7, 10, 15].map(function (d) {
+            return '<button type="button" onclick="generateFakiCascadedPlan(' + d + ',\'' + m.prodKey + '\')" style="padding:7px 13px;border-radius:10px;border:1.5px solid #5C2D91;background:#f5f3ff;color:#5C2D91;font-size:11.5px;font-weight:900;cursor:pointer">' + d + (d === 1 ? ' Day' : ' Days') + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'cascaded_plan') {
+      var pl = m.plan;
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot" id="' + m.planId + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
+          '<span style="font-size:13.5px;font-weight:900;color:#5C2D91">🚀 On-Track Recovery Plan (' + pl.K + ' Days) — ' + mgrEsc(pl.ident.label) + '</span>' +
+          '<div style="display:flex;gap:5px">' +
+            '<button type="button" onclick="copyFakiPlanWhatsApp()" style="padding:4px 10px;border-radius:8px;border:none;background:#16a34a;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>' +
+            '<button type="button" onclick="saveFakiPlanAsPNG(\'' + m.planId + '\')" style="padding:4px 10px;border-radius:8px;border:none;background:#2563eb;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-image mr-1"></i>Save PNG</button>' +
+            '<button type="button" onclick="sendFakiPlanEmail()" style="padding:4px 10px;border-radius:8px;border:none;background:#5C2D91;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-envelope mr-1"></i>Email</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:10px 12px;border-radius:10px;background:#fef2f2;border:1.5px solid #fecaca;margin-bottom:10px">' +
+          '<div style="font-size:12.5px;font-weight:900;color:#dc2626">🎯 Total Daily Needed (' + pl.pLabel + '): ' + fmtN(Math.ceil(pl.totalMetrics.reqPerDay)) + ' / day for ' + pl.K + ' days</div>' +
+          '<div style="font-size:10.5px;color:#7f1d1d;font-weight:700;margin-top:2px">Standing: ' + pl.totalMetrics.projPct.toFixed(1) + '% · Normal Pace: ' + fmtN(Math.ceil(pl.totalMetrics.normalDaily)) + '/d + Catch-up: +' + fmtN(Math.ceil(pl.totalMetrics.catchUpPerDay)) + '/d</div>' +
+        '</div>' +
+        (pl.pKey === 'all' ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px;margin-bottom:10px">' + pl.allProdMetrics.map(function (pm) {
+          return '<div style="padding:6px 8px;border-radius:8px;background:var(--gray-bg);border-top:2.5px solid ' + pm.color + ';font-size:10.5px"><b>' + pm.label + '</b>: ' + pm.projPct.toFixed(0) + '% ➔ <b style="color:' + (pm.isOnTrack ? '#16a34a' : '#dc2626') + '">' + fmtN(Math.ceil(pm.reqPerDay)) + '/d</b></div>';
+        }).join('') + '</div>' : '') +
+        (pl.branchFlat.length > 1 ? '<div style="font-size:11px;font-weight:900;margin-bottom:5px">📋 Cascaded Plan by Area Manager &amp; Branch:</div><div style="max-height:190px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;padding:6px;background:var(--gray-bg);margin-bottom:10px">' +
+          pl.cascadedList.map(function (sv) {
+            return sv.ams.map(function (am) {
+              return '<div style="padding:5px 7px;border-bottom:1px solid var(--border);font-size:11px">' +
+                '<div style="display:flex;justify-content:space-between;font-weight:900;color:#5C2D91"><span>📍 ' + mgrEsc(am.name) + ' (' + am.projPct.toFixed(0) + '%)</span><span>' + fmtN(Math.ceil(am.reqPerDay)) + ' / day</span></div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">' + am.stores.map(function (st) {
+                  return '<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;background:' + (st.isOnTrack ? '#dcfce7;color:#15803d' : '#fee2e2;color:#b91c1c') + ';font-weight:700">' + mgrEsc(st.name) + ': <b>' + fmtN(Math.ceil(st.reqPerDay)) + '/d</b></span>';
+                }).join('') + '</div>' +
+              '</div>';
+            }).join('');
+          }).join('') +
+        '</div>' : '') +
+        '<div dir="rtl" style="padding:9px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:11.5px;color:#78350f;line-height:1.6">' +
+          '<div style="font-weight:900;margin-bottom:3px">💡 ملاحظات فاكي الذكية (Faki AI Insights):</div>' +
+          pl.smartNotes.map(function (n) { return '<div>• ' + n + '</div>'; }).join('') +
+        '</div>' +
+      '</div></div>';
+    }
+
+    if (m.type === 'qa') {
+      return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+        '<div style="font-size:12.5px;font-weight:900;color:#5C2D91;margin-bottom:6px">🤖 ' + mgrEsc(m.title) + '</div>' +
+        m.items.map(function (it, idx) {
+          var c = it.pct >= 100 ? '#16a34a' : '#dc2626';
+          return '<div style="display:flex;justify-content:space-between;padding:5px 8px;border-radius:7px;background:var(--gray-bg);margin-bottom:4px;font-size:11px"><b dir="auto">#' + (idx + 1) + ' ' + mgrEsc(it.name) + '</b><b style="color:' + c + '">' + it.pct.toFixed(1) + '%</b></div>';
+        }).join('') +
+      '</div></div>';
+    }
+    return '';
+  }).join('');
+
+  if (document.getElementById('faki-onboard-list')) renderFakiOnboardList();
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function renderFakiOnboardList() {
+  var listEl = document.getElementById('faki-onboard-list');
+  if (!listEl) return;
+  var all = buildFakiDirectory();
+  var q = FAKI_ONBOARD_QUERY.toLowerCase();
+  var filtered = all.filter(function (x) {
+    if (FAKI_ONBOARD_ROLE !== 'all' && x.type !== FAKI_ONBOARD_ROLE) return false;
+    if (!q) return true;
+    return String(x.label || '').toLowerCase().indexOf(q) >= 0 || String(x.sub || '').toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 45);
+  window._FAKI_ONBOARD_LIST = filtered;
+  listEl.innerHTML = filtered.map(function (item, idx) {
+    return '<button type="button" onclick="selectFakiOnboardIdentity(' + idx + ')" style="text-align:left;padding:7px 10px;border-radius:9px;border:1px solid var(--border);background:var(--gray-bg);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:6px">' +
+      '<div style="min-width:0"><div dir="auto" style="font-size:11.5px;font-weight:800;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.roleIcon + ' ' + mgrEsc(item.label) + '</div><div style="font-size:9.5px;color:var(--text-muted)">' + mgrEsc(item.roleLabel) + '</div></div>' +
+      '<span style="font-size:9.5px;font-weight:800;color:#5C2D91">' + (item.stores ? item.stores.size : 1) + '</span>' +
+    '</button>';
+  }).join('');
+}
+
+(function () {
+  var _origInitApp = (typeof initAppWithData === 'function') ? initAppWithData : null;
+  if (_origInitApp) {
+    initAppWithData = function () {
+      var res = _origInitApp.apply(this, arguments);
+      setTimeout(syncFakiVisibilityWithAuth, 400);
+      return res;
+    };
+  }
+  var _origLogout = (typeof doLogout === 'function') ? doLogout : null;
+  if (_origLogout) {
+    doLogout = function () {
+      var res = _origLogout.apply(this, arguments);
+      FAKI_WELCOME_SHOWN_SESSION = false;
+      syncFakiVisibilityWithAuth();
+      return res;
+    };
+  }
+  setTimeout(syncFakiVisibilityWithAuth, 600);
+})();
+</script>
 </body>
 </html>
