@@ -21952,11 +21952,24 @@ async function exportMTDOnTrackExcel(btn) {
   font-family: 'Inter', 'Cairo', sans-serif;
   animation: fakiMsgIn34 0.25s ease-out;
 }
+.faki-ws-grid > div,
+#faki-chat-stream,
+.faki-msg-row,
+.faki-bubble-bot {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 @media (max-width: 768px) {
   #faki-fab-btn { bottom: 72px; right: 12px; }
   #faki-welcome-popover { bottom: 132px; right: 12px; width: 320px; }
-  .faki-ws-grid { grid-template-columns: 1fr !important; }
+  #faki-modal-overlay { padding: 6px !important; }
+  #faki-modal-overlay > div { height: 94dvh !important; max-height: 94dvh !important; border-radius: 14px !important; }
+  .faki-ws-grid { grid-template-columns: minmax(0, 1fr) !important; }
   .faki-char-panel { display: none !important; }
+  #faki-chat-stream { padding: 10px 8px !important; }
+  .faki-bubble-bot { padding: 10px 10px !important; font-size: 11.5px !important; }
+  .faki-plan-prods-grid { grid-template-columns: 1fr !important; }
 }
 .faki-msg-row {
   display: flex;
@@ -22481,11 +22494,12 @@ function onFakiSelectProduct(prodKey) {
   renderFakiWorkspace();
 }
 
-// ── STEP 3B: "مين موقعني؟" OR "مين On Track؟" ──
+// ── STEP 3B: "مين موقعني؟" OR "مين On Track؟" (Supports Single Product AND All 6 Products!) ──
 function pushFakiSubBreakdown(prodKey, showLaggingOnly) {
   if (!FAKI_SELECTED_IDENTITY) return;
-  var pKey = (prodKey && prodKey !== 'all') ? prodKey : 'mobile';
-  var pLabel = (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
+  var pKey = prodKey || 'mobile';
+  var isAll = (pKey === 'all');
+  var pLabel = isAll ? 'All 6 Products' : (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
   FAKI_MESSAGES.push({ sender: 'user', text: showLaggingOnly ? ('مين موقعني في ' + pLabel + '؟') : ('مين On Track في ' + pLabel + '؟') });
 
   var rData = getFakiEntityRows(FAKI_SELECTED_IDENTITY);
@@ -22493,8 +22507,6 @@ function pushFakiSubBreakdown(prodKey, showLaggingOnly) {
   var hierMap = rData.hierMap;
   var ident = FAKI_SELECTED_IDENTITY;
 
-  // Smart Role-Aware Grouping:
-  // If Regional -> group by Area Manager (and Supervisor); If Supervisor -> group by Area Manager + Branches; If Area Mgr -> group by Branch
   var amGroups = {}, stGroups = {};
   rData.activeRows.forEach(function (r) {
     var code = String(r.storeCode || '').trim().toUpperCase();
@@ -22508,6 +22520,45 @@ function pushFakiSubBreakdown(prodKey, showLaggingOnly) {
     if (!stGroups[stKey]) stGroups[stKey] = { name: st, sub: am, rows: [] };
     stGroups[stKey].rows.push(r);
   });
+
+  if (isAll) {
+    function buildAllProdsList(grpMap) {
+      return Object.values(grpMap).map(function (g) {
+        var perProd = {};
+        var lagProds = [];
+        var onTrackProds = [];
+        var totalDeficitCount = 0;
+        MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+          var m = calcFakiProdMetricsForRows(g.rows, p.key, rData.isMtd, pm, FAKI_HORIZON_DAYS);
+          perProd[p.key] = m;
+          if (m.tgt > 0) {
+            if (!m.isOnTrack) { lagProds.push(p.label + ' ' + m.projPct.toFixed(0) + '%'); totalDeficitCount++; }
+            else { onTrackProds.push(p.label + ' ' + m.projPct.toFixed(0) + '%'); }
+          }
+        });
+        return { name: g.name, sub: g.sub, perProd: perProd, lagProds: lagProds, onTrackProds: onTrackProds, lagCount: totalDeficitCount };
+      }).filter(function (x) {
+        return showLaggingOnly ? (x.lagCount > 0) : (x.lagCount === 0);
+      }).sort(function (a, b) {
+        return showLaggingOnly ? (b.lagCount - a.lagCount) : (a.name.localeCompare(b.name));
+      });
+    }
+
+    var amAll = (ident.type === 'rm' || ident.type === 'sv') ? buildAllProdsList(amGroups) : [];
+    var stAll = buildAllProdsList(stGroups);
+    FAKI_MESSAGES.push({
+      sender: 'faki',
+      type: 'sub_breakdown',
+      isAll: true,
+      pKey: 'all',
+      pLabel: 'All 6 Products',
+      showLaggingOnly: showLaggingOnly,
+      amList: amAll,
+      stList: stAll
+    });
+    renderFakiWorkspace();
+    return;
+  }
 
   function mapStats(grpMap) {
     return Object.values(grpMap).map(function (g) {
@@ -22526,11 +22577,12 @@ function pushFakiSubBreakdown(prodKey, showLaggingOnly) {
   FAKI_MESSAGES.push({
     sender: 'faki',
     type: 'sub_breakdown',
+    isAll: false,
     pKey: pKey,
     pLabel: pLabel,
     showLaggingOnly: showLaggingOnly,
     amList: amList,
-    stList: stList.slice(0, 12)
+    stList: stList
   });
   renderFakiWorkspace();
 }
@@ -22551,7 +22603,7 @@ function generateFakiCascadedPlan(days, prodKey) {
   if (!FAKI_SELECTED_IDENTITY) return;
   FAKI_HORIZON_DAYS = Number(days) || 5;
   var pKey = prodKey || FAKI_SELECTED_PRODUCT || 'mobile';
-  var pLabel = pKey === 'all' ? 'All Products' : (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
+  var pLabel = pKey === 'all' ? 'All 6 Products' : (MTD_ONTRACK_PRODUCTS.find(function (p) { return p.key === pKey; }) || { label: 'Mobile' }).label;
 
   FAKI_MESSAGES.push({ sender: 'user', text: 'اعمل خطة الرجوع في ' + pLabel + ' على ' + FAKI_HORIZON_DAYS + ' أيام' });
   setFakiRobotState('analyzing');
@@ -22566,7 +22618,15 @@ function generateFakiCascadedPlan(days, prodKey) {
   var totalMetrics = calcFakiProdMetricsForRows(rData.activeRows, focusProd, rData.isMtd, pm, K);
   var allProdMetrics = MTD_ONTRACK_PRODUCTS.map(function (p) { return calcFakiProdMetricsForRows(rData.activeRows, p.key, rData.isMtd, pm, K); });
 
-  // Build Cascaded Hierarchy Breakdown (Supervisor -> Area Manager -> Branches)
+  function buildMultiProdMap(rowsSub) {
+    var mp = {};
+    MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+      mp[p.key] = calcFakiProdMetricsForRows(rowsSub, p.key, rData.isMtd, pm, K);
+    });
+    return mp;
+  }
+
+  // Build Cascaded Hierarchy Breakdown (Supervisor -> Area Manager -> ALL Branches)
   var tree = {};
   rData.activeRows.forEach(function (r) {
     var code = String(r.storeCode || '').trim().toUpperCase();
@@ -22579,7 +22639,7 @@ function generateFakiCascadedPlan(days, prodKey) {
     tree[sv].rows.push(r);
     if (!tree[sv].ams[am]) tree[sv].ams[am] = { name: am, rows: [], stores: {} };
     tree[sv].ams[am].rows.push(r);
-    if (!tree[sv].ams[am].stores[stKey]) tree[sv].ams[am].stores[stKey] = { name: st, rows: [] };
+    if (!tree[sv].ams[am].stores[stKey]) tree[sv].ams[am].stores[stKey] = { name: st, code: code, rows: [] };
     tree[sv].ams[am].stores[stKey].rows.push(r);
   });
 
@@ -22587,19 +22647,22 @@ function generateFakiCascadedPlan(days, prodKey) {
   var branchFlat = [];
   Object.values(tree).forEach(function (svObj) {
     var svM = calcFakiProdMetricsForRows(svObj.rows, focusProd, rData.isMtd, pm, K);
+    var svMulti = (pKey === 'all') ? buildMultiProdMap(svObj.rows) : null;
     var amArr = [];
     Object.values(svObj.ams).forEach(function (amObj) {
       var amM = calcFakiProdMetricsForRows(amObj.rows, focusProd, rData.isMtd, pm, K);
+      var amMulti = (pKey === 'all') ? buildMultiProdMap(amObj.rows) : null;
       var stArr = Object.values(amObj.stores).map(function (stObj) {
         var stM = calcFakiProdMetricsForRows(stObj.rows, focusProd, rData.isMtd, pm, K);
-        var obj = Object.assign({ name: stObj.name, am: amObj.name }, stM);
+        var stMulti = (pKey === 'all') ? buildMultiProdMap(stObj.rows) : null;
+        var obj = Object.assign({ name: stObj.name, code: stObj.code, am: amObj.name, sv: svObj.name, multi: stMulti }, stM);
         branchFlat.push(obj);
         return obj;
       }).sort(function (a, b) { return a.projPct - b.projPct; });
-      amArr.push(Object.assign({ name: amObj.name, stores: stArr }, amM));
+      amArr.push(Object.assign({ name: amObj.name, sv: svObj.name, multi: amMulti, stores: stArr }, amM));
     });
     amArr.sort(function (a, b) { return a.projPct - b.projPct; });
-    cascadedList.push(Object.assign({ name: svObj.name, ams: amArr }, svM));
+    cascadedList.push(Object.assign({ name: svObj.name, multi: svMulti, ams: amArr }, svM));
   });
 
   // Smart Faki AI Notes (Egyptian Arabic + English KPIs)
@@ -22648,12 +22711,131 @@ function generateFakiCascadedPlan(days, prodKey) {
   renderFakiWorkspace();
 }
 
-// ── EXPORTS: WHATSAPP / SAVE PNG / SEND EMAIL ──
+// Build Clean Structured HTML Table for Plan (used in UI, Offscreen Full PNG, and Email HTML Body)
+function buildFakiPlanTableHTML(pl, isFullExport) {
+  var wrapStyle = isFullExport
+    ? 'border:1px solid #cbd5e1;border-radius:10px;overflow:visible;margin-bottom:12px'
+    : 'max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:10px';
+
+  if (pl.pKey === 'all') {
+    // All 6 Products Cascaded Table: Area Manager -> All Branches with Req/Day for every product
+    var pHeaders = MTD_ONTRACK_PRODUCTS.map(function (p) {
+      return '<th style="padding:7px 6px;text-align:center;background:' + p.color + ';color:white;white-space:nowrap">' + p.label + ' (Proj% / Daily)</th>';
+    }).join('');
+    var rowsHTML = '';
+    pl.cascadedList.forEach(function (sv) {
+      sv.ams.forEach(function (am) {
+        rowsHTML += '<tr style="background:#ede9fe;color:#4c1d95;font-weight:900;font-size:11px;border-bottom:1px solid #c4b5fd">' +
+          '<td style="padding:7px 10px;text-align:left;white-space:nowrap">📍 ' + mgrEsc(am.name) + ' <span style="font-weight:700;font-size:9.5px">(' + am.stores.length + ' stores)</span></td>' +
+          MTD_ONTRACK_PRODUCTS.map(function (p) {
+            var pm = am.multi[p.key];
+            var c = pm.isOnTrack ? '#15803d' : '#dc2626';
+            return '<td style="padding:6px 6px;text-align:center;white-space:nowrap" dir="ltr">' + pm.projPct.toFixed(0) + '% · <b style="color:' + c + '">' + fmtN(Math.ceil(pm.reqPerDay)) + ' /d</b></td>';
+          }).join('') +
+        '</tr>';
+        am.stores.forEach(function (st, si) {
+          rowsHTML += '<tr style="background:' + (si % 2 === 0 ? '#ffffff' : '#f8fafc') + ';color:#1f2937;font-size:10.5px;border-bottom:1px solid #e5e7eb">' +
+            '<td dir="ltr" style="padding:5px 10px 5px 22px;text-align:left;font-weight:700;white-space:nowrap">🏪 <bdi>' + mgrEsc(st.name) + '</bdi></td>' +
+            MTD_ONTRACK_PRODUCTS.map(function (p) {
+              var pm = st.multi[p.key];
+              var c = pm.isOnTrack ? '#15803d' : '#dc2626';
+              return '<td style="padding:5px 6px;text-align:center;white-space:nowrap" dir="ltr">' + pm.projPct.toFixed(0) + '% · <b style="color:' + c + '">' + fmtN(Math.ceil(pm.reqPerDay)) + ' /d</b></td>';
+            }).join('') +
+          '</tr>';
+        });
+      });
+    });
+
+    return '<div style="' + wrapStyle + '" dir="ltr">' +
+      '<table style="width:100%;border-collapse:collapse;font-family:Inter,Cairo,sans-serif">' +
+        '<thead style="' + (isFullExport ? '' : 'position:sticky;top:0;z-index:2') + '"><tr style="background:#1e1b4b;color:white;font-size:10.5px;font-weight:800">' +
+          '<th style="padding:7px 10px;text-align:left">Area Manager / Branch</th>' + pHeaders +
+        '</tr></thead>' +
+        '<tbody>' + rowsHTML + '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
+  // Single Product Cascaded Table: Target | Ach | Gap | Proj% | Daily Needed (Kd)
+  var rowsHTML1 = '';
+  pl.cascadedList.forEach(function (sv) {
+    if (pl.cascadedList.length > 1) {
+      rowsHTML1 += '<tr style="background:#dbe8f7;color:#1e3a5f;font-weight:900;font-size:11px;border-bottom:1px solid #93c5fd">' +
+        '<td style="padding:7px 10px;text-align:left">🧑‍💼 Supervisor: ' + mgrEsc(sv.name) + '</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + fmtN(Math.round(sv.tgt)) + '</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + fmtN(Math.round(sv.act)) + '</td>' +
+        '<td style="padding:7px 8px;text-align:center;color:' + (sv.gap >= 0 ? '#15803d' : '#dc2626') + '">' + (sv.gap >= 0 ? '+' : '') + fmtN(Math.round(sv.gap)) + '</td>' +
+        '<td style="padding:7px 8px;text-align:center">' + sv.projPct.toFixed(1) + '%</td>' +
+        '<td style="padding:7px 10px;text-align:center;color:' + (sv.isOnTrack ? '#15803d' : '#dc2626') + '" dir="ltr">' + fmtN(Math.ceil(sv.reqPerDay)) + ' / day</td>' +
+      '</tr>';
+    }
+    sv.ams.forEach(function (am) {
+      rowsHTML1 += '<tr style="background:#ede9fe;color:#4c1d95;font-weight:900;font-size:11px;border-bottom:1px solid #c4b5fd">' +
+        '<td style="padding:6px 10px 6px 16px;text-align:left">📍 ' + mgrEsc(am.name) + ' <span style="font-weight:700;font-size:9.5px">(' + am.stores.length + ' stores)</span></td>' +
+        '<td style="padding:6px 8px;text-align:center">' + fmtN(Math.round(am.tgt)) + '</td>' +
+        '<td style="padding:6px 8px;text-align:center">' + fmtN(Math.round(am.act)) + '</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:' + (am.gap >= 0 ? '#15803d' : '#dc2626') + '">' + (am.gap >= 0 ? '+' : '') + fmtN(Math.round(am.gap)) + '</td>' +
+        '<td style="padding:6px 8px;text-align:center">' + am.projPct.toFixed(1) + '%</td>' +
+        '<td style="padding:6px 10px;text-align:center;color:' + (am.isOnTrack ? '#15803d' : '#dc2626') + '" dir="ltr">' + fmtN(Math.ceil(am.reqPerDay)) + ' / day</td>' +
+      '</tr>';
+      am.stores.forEach(function (st, si) {
+        var c = st.isOnTrack ? '#15803d' : '#dc2626';
+        rowsHTML1 += '<tr style="background:' + (si % 2 === 0 ? '#ffffff' : '#f8fafc') + ';color:#1f2937;font-size:10.5px;border-bottom:1px solid #e5e7eb">' +
+          '<td dir="ltr" style="padding:5px 10px 5px 28px;text-align:left;font-weight:700">🏪 <bdi>' + mgrEsc(st.name) + '</bdi></td>' +
+          '<td style="padding:5px 8px;text-align:center">' + fmtN(Math.round(st.tgt)) + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;font-weight:700">' + fmtN(Math.round(st.act)) + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;font-weight:800;color:' + c + '">' + (st.gap >= 0 ? '+' : '') + fmtN(Math.round(st.gap)) + '</td>' +
+          '<td style="padding:5px 8px;text-align:center;font-weight:800;color:' + c + '">' + st.projPct.toFixed(1) + '%</td>' +
+          '<td style="padding:5px 10px;text-align:center;font-weight:900;color:' + c + ';background:' + (st.isOnTrack ? '#f0fdf4' : '#fef2f2') + '" dir="ltr">' + fmtN(Math.ceil(st.reqPerDay)) + ' / day</td>' +
+        '</tr>';
+      });
+    });
+  });
+
+  return '<div style="' + wrapStyle + '" dir="ltr">' +
+    '<table style="width:100%;border-collapse:collapse;font-family:Inter,Cairo,sans-serif">' +
+      '<thead style="' + (isFullExport ? '' : 'position:sticky;top:0;z-index:2') + '"><tr style="background:#1e1b4b;color:white;font-size:10.5px;font-weight:800">' +
+        '<th style="padding:7px 10px;text-align:left">Area Manager / Branch</th>' +
+        '<th style="padding:7px 8px;text-align:center">Target</th>' +
+        '<th style="padding:7px 8px;text-align:center">Ach</th>' +
+        '<th style="padding:7px 8px;text-align:center">Gap</th>' +
+        '<th style="padding:7px 8px;text-align:center">Proj %</th>' +
+        '<th style="padding:7px 10px;text-align:center;background:#15803d">Daily Needed (' + pl.K + 'd)</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rowsHTML1 + '</tbody>' +
+    '</table>' +
+  '</div>';
+}
+
+function buildFakiFullPlanCardHTML(pl, isFullExport) {
+  return '<div style="background:#ffffff;padding:' + (isFullExport ? '22px' : '0px') + ';font-family:Inter,Cairo,Arial,sans-serif">' +
+    '<div style="background:linear-gradient(135deg,#1e1b4b,#5C2D91);color:white;border-radius:12px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
+      '<div>' +
+        '<div style="font-size:14px;font-weight:900">🚀 FAKI On-Track Recovery Plan (' + pl.K + ' Days) — ' + mgrEsc(pl.ident.label) + '</div>' +
+        '<div style="font-size:11px;color:#e9d5ff;font-weight:700">' + mgrEsc(pl.ident.roleLabel) + ' · Focus: ' + mgrEsc(pl.pLabel) + ' · ' + (pl.isMtd ? ('Live MTD Day ' + pl.pm.currentDay + '/' + pl.pm.daysInMonth) : 'Full Year YTD') + ' · ' + pl.branchFlat.length + ' Stores</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.16);padding:6px 12px;border-radius:10px;text-align:center" dir="ltr">' +
+        '<div style="font-size:9.5px;color:#fef08a;font-weight:800">' + (pl.pKey === 'all' ? 'ALL 6 PRODUCTS PLAN' : 'TOTAL DAILY NEEDED') + '</div>' +
+        '<div style="font-size:15px;font-weight:900;color:#ffffff">' + (pl.pKey === 'all' ? (pl.allProdMetrics.filter(function(x){return !x.isOnTrack;}).length + ' Products Need Push') : (fmtN(Math.ceil(pl.totalMetrics.reqPerDay)) + ' / day')) + '</div>' +
+      '</div>' +
+    '</div>' +
+    (pl.pKey === 'all' ? '<div class="faki-plan-prods-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px">' + pl.allProdMetrics.map(function (pm) {
+      return '<div style="padding:7px 9px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid ' + pm.color + ';font-size:10.5px" dir="ltr"><b>' + pm.label + '</b>: ' + pm.projPct.toFixed(1) + '% (Gap ' + (pm.gap >= 0 ? '+' : '') + fmtN(Math.round(pm.gap)) + ') ➔ <b style="color:' + (pm.isOnTrack ? '#16a34a' : '#dc2626') + '">' + fmtN(Math.ceil(pm.reqPerDay)) + ' / day</b></div>';
+    }).join('') + '</div>' : '') +
+    (pl.branchFlat.length > 1 ? buildFakiPlanTableHTML(pl, isFullExport) : '') +
+    '<div dir="rtl" style="padding:10px 13px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:11.5px;color:#78350f;line-height:1.6">' +
+      '<div style="font-weight:900;margin-bottom:3px">💡 ملاحظات فاكي الذكية (Faki AI Insights):</div>' +
+      pl.smartNotes.map(function (n) { return '<div>• ' + n + '</div>'; }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+// ── EXPORTS: WHATSAPP (ALL BRANCHES) / FULL UNCLIPPED SAVE PNG / PROFESSIONAL .EML + EXCEL EMAIL ──
 function buildFakiPlanText(plan) {
   if (!plan) return '';
   var lines = [
     '🤖 *FAKI AI Action Plan · FAKHARANY³⁶⁰*',
-    '👤 *' + plan.ident.label + '* (' + plan.ident.roleLabel + ')',
+    '👤 *' + plan.ident.label + '* (' + plan.ident.roleLabel + ' · ' + plan.branchFlat.length + ' Branches)',
     '📦 *Focus:* ' + plan.pLabel + ' | *Horizon:* ' + plan.K + ' Days (' + (plan.isMtd ? 'Live MTD' : 'YTD') + ')',
     '━━━━━━━━━━━━━━━━━━━━',
     '🎯 *Required Daily Target:* *' + fmtN(Math.ceil(plan.totalMetrics.reqPerDay)) + ' / day* (Standing: ' + plan.totalMetrics.projPct.toFixed(1) + '% · Gap: ' + fmtN(Math.round(plan.totalMetrics.gap)) + ')'
@@ -22661,13 +22843,23 @@ function buildFakiPlanText(plan) {
   if (plan.pKey === 'all') {
     lines.push('', '📊 *Per-Product Daily Needed:*');
     plan.allProdMetrics.forEach(function (m) {
-      if (m.tgt > 0) lines.push('• ' + m.label + ': ' + m.projPct.toFixed(1) + '% ➔ *' + fmtN(Math.ceil(m.reqPerDay)) + '/day*');
+      if (m.tgt > 0) lines.push('• ' + m.label + ': ' + m.projPct.toFixed(1) + '% ➔ *' + fmtN(Math.ceil(m.reqPerDay)) + ' / day*');
     });
   }
   if (plan.branchFlat.length > 1) {
-    lines.push('', '🏪 *Branch / Area Breakdown (' + plan.K + 'd Plan):*');
-    plan.branchFlat.filter(function (b) { return !b.isOnTrack; }).slice(0, 10).forEach(function (b) {
-      lines.push('• ' + b.name + ' (' + b.projPct.toFixed(0) + '%): *' + fmtN(Math.ceil(b.reqPerDay)) + ' / day*');
+    lines.push('', '📋 *Full Cascaded Plan (' + plan.branchFlat.length + ' Branches):*');
+    plan.cascadedList.forEach(function (sv) {
+      sv.ams.forEach(function (am) {
+        lines.push('', '📍 *' + am.name + '* (' + am.projPct.toFixed(0) + '% · Req: *' + fmtN(Math.ceil(am.reqPerDay)) + '/day*)');
+        am.stores.forEach(function (b) {
+          if (plan.pKey === 'all' && b.multi) {
+            var pSummary = MTD_ONTRACK_PRODUCTS.map(function(mp){ var m=b.multi[mp.key]; return mp.label + ' ' + fmtN(Math.ceil(m.reqPerDay)) + '/d'; }).join(' | ');
+            lines.push('  • ' + b.name + ': ' + pSummary);
+          } else {
+            lines.push('  • ' + b.name + ': Ach ' + fmtN(Math.round(b.act)) + '/' + fmtN(Math.round(b.tgt)) + ' (' + b.projPct.toFixed(0) + '%) ➔ *' + fmtN(Math.ceil(b.reqPerDay)) + '/day*');
+          }
+        });
+      });
     });
   }
   lines.push('', '💡 *Faki Notes:*');
@@ -22678,31 +22870,206 @@ function buildFakiPlanText(plan) {
 function copyFakiPlanWhatsApp() {
   if (!FAKI_LAST_PLAN_DATA) return;
   navigator.clipboard.writeText(buildFakiPlanText(FAKI_LAST_PLAN_DATA));
-  if (typeof mgrToast === 'function') mgrToast('✅ تم نسخ الخطة للواتساب بنجاح!');
+  if (typeof mgrToast === 'function') mgrToast('✅ تم نسخ الخطة الكاملة لكل الفروع للواتساب!');
 }
 
-function sendFakiPlanEmail() {
-  if (!FAKI_LAST_PLAN_DATA) return;
-  var plan = FAKI_LAST_PLAN_DATA;
-  var subj = 'FAKHARANY360 Action Plan (' + plan.K + ' Days) — ' + plan.ident.label + ' [' + plan.pLabel + ']';
-  var body = buildFakiPlanText(plan).replace(/\*/g, '');
-  window.location.href = 'mailto:?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(body);
+function buildFakiEmailHeaderCardHTML(pl) {
+  return '<div style="background:#ffffff;padding:16px;font-family:Inter,Cairo,Arial,sans-serif">' +
+    '<div style="background:linear-gradient(135deg,#1e1b4b,#5C2D91);color:white;border-radius:14px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
+      '<div>' +
+        '<div style="font-size:16px;font-weight:900">🚀 FAKI On-Track Recovery Plan (' + pl.K + ' Days) — ' + mgrEsc(pl.ident.label) + '</div>' +
+        '<div style="font-size:11.5px;color:#e9d5ff;font-weight:700;margin-top:3px">' + mgrEsc(pl.ident.roleLabel) + ' · Focus: ' + mgrEsc(pl.pLabel) + ' · ' + (pl.isMtd ? ('Live MTD Day ' + pl.pm.currentDay + '/' + pl.pm.daysInMonth) : 'Full Year YTD') + ' · ' + pl.branchFlat.length + ' Stores</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.16);padding:8px 16px;border-radius:12px;text-align:center" dir="ltr">' +
+        '<div style="font-size:10px;color:#fef08a;font-weight:800">' + (pl.pKey === 'all' ? 'ALL 6 PRODUCTS PLAN' : 'TOTAL DAILY NEEDED') + '</div>' +
+        '<div style="font-size:20px;font-weight:900;color:#ffffff">' + (pl.pKey === 'all' ? (pl.allProdMetrics.filter(function(x){return !x.isOnTrack;}).length + ' Products Need Push') : (fmtN(Math.ceil(pl.totalMetrics.reqPerDay)) + ' / day')) + '</div>' +
+      '</div>' +
+    '</div>' +
+    (pl.pKey === 'all'
+      ? '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">' + pl.allProdMetrics.map(function (pm) {
+          return '<div style="padding:8px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid ' + pm.color + ';font-size:11px" dir="ltr">' +
+            '<div style="font-weight:900;color:' + pm.color + '">' + pm.label + '</div>' +
+            '<div style="margin-top:2px">Standing: <b>' + pm.projPct.toFixed(1) + '%</b> · Gap: <b>' + (pm.gap >= 0 ? '+' : '') + fmtN(Math.round(pm.gap)) + '</b></div>' +
+            '<div style="margin-top:2px;font-weight:900;color:' + (pm.isOnTrack ? '#16a34a' : '#dc2626') + '">Daily Needed: ' + fmtN(Math.ceil(pm.reqPerDay)) + ' / day</div>' +
+          '</div>';
+        }).join('') + '</div>'
+      : '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px" dir="ltr">' +
+          '<div style="padding:8px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0"><div style="font-size:9.5px;color:#6b7280;font-weight:800">TARGET</div><div style="font-size:15px;font-weight:900;color:#1e1b4b">' + fmtN(Math.round(pl.totalMetrics.tgt)) + '</div></div>' +
+          '<div style="padding:8px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0"><div style="font-size:9.5px;color:#6b7280;font-weight:800">ACHIEVED</div><div style="font-size:15px;font-weight:900;color:#1e1b4b">' + fmtN(Math.round(pl.totalMetrics.act)) + '</div></div>' +
+          '<div style="padding:8px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0"><div style="font-size:9.5px;color:#6b7280;font-weight:800">PROJ % / GAP</div><div style="font-size:15px;font-weight:900;color:' + (pl.totalMetrics.isOnTrack ? '#16a34a' : '#dc2626') + '">' + pl.totalMetrics.projPct.toFixed(1) + '% (' + (pl.totalMetrics.gap >= 0 ? '+' : '') + fmtN(Math.round(pl.totalMetrics.gap)) + ')</div></div>' +
+          '<div style="padding:8px 10px;border-radius:9px;background:' + (pl.totalMetrics.isOnTrack ? '#f0fdf4;border:1px solid #bbf7d0' : '#fef2f2;border:1px solid #fecaca') + '"><div style="font-size:9.5px;color:#6b7280;font-weight:800">DAILY NEEDED (' + pl.K + 'd)</div><div style="font-size:15px;font-weight:900;color:' + (pl.totalMetrics.isOnTrack ? '#15803d' : '#dc2626') + '">' + fmtN(Math.ceil(pl.totalMetrics.reqPerDay)) + ' / day</div></div>' +
+        '</div>') +
+  '</div>';
 }
 
-async function saveFakiPlanAsPNG(planCardId) {
-  var el = document.getElementById(planCardId);
-  if (!el) return;
+async function captureFakiEmailHeaderPNG(plan) {
+  if (typeof mtdBALoadH2C === 'function') await mtdBALoadH2C();
+  var host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:860px;background:#ffffff;z-index:-1';
+  host.innerHTML = buildFakiEmailHeaderCardHTML(plan);
+  document.body.appendChild(host);
   try {
-    if (typeof mtdBALoadH2C === 'function') await mtdBALoadH2C();
-    var canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    var canvas = await html2canvas(host, { scale: 2, width: 860, windowWidth: 1100, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    var dataUrl = canvas.toDataURL('image/png');
+    return { dataUrl: dataUrl, base64: dataUrl.split(',')[1] || '' };
+  } finally {
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
+async function captureFakiFullPlanPNG(plan) {
+  if (typeof mtdBALoadH2C === 'function') await mtdBALoadH2C();
+  var host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:900px;background:#ffffff;z-index:-1';
+  host.innerHTML = buildFakiFullPlanCardHTML(plan, true);
+  document.body.appendChild(host);
+  try {
+    var canvas = await html2canvas(host, { scale: 2, width: 900, windowWidth: 1100, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    var dataUrl = canvas.toDataURL('image/png');
+    return { dataUrl: dataUrl, base64: dataUrl.split(',')[1] || '' };
+  } finally {
+    if (host.parentNode) host.parentNode.removeChild(host);
+  }
+}
+
+async function saveFakiPlanAsPNG(btn) {
+  if (!FAKI_LAST_PLAN_DATA) return;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Saving...'; }
+  try {
+    var cap = await captureFakiFullPlanPNG(FAKI_LAST_PLAN_DATA);
     var a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = 'FAKI_Action_Plan_' + (FAKI_SELECTED_IDENTITY ? FAKI_SELECTED_IDENTITY.label.replace(/\s+/g, '_') : 'Team') + '.png';
+    a.href = cap.dataUrl;
+    a.download = 'FAKI_Action_Plan_' + FAKI_LAST_PLAN_DATA.ident.label.replace(/\s+/g, '_') + '_' + FAKI_LAST_PLAN_DATA.K + 'd.png';
     document.body.appendChild(a); a.click();
     setTimeout(function () { a.remove(); }, 800);
-    if (typeof mgrToast === 'function') mgrToast('📸 تم حفظ صورة الخطة بنجاح!');
+    if (typeof mgrToast === 'function') mgrToast('📸 تم حفظ صورة الخطة الكاملة بدون قص!');
   } catch (e) {
     alert('تعذر حفظ الصورة: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
+  }
+}
+
+async function buildFakiPlanExcelBuffer(pl) {
+  await mtdInsLoadExcelJS();
+  var wb = new ExcelJS.Workbook();
+  wb.creator = 'FAKHARANY360 FAKI AI';
+  var ws = wb.addWorksheet('FAKI Action Plan');
+  ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 4 }];
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  if (pl.pKey === 'all') {
+    var colsW = [30, 24];
+    MTD_ONTRACK_PRODUCTS.forEach(function () { colsW.push(10, 10, 10, 12); });
+    colsW.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+    var N = colsW.length, r = 1;
+    ovWriteMergedBanner(ws, r++, 1, N, 'FAKI AI Action Plan (' + pl.K + ' Days) — ' + pl.ident.label + ' [All 6 Products]', { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r++;
+    var h1 = [{ t: 'Area Manager / Branch', rs: 2, al: 'l' }, { t: 'Supervisor', rs: 2, al: 'l' }];
+    var h2 = [];
+    MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+      h1.push({ t: p.label, cs: 4, bg: p.color });
+      h2.push({ t: 'Target', bg: '#4C1D95' }, { t: 'Ach', bg: '#4C1D95' }, { t: 'Proj%', bg: '#4C1D95' }, { t: 'Req/Day', bg: '#15803D' });
+    });
+    r = ovWriteTwoRowHeader(ws, r, h1, h2);
+    pl.cascadedList.forEach(function (sv) {
+      sv.ams.forEach(function (am) {
+        var c = 1;
+        ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', fg: '#4C1D95', b: true, al: 'l' }); ws.getCell(r, c - 1).value = '📍 ' + am.name;
+        ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', fg: '#4C1D95', b: false, al: 'l' }); ws.getCell(r, c - 1).value = sv.name;
+        MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+          var m = am.multi[p.key];
+          ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', b: false, numFmt: '#,##0' }); ws.getCell(r, c - 1).value = Math.round(m.tgt);
+          ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', b: true, numFmt: '#,##0' }); ws.getCell(r, c - 1).value = Math.round(m.act);
+          ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', b: true, numFmt: '0.0%' }); ws.getCell(r, c - 1).value = m.projPct / 100;
+          ovStyleCell(ws.getCell(r, c++), { bg: '#EDE9FE', fg: m.isOnTrack ? '#15803D' : '#DC2626', b: true, numFmt: '#,##0' }); ws.getCell(r, c - 1).value = Math.ceil(m.reqPerDay);
+        });
+        ws.getRow(r++).height = 20;
+        am.stores.forEach(function (st, si) {
+          var bg = si % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+          var cs = 1;
+          ovStyleCell(ws.getCell(r, cs++), { bg: bg, fg: '#1F2937', b: true, al: 'l', indent: 2 }); ws.getCell(r, cs - 1).value = st.name;
+          ovStyleCell(ws.getCell(r, cs++), { bg: bg, fg: '#6B7280', al: 'l' }); ws.getCell(r, cs - 1).value = sv.name;
+          MTD_ONTRACK_PRODUCTS.forEach(function (p) {
+            var m = st.multi[p.key];
+            ovStyleCell(ws.getCell(r, cs++), { bg: bg, numFmt: '#,##0' }); ws.getCell(r, cs - 1).value = Math.round(m.tgt);
+            ovStyleCell(ws.getCell(r, cs++), { bg: bg, b: true, numFmt: '#,##0' }); ws.getCell(r, cs - 1).value = Math.round(m.act);
+            ovStyleCell(ws.getCell(r, cs++), { bg: bg, b: true, numFmt: '0.0%' }); ws.getCell(r, cs - 1).value = m.projPct / 100;
+            ovStyleCell(ws.getCell(r, cs++), { bg: m.isOnTrack ? '#DCFCE7' : '#FEE2E2', fg: m.isOnTrack ? '#15803D' : '#991B1B', b: true, numFmt: '#,##0' }); ws.getCell(r, cs - 1).value = Math.ceil(m.reqPerDay);
+          });
+          ws.getRow(r++).height = 19;
+        });
+      });
+    });
+  } else {
+    [32, 24, 12, 12, 12, 12, 16].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+    var r1 = 1;
+    ovWriteMergedBanner(ws, r1++, 1, 7, 'FAKI AI Action Plan (' + pl.K + ' Days) — ' + pl.ident.label + ' [' + pl.pLabel + ']', { bg: '#111827', fg: '#FFFFFF', b: true, al: 'l', bd: '#111827', sz: 12, h: 26 });
+    r1++;
+    ['Area Manager / Branch', 'Supervisor', 'Target', 'Ach', 'Gap', 'Proj %', 'Daily Needed (' + pl.K + 'd)'].forEach(function (h, i) {
+      var cell = ws.getCell(r1, i + 1); cell.value = h;
+      ovStyleCell(cell, { hd: true, bg: i === 6 ? '#15803D' : '#5E2D91', fg: '#FFFFFF', b: true, al: i < 2 ? 'l' : 'c' });
+    });
+    ws.getRow(r1++).height = 22;
+    pl.cascadedList.forEach(function (sv) {
+      sv.ams.forEach(function (am) {
+        var valsAM = ['📍 ' + am.name, sv.name, Math.round(am.tgt), Math.round(am.act), Math.round(am.gap), am.projPct / 100, Math.ceil(am.reqPerDay)];
+        valsAM.forEach(function (v, i) {
+          var c = ws.getCell(r1, i + 1); c.value = v;
+          ovStyleCell(c, { bg: '#EDE9FE', fg: i === 6 && !am.isOnTrack ? '#DC2626' : '#4C1D95', b: true, al: i < 2 ? 'l' : 'c', numFmt: i === 5 ? '0.0%' : (i >= 2 ? '#,##0' : undefined) });
+        });
+        ws.getRow(r1++).height = 20;
+        am.stores.forEach(function (st, si) {
+          var bg = si % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+          var valsS = [st.name, sv.name, Math.round(st.tgt), Math.round(st.act), Math.round(st.gap), st.projPct / 100, Math.ceil(st.reqPerDay)];
+          valsS.forEach(function (v, i) {
+            var c = ws.getCell(r1, i + 1); c.value = v;
+            ovStyleCell(c, { bg: i === 6 ? (st.isOnTrack ? '#DCFCE7' : '#FEE2E2') : bg, fg: i === 6 ? (st.isOnTrack ? '#15803D' : '#991B1B') : '#1F2937', b: i >= 3, al: i < 2 ? 'l' : 'c', indent: i === 0 ? 2 : 0, numFmt: i === 5 ? '0.0%' : (i >= 2 ? '#,##0' : undefined) });
+          });
+          ws.getRow(r1++).height = 19;
+        });
+      });
+    });
+  }
+  return await wb.xlsx.writeBuffer();
+}
+
+async function sendFakiPlanEmail(btn) {
+  if (!FAKI_LAST_PLAN_DATA) return;
+  var pl = FAKI_LAST_PLAN_DATA;
+  var old = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Preparing .EML...'; }
+  try {
+    var cap = await captureFakiEmailHeaderPNG(pl);
+    var xlsxBuf = await buildFakiPlanExcelBuffer(pl);
+    var cidName = 'fakiplan_' + Date.now() + '@fakharany360';
+    var f = 'font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1f2937;line-height:1.55';
+
+    var emailHTML = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="' + f + ';background:#ffffff;padding:20px;margin:0;direction:ltr;text-align:left">' +
+      '<p style="' + f + ';font-size:15px;margin:0 0 10px">Dear <strong>' + mgrEsc(pl.ident.label) + '</strong>,</p>' +
+      '<p style="' + f + ';font-size:14px;margin:0 0 14px">Please find below your <strong>FAKI AI ' + pl.K + '-Day On-Track Recovery Plan</strong> for <strong>' + mgrEsc(pl.pLabel) + '</strong> (' + (pl.isMtd ? ('Live MTD Day ' + pl.pm.currentDay + '/' + pl.pm.daysInMonth) : 'Full Year YTD') + '):</p>' +
+      '<div style="margin:12px 0 18px"><img src="cid:' + cidName + '" alt="FAKI Action Plan" width="840" style="display:block;max-width:100%;width:840px;height:auto;border:1px solid #e2e8f0;border-radius:12px"/></div>' +
+      (pl.branchFlat.length > 1 ? '<p style="' + f + ';font-size:14px;font-weight:bold;color:#5E2D91;margin:14px 0 8px">📋 Detailed Cascaded Breakdown (' + pl.branchFlat.length + ' Branches):</p>' + buildFakiPlanTableHTML(pl, true) : '') +
+      '<div dir="rtl" style="padding:10px 14px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:12.5px;color:#78350f;line-height:1.65;margin:12px 0"><div style="font-weight:bold;margin-bottom:4px">💡 ملاحظات فاكي الذكية (Faki AI Insights):</div>' + pl.smartNotes.map(function(n){return '<div>• '+n+'</div>';}).join('') + '</div>' +
+      '<p style="' + f + ';font-size:13.5px;font-weight:bold;color:#5E2D91;margin:14px 0 8px">And find the full Excel breakdown attached.</p>' +
+      '<p style="' + f + ';font-size:12.5px;color:#4b5563;margin-top:18px;border-top:1px solid #e5e7eb;padding-top:10px">Best Regards,<br><strong>East Cairo Team — Mohamed Elfakharany</strong><br><span style="font-size:11px;color:#6b7280">FAKHARANY³⁶⁰ · FAKI AI Performance Coach</span></p>' +
+    '</body></html>';
+
+    var safeName = pl.ident.label.replace(/[^\w\u0600-\u06FF]+/g, '_');
+    var subj = 'FAKHARANY360 — ' + pl.K + '-Day On-Track Recovery Plan | ' + pl.ident.label + ' [' + pl.pLabel + ']';
+    var emlStr = buildScorecardAndExcelMimeEml('', subj, emailHTML, 'FAKI_Plan_' + safeName + '.png', cap.base64, cidName, 'FAKI_Action_Plan_' + safeName + '.xlsx', xlsxBuf);
+
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([emlStr], { type: 'message/rfc822' }));
+    a.download = 'FAKHARANY360_Plan_' + safeName + '_' + pl.K + 'd.eml';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    if (typeof mgrToast === 'function') mgrToast('📧 تم تجهيز وتحميل ملف الإيميل (.EML) بالجدول والصورة والإكسيل!');
+  } catch (e) {
+    alert('تعذر تجهيز الإيميل: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = old; }
   }
 }
 
@@ -22855,20 +23222,52 @@ function renderFakiWorkspace() {
     }
 
     if (m.type === 'sub_breakdown') {
+      if (m.isAll) {
+        var renderAllTbl = function (arr) {
+          if (!arr.length) return '<div style="font-size:11px;color:var(--text-muted)">No items in this category.</div>';
+          return '<div style="max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:9px;margin-bottom:8px" dir="ltr">' +
+            '<table style="width:100%;border-collapse:collapse;font-size:10.5px">' +
+              '<thead style="position:sticky;top:0;background:#1e1b4b;color:white"><tr>' +
+                '<th style="padding:6px 8px;text-align:left">Entity / Branch</th>' +
+                MTD_ONTRACK_PRODUCTS.map(function (p) { return '<th style="padding:6px 5px;text-align:center;background:' + p.color + '">' + p.label + '</th>'; }).join('') +
+              '</tr></thead>' +
+              '<tbody>' +
+                arr.map(function (x, i) {
+                  return '<tr style="background:' + (i % 2 === 0 ? 'var(--card-bg)' : 'var(--gray-bg)') + ';border-bottom:1px solid var(--border)">' +
+                    '<td dir="auto" style="padding:5px 8px;font-weight:800;white-space:nowrap">' + mgrEsc(x.name) + '</td>' +
+                    MTD_ONTRACK_PRODUCTS.map(function (p) {
+                      var pm = x.perProd[p.key];
+                      var c = pm.isOnTrack ? '#16a34a' : '#dc2626';
+                      return '<td style="padding:5px;text-align:center;font-weight:800;color:' + c + ';white-space:nowrap">' + pm.projPct.toFixed(0) + '% <span style="font-size:9px">(' + (pm.gap >= 0 ? '+' : '') + fmtN(Math.round(pm.gap)) + ')</span></td>';
+                    }).join('') +
+                  '</tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>' +
+          '</div>';
+        };
+        return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
+          '<div style="font-size:12.5px;font-weight:900;color:' + (m.showLaggingOnly ? '#dc2626' : '#16a34a') + ';margin-bottom:8px">' + (m.showLaggingOnly ? '🚨 مين موقعني في All 6 Products' : '🌟 مين On Track في كل المنتجات الـ 6') + '</div>' +
+          (m.amList.length ? '<div style="font-size:11px;font-weight:800;margin-bottom:4px">📍 Area Managers (' + m.amList.length + '):</div>' + renderAllTbl(m.amList) : '') +
+          '<div style="font-size:11px;font-weight:800;margin:6px 0 4px">🏪 Branches (' + m.stList.length + '):</div>' + renderAllTbl(m.stList) +
+          '<div style="margin-top:6px"><button type="button" class="faki-action-pill" style="background:#5C2D91;color:white" onclick="pushFakiAskHorizon(\'all\')">🚀 اعملي خطة الرجوع لكل المنتجات</button></div>' +
+        '</div></div>';
+      }
+
       var renderRows = function (arr) {
         if (!arr.length) return '<div style="font-size:11px;color:var(--text-muted)">No items in this category.</div>';
-        return arr.map(function (x) {
+        return '<div style="max-height:220px;overflow-y:auto">' + arr.map(function (x) {
           var c = x.isOnTrack ? '#16a34a' : '#dc2626';
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 9px;border-radius:8px;background:var(--gray-bg);border:1px solid var(--border);margin-bottom:4px;font-size:11px">' +
             '<div><b dir="auto">' + mgrEsc(x.name) + '</b> <span style="font-size:9.5px;color:var(--text-muted)">(' + mgrEsc(x.sub) + ')</span></div>' +
-            '<div style="font-weight:800;color:' + c + '">' + fmtN(Math.round(x.act)) + '/' + fmtN(Math.round(x.tgt)) + ' · ' + x.projPct.toFixed(0) + '% (Gap: ' + (x.gap >= 0 ? '+' : '') + fmtN(Math.round(x.gap)) + ')</div>' +
+            '<div style="font-weight:800;color:' + c + '" dir="ltr">' + fmtN(Math.round(x.act)) + '/' + fmtN(Math.round(x.tgt)) + ' · ' + x.projPct.toFixed(0) + '% (Gap: ' + (x.gap >= 0 ? '+' : '') + fmtN(Math.round(x.gap)) + ')</div>' +
           '</div>';
-        }).join('');
+        }).join('') + '</div>';
       };
       return '<div class="faki-msg-row"><div class="faki-bubble-bot">' +
         '<div style="font-size:12.5px;font-weight:900;color:' + (m.showLaggingOnly ? '#dc2626' : '#16a34a') + ';margin-bottom:8px">' + (m.showLaggingOnly ? '🚨 مين موقعني في ' + m.pLabel : '🌟 مين On Track في ' + m.pLabel) + '</div>' +
-        (m.amList.length ? '<div style="font-size:11px;font-weight:800;margin-bottom:4px">📍 Area Managers:</div>' + renderRows(m.amList) : '') +
-        '<div style="font-size:11px;font-weight:800;margin:6px 0 4px">🏪 Branches:</div>' + renderRows(m.stList) +
+        (m.amList.length ? '<div style="font-size:11px;font-weight:800;margin-bottom:4px">📍 Area Managers (' + m.amList.length + '):</div>' + renderRows(m.amList) : '') +
+        '<div style="font-size:11px;font-weight:800;margin:6px 0 4px">🏪 Branches (' + m.stList.length + '):</div>' + renderRows(m.stList) +
         '<div style="margin-top:8px"><button type="button" class="faki-action-pill" style="background:#5C2D91;color:white" onclick="pushFakiAskHorizon(\'' + m.pKey + '\')">🚀 اعملي خطة الرجوع دلوقتي</button></div>' +
       '</div></div>';
     }
@@ -22887,37 +23286,12 @@ function renderFakiWorkspace() {
     if (m.type === 'cascaded_plan') {
       var pl = m.plan;
       return '<div class="faki-msg-row"><div class="faki-bubble-bot" id="' + m.planId + '">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
-          '<span style="font-size:13.5px;font-weight:900;color:#5C2D91">🚀 On-Track Recovery Plan (' + pl.K + ' Days) — ' + mgrEsc(pl.ident.label) + '</span>' +
-          '<div style="display:flex;gap:5px">' +
-            '<button type="button" onclick="copyFakiPlanWhatsApp()" style="padding:4px 10px;border-radius:8px;border:none;background:#16a34a;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</button>' +
-            '<button type="button" onclick="saveFakiPlanAsPNG(\'' + m.planId + '\')" style="padding:4px 10px;border-radius:8px;border:none;background:#2563eb;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-image mr-1"></i>Save PNG</button>' +
-            '<button type="button" onclick="sendFakiPlanEmail()" style="padding:4px 10px;border-radius:8px;border:none;background:#5C2D91;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-envelope mr-1"></i>Email</button>' +
-          '</div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-bottom:8px">' +
+          '<button type="button" onclick="copyFakiPlanWhatsApp()" style="padding:5px 11px;border-radius:8px;border:none;background:#16a34a;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fab fa-whatsapp mr-1"></i>WhatsApp (All ' + pl.branchFlat.length + ')</button>' +
+          '<button type="button" onclick="saveFakiPlanAsPNG(this)" style="padding:5px 11px;border-radius:8px;border:none;background:#2563eb;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-image mr-1"></i>Save Full PNG</button>' +
+          '<button type="button" onclick="sendFakiPlanEmail(this)" style="padding:5px 11px;border-radius:8px;border:none;background:#5C2D91;color:white;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-envelope mr-1"></i>Save Email (.EML + Excel)</button>' +
         '</div>' +
-        '<div style="padding:10px 12px;border-radius:10px;background:#fef2f2;border:1.5px solid #fecaca;margin-bottom:10px">' +
-          '<div style="font-size:12.5px;font-weight:900;color:#dc2626">🎯 Total Daily Needed (' + pl.pLabel + '): ' + fmtN(Math.ceil(pl.totalMetrics.reqPerDay)) + ' / day for ' + pl.K + ' days</div>' +
-          '<div style="font-size:10.5px;color:#7f1d1d;font-weight:700;margin-top:2px">Standing: ' + pl.totalMetrics.projPct.toFixed(1) + '% · Normal Pace: ' + fmtN(Math.ceil(pl.totalMetrics.normalDaily)) + '/d + Catch-up: +' + fmtN(Math.ceil(pl.totalMetrics.catchUpPerDay)) + '/d</div>' +
-        '</div>' +
-        (pl.pKey === 'all' ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px;margin-bottom:10px">' + pl.allProdMetrics.map(function (pm) {
-          return '<div style="padding:6px 8px;border-radius:8px;background:var(--gray-bg);border-top:2.5px solid ' + pm.color + ';font-size:10.5px"><b>' + pm.label + '</b>: ' + pm.projPct.toFixed(0) + '% ➔ <b style="color:' + (pm.isOnTrack ? '#16a34a' : '#dc2626') + '">' + fmtN(Math.ceil(pm.reqPerDay)) + '/d</b></div>';
-        }).join('') + '</div>' : '') +
-        (pl.branchFlat.length > 1 ? '<div style="font-size:11px;font-weight:900;margin-bottom:5px">📋 Cascaded Plan by Area Manager &amp; Branch:</div><div style="max-height:190px;overflow-y:auto;border:1px solid var(--border);border-radius:9px;padding:6px;background:var(--gray-bg);margin-bottom:10px">' +
-          pl.cascadedList.map(function (sv) {
-            return sv.ams.map(function (am) {
-              return '<div style="padding:5px 7px;border-bottom:1px solid var(--border);font-size:11px">' +
-                '<div style="display:flex;justify-content:space-between;font-weight:900;color:#5C2D91"><span>📍 ' + mgrEsc(am.name) + ' (' + am.projPct.toFixed(0) + '%)</span><span>' + fmtN(Math.ceil(am.reqPerDay)) + ' / day</span></div>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">' + am.stores.map(function (st) {
-                  return '<span style="font-size:9.5px;padding:2px 6px;border-radius:6px;background:' + (st.isOnTrack ? '#dcfce7;color:#15803d' : '#fee2e2;color:#b91c1c') + ';font-weight:700">' + mgrEsc(st.name) + ': <b>' + fmtN(Math.ceil(st.reqPerDay)) + '/d</b></span>';
-                }).join('') + '</div>' +
-              '</div>';
-            }).join('');
-          }).join('') +
-        '</div>' : '') +
-        '<div dir="rtl" style="padding:9px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;font-size:11.5px;color:#78350f;line-height:1.6">' +
-          '<div style="font-weight:900;margin-bottom:3px">💡 ملاحظات فاكي الذكية (Faki AI Insights):</div>' +
-          pl.smartNotes.map(function (n) { return '<div>• ' + n + '</div>'; }).join('') +
-        '</div>' +
+        buildFakiFullPlanCardHTML(pl, false) +
       '</div></div>';
     }
 
