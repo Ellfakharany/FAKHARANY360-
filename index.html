@@ -7392,7 +7392,34 @@ function parseMTDMultiLevel(ws) {
   var keepCols = [];
   for (var c = 0; c < totalCols; c++) keepCols.push(c);
 
-  var headers = keepCols.map(function(ci){ return ci < 12 ? INFO_NAMES[ci] : hdr(ci); });
+  // Identify Row-5 (top group row) grand-total columns so Row-6 sub-category columns
+  // (e.g. "Fixed" sub-category inside FBB at cols 77-81) can NEVER overwrite real Fixed Target/Subs/Proj (cols 67-71)!
+  var topGroupRow = groupRows.length > 0 ? aoa[groupRows[0]] : null;
+  var isGrandTotalCol = keepCols.map(function (ci) {
+    if (ci < 12 || !topGroupRow) return false;
+    var tv = topGroupRow[ci];
+    if (tv === null || tv === undefined) return false;
+    var tNorm = String(tv).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    return !!MTD_COL_MAP[tNorm];
+  });
+  var headers = keepCols.map(function (ci, idx) {
+    if (ci < 12) return INFO_NAMES[ci];
+    if (isGrandTotalCol[idx] && topGroupRow) {
+      return String(topGroupRow[ci]).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return hdr(ci);
+  });
+  // If any Grand Total column exists for a normalized header key, skip duplicate non-Grand-Total columns with that same key
+  var grandTotalKeys = {};
+  headers.forEach(function (h, idx) {
+    if (isGrandTotalCol[idx]) grandTotalKeys[String(h).trim().toLowerCase()] = true;
+  });
+  var activeColIndices = [];
+  keepCols.forEach(function (ci, idx) {
+    var hNorm = String(headers[idx] || '').trim().toLowerCase();
+    if (!isGrandTotalCol[idx] && grandTotalKeys[hNorm]) return; // skip shadowing sub-category column!
+    activeColIndices.push(idx);
+  });
 
   var dataStartRow = fieldRowIdx + 1;
   var fakeRaw = [];
@@ -7401,7 +7428,10 @@ function parseMTDMultiLevel(ws) {
     if (!row || !row[0]) continue;
     if (String(row[0]).trim().toLowerCase() === 'grand total') continue;
     var obj = {};
-    keepCols.forEach(function(ci, idx){ obj[headers[idx]] = row[ci]; });
+    activeColIndices.forEach(function (idx) {
+      var ci = keepCols[idx];
+      obj[headers[idx]] = row[ci];
+    });
     fakeRaw.push(obj);
   }
   return parseMTDFlat(fakeRaw);
@@ -7442,25 +7472,23 @@ function parseIDLESheet(wb) {
   var fieldRow = aoa[headerRowIdx] || [];
   var totalCols = fieldRow.length;
 
-  var colLabel = []; // ci -> fully combined label, e.g. "WE Gold All Sales"
+  var pass1Label = []; // Grand-total columns (e.g. "Mobile All Sales", "Fixed All Activation", "FBB All Sales")
+  var pass2Label = []; // Sub-category columns (e.g. "WE Gold All Sales", "WE Mix All Activation")
 
-  // Pass 1: rows above the field row may already contain the full combined
-  // text for some columns (Mobile/Fixed/FBB grand totals).
+  // Pass 1: rows above the field row carrying full combined grand-total labels
   for (var r = Math.max(0, headerRowIdx - 3); r < headerRowIdx; r++) {
     var rr = aoa[r] || [];
     for (var ci = 0; ci < totalCols; ci++) {
       var v = rr[ci];
-      if (typeof v === 'string' && /All (Sales|Activation)/.test(v)) {
-        colLabel[ci] = v.trim();
+      if (typeof v === 'string' && /All\s+(Sales|Activation)/i.test(v)) {
+        pass1Label[ci] = v.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
       }
     }
   }
 
-  // Pass 2: columns where the field row itself is exactly "All Sales" /
-  // "All Activation" — combine with the product-name row directly above
-  // (handles WE Gold, WE Mix, and similar package-level breakdowns).
+  // Pass 2: columns where the field row itself is "All Sales" / "All Activation"
   for (var ci2 = 0; ci2 < totalCols; ci2++) {
-    if (colLabel[ci2]) continue; // already resolved in pass 1
+    if (pass1Label[ci2]) continue;
     var fv = fieldRow[ci2];
     var fStr = (typeof fv === 'string') ? fv.trim() : '';
     if (fStr !== 'All Sales' && fStr !== 'All Activation') continue;
@@ -7470,22 +7498,32 @@ function parseIDLESheet(wb) {
       for (var lc = ci2; lc >= Math.max(0, ci2 - 2) && !grp; lc--) {
         var gv = rowAbove[lc];
         if (typeof gv === 'string' && gv.trim() !== '' && !/^All\s+(Sales|Activation)$/i.test(gv.trim())) {
-          grp = gv.trim();
+          grp = gv.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
         }
       }
     }
-    if (grp) colLabel[ci2] = grp + ' ' + fStr;
+    if (grp) pass2Label[ci2] = grp + ' ' + fStr;
   }
 
   function findProductCols(productLabel) {
     var salesCol = -1, actCol = -1;
     var normTargetSales = (productLabel + ' all sales').toLowerCase().replace(/\s+/g, ' ');
     var normTargetAct   = (productLabel + ' all activation').toLowerCase().replace(/\s+/g, ' ');
+    // Priority 1: Grand-total labels from Pass 1 ONLY (immune to sub-category collisions like Fixed-inside-FBB!)
     for (var ci = 0; ci < totalCols; ci++) {
-      if (!colLabel[ci]) continue;
-      var cl = String(colLabel[ci]).trim().toLowerCase().replace(/\s+/g, ' ');
-      if (cl === normTargetSales) salesCol = ci;
-      if (cl === normTargetAct)   actCol = ci;
+      if (!pass1Label[ci]) continue;
+      var cl = pass1Label[ci].toLowerCase();
+      if (salesCol < 0 && cl === normTargetSales) salesCol = ci;
+      if (actCol < 0 && cl === normTargetAct)     actCol = ci;
+    }
+    // Priority 2: Sub-category labels from Pass 2 (for WE Gold, WE Mix, etc.) — only if not already resolved in Pass 1
+    if (salesCol < 0 || actCol < 0) {
+      for (var ci2 = 0; ci2 < totalCols; ci2++) {
+        if (!pass2Label[ci2]) continue;
+        var cl2 = pass2Label[ci2].toLowerCase();
+        if (salesCol < 0 && cl2 === normTargetSales) salesCol = ci2;
+        if (actCol < 0 && cl2 === normTargetAct)     actCol = ci2;
+      }
     }
     return { salesCol: salesCol, actCol: actCol };
   }
@@ -7936,12 +7974,14 @@ function parseTariffsSheetClosure(wb) {
       var isKix = lowLabel.indexOf('kix') >= 0;
       var isTaz = lowLabel.indexOf('tazbeet') >= 0;
       if (!isKix && !isTaz) {
-        if (/^(storecodebss|branchname|store|partner|classification|region|account|channel|area|supervisor|regional)/i.test(lowLabel)) continue;
+        if (/^(storecodebss|branch\s*name|store|partner|classification|region|account|channel|area|supervisor|sinor|senior|regional)/i.test(lowLabel)) continue;
+        var numV = Number(v);
+        if (!isFinite(numV) || numV === 0) continue;
         var cls = classifyWeTariffPlan(label2);
         var extraCat = cls.cat || 'other';
         var extraLbl = cls.label || label2;
         if (!extraTariffs[extraCat]) extraTariffs[extraCat] = {};
-        extraTariffs[extraCat][extraLbl] = (extraTariffs[extraCat][extraLbl] || 0) + Number(v);
+        extraTariffs[extraCat][extraLbl] = (extraTariffs[extraCat][extraLbl] || 0) + numV;
         continue;
       }
       v = Number(v);
