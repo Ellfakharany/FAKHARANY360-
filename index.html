@@ -644,6 +644,191 @@ input *, textarea *, select * {
   user-select: text !important;
 }
 
+
+/* ── Floating Edge Activation / Sales Dock (v52) ── */
+#floating-mode-dock {
+  position: fixed;
+  left: 0;
+  top: 52%;
+  transform: translateY(-50%);
+  z-index: 8800;
+  display: none;
+  align-items: center;
+  font-family: 'Inter', 'Cairo', sans-serif;
+}
+#floating-mode-dock .fmd-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 30px;
+  padding: 9px 4px;
+  border: none;
+  border-radius: 0 12px 12px 0;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 2px 4px 14px rgba(15, 23, 42, 0.22);
+  transition: all 0.2s ease;
+  font-size: 11px;
+  font-weight: 800;
+}
+#floating-mode-dock .fmd-handle:hover { width: 34px; }
+#floating-mode-dock .fmd-handle .fmd-tag {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+#floating-mode-dock .fmd-panel {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 5px 7px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(94, 45, 145, 0.2);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+.dark #floating-mode-dock .fmd-panel {
+  background: rgba(26, 22, 40, 0.95);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+#floating-mode-dock.open .fmd-panel { display: inline-flex; }
+#floating-mode-dock .fmd-btn {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+#floating-mode-dock .fmd-scope {
+  font-size: 9px;
+  font-weight: 800;
+  color: #6b7280;
+  padding: 0 4px;
+  text-transform: uppercase;
+}
+@media print { #floating-mode-dock { display: none !important; } }
+
+/* ── Floating Right-Edge Quick Filter Dock (v53) ── */
+#floating-filter-dock {
+  position: fixed;
+  right: 0;
+  top: 52%;
+  transform: translateY(-50%);
+  z-index: 8800;
+  display: none;
+  align-items: center;
+  flex-direction: row-reverse;
+  font-family: 'Inter', 'Cairo', sans-serif;
+}
+#floating-filter-dock .ffd-handle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 30px;
+  padding: 9px 4px;
+  border: none;
+  border-radius: 12px 0 0 12px;
+  background: linear-gradient(135deg, #312e81, #5E2D91);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: -2px 4px 14px rgba(15, 23, 42, 0.22);
+  transition: all 0.2s ease;
+  font-size: 11px;
+  font-weight: 800;
+}
+#floating-filter-dock .ffd-handle:hover { width: 34px; }
+#floating-filter-dock .ffd-tag {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+#floating-filter-dock .ffd-badge {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e91e8c;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(233, 30, 140, 0.45);
+}
+#floating-filter-dock .ffd-panel {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-right: 6px;
+  width: 272px;
+  max-width: calc(100vw - 48px);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px 11px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(94, 45, 145, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+}
+.dark #floating-filter-dock .ffd-panel {
+  background: rgba(26, 22, 40, 0.96);
+  border-color: rgba(167, 139, 250, 0.3);
+  color: #f0eeff;
+}
+#floating-filter-dock.open .ffd-panel { display: flex; }
+#floating-filter-dock .ffd-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+#floating-filter-dock .ffd-field label {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+#floating-filter-dock .ffd-field select {
+  width: 100%;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+}
+.dark #floating-filter-dock .ffd-field select {
+  background: #0f0d1a;
+  border-color: #3b3054;
+  color: #f0eeff;
+}
+@media print { #floating-filter-dock { display: none !important; } }
+
+
 </style>
 </head>
 <body class="bg-gray-50 font-sans" id="app-body">
@@ -1142,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', function() {
         style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
         <i class="fas fa-shopping-cart mr-1"></i>Sales
       </button>
-      <span id="dash-mode-status-badge" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#f3f4f6;color:#4b5563"></span>
+      <span id="dash-mode-status-badge" dir="rtl" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-family:'Cairo','Inter',sans-serif"></span>
       <span style="font-size:10px;color:#9ca3af">(بيفرق بس في Mobile / Fixed / FBB — باقي المنتجات زي ما هي)</span>
     </div>
     <!-- Row 0: Classification Slicer -->
@@ -2095,17 +2280,30 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
 
-      <!-- ── Package Mix Breakdown (Mobile packages, MTD) ── -->
+      <!-- ── Package Mix Breakdown (Unified Product & Sub-Tariffs View, MTD) ── -->
       <div id="mtd-pkgmix-wrap" style="display:none">
-        <div class="section-title"><i class="fas fa-th-large mr-2"></i>Package Mix Breakdown</div>
-        <div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);border-radius:14px;padding:16px;margin-bottom:14px;color:white;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span style="font-size:12px;font-weight:700;opacity:.9"><i class="fas fa-chart-bar mr-1"></i>Total Mobile Sales</span>
-          <span id="mtd-pkg-total" style="font-size:26px;font-weight:800"></span>
-          <span style="font-size:10px;opacity:.85;width:100%">Distribution across packages shown below as % of this total</span>
+        <div class="section-title"><i class="fas fa-th-large mr-2"></i>Package Mix & Sub-Tariffs Breakdown (MTD)</div>
+        <div id="mtd-pkg-product-selector" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px">
+          <span style="font-size:10.5px;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-inline-end:4px"><i class="fas fa-cubes mr-1" style="color:var(--we-purple)"></i>Product:</span>
+          <button type="button" class="mtd-pkg-prod-pill active" data-mtdpkgprod="mobile" onclick="setMtdPkgProductFocus('mobile')" style="padding:5px 12px;border-radius:999px;border:1.5px solid #5E2D91;background:#5E2D91;color:#fff;font-size:11px;font-weight:700;cursor:pointer">📱 Mobile</button>
+          <button type="button" class="mtd-pkg-prod-pill" data-mtdpkgprod="gold" onclick="setMtdPkgProductFocus('gold')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">🥇 WE Gold</button>
+          <button type="button" class="mtd-pkg-prod-pill" data-mtdpkgprod="fbb" onclick="setMtdPkgProductFocus('fbb')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">📶 FBB</button>
+          <button type="button" class="mtd-pkg-prod-pill" data-mtdpkgprod="fixed" onclick="setMtdPkgProductFocus('fixed')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">☎️ Fixed</button>
+          <button type="button" class="mtd-pkg-prod-pill" data-mtdpkgprod="fwa" onclick="setMtdPkgProductFocus('fwa')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">📡 WE Air</button>
+          <span dir="rtl" style="font-size:10.5px;color:var(--text-muted);margin-inline-start:auto;font-family:'Cairo','Inter',sans-serif">نفس تقسيمة الباقات الرسمية — للشهر الحالي <bdi>MTD</bdi> فقط</span>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6" id="mtd-pkg-grid"></div>
-        <div id="mtd-pkg-detail"></div>
-        <div id="mtd-pkg-col-drill" style="margin-top:12px"></div>
+        <div id="mtd-pkg-mobile-wrap">
+          <div style="background:linear-gradient(135deg,#5E2D91,#7c3aed);border-radius:14px;padding:16px;margin-bottom:10px;color:white;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span style="font-size:12px;font-weight:700;opacity:.9"><i class="fas fa-chart-bar mr-1"></i>Total Mobile (MTD)</span>
+            <span id="mtd-pkg-total" style="font-size:26px;font-weight:800"></span>
+            <span style="font-size:10px;opacity:.85;width:100%">Mobile packages only (FBB / Fixed / WE Air separated cleanly into their own tabs above)</span>
+          </div>
+          <div id="mtd-pkg-reconcile-note"></div>
+          <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6" id="mtd-pkg-grid"></div>
+          <div id="mtd-pkg-detail"></div>
+          <div id="mtd-pkg-col-drill" style="margin-top:12px"></div>
+        </div>
+        <div id="mtd-pkg-product-focus" style="display:none" class="mb-6"></div>
       </div>
 
       <!-- ── Tariff Mix (Low/Mid/High/12PT) — MTD scope, same concept as the Tariff Mix tab ── -->
@@ -5644,9 +5842,9 @@ function renderPkgSubTariffDrill() {
     var diffVal = Math.round(groupAch - subTotalSum);
     var diffNotice = '';
     if (diffVal !== 0) {
-      diffNotice = '<div style="margin-bottom:8px;padding:6px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11px;display:flex;align-items:center;gap:6px">' +
-        '<i class="fas fa-info-circle"></i>' +
-        '<span>مجموع الباقات الفرعية = <b>' + fmtN(subTotalSum) + '</b> من أصل <b>' + fmtN(groupAch) + '</b> (فرق <b>' + (diffVal > 0 ? '+' : '') + fmtN(diffVal) + '</b> بسبب باقات غير مصنّفة أو فرق Sales/Activation في شيت Tariffs).</span>' +
+      diffNotice = '<div dir="rtl" style="margin-bottom:8px;padding:8px 12px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px;text-align:right;font-family:\'Cairo\',\'Inter\',sans-serif;line-height:1.6">' +
+        '<i class="fas fa-info-circle" style="flex-shrink:0"></i>' +
+        '<span>مجموع الباقات الفرعية هو <bdi><b>' + fmtN(subTotalSum) + '</b></bdi> من إجمالي <bdi><b>' + fmtN(groupAch) + '</b></bdi> (فرق <bdi><b>' + (diffVal > 0 ? '+' : '') + fmtN(diffVal) + '</b></bdi> بسبب باقات غير مصنّفة أو فرق <bdi>Sales / Activation</bdi>).</span>' +
       '</div>';
     }
     rowsHtml = diffNotice + subItems.map(function (item) {
@@ -5660,7 +5858,7 @@ function renderPkgSubTariffDrill() {
         '</div>';
     }).join('');
   } else {
-    rowsHtml = '<div style="padding:12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:12px;line-height:1.6">' +
+    rowsHtml = '<div dir="rtl" style="padding:12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:12px;line-height:1.7;text-align:right;font-family:\'Cairo\',\'Inter\',sans-serif">' +
       '<i class="fas fa-info-circle mr-1"></i>' +
       'إجمالي <b>' + g.label + '</b> في الفلتر الحالي = <b>' + fmtN(groupAch) + '</b>، لكن تفاصيل الباقات الفرعية (Sub-Tariffs) غير محفوظة في بيانات الـ Closure القديمة للشهر ده. ' +
       'ارفع ملف الـ Closure بالنسخة الجديدة من شاشة <b>Upload Data</b> أو راجع شيت <b>Tariffs Per Stoers</b> في تبويب <b>MTD</b> لعرض التفاصيل الكاملة فوراً.' +
@@ -5700,9 +5898,9 @@ function renderPkgProductFocusView() {
     var focusDiff = Math.round(ach - focusSubSum);
     var focusDiffNote = '';
     if (focusDiff !== 0) {
-      focusDiffNote = '<div style="margin-bottom:10px;padding:7px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px">' +
-        '<i class="fas fa-info-circle"></i>' +
-        '<span>تنبيه: مجموع تفاصيل شيت Tariffs = <b>' + fmtN(focusSubSum) + '</b> من أصل إجمالي ' + m.label + ' (<b>' + fmtN(ach) + '</b>) — فرق <b>' + (focusDiff > 0 ? '+' : '') + fmtN(focusDiff) + '</b> ناتج عن باقات غير مدرجة في شيت Tariffs أو فرق Sales/Activation.</span>' +
+      focusDiffNote = '<div dir="rtl" style="margin-bottom:10px;padding:8px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px;text-align:right;font-family:\'Cairo\',\'Inter\',sans-serif;line-height:1.6">' +
+        '<i class="fas fa-info-circle" style="flex-shrink:0"></i>' +
+        '<span>تنبيه: مجموع تفاصيل شيت <bdi>Tariffs</bdi> هو <bdi><b>' + fmtN(focusSubSum) + '</b></bdi> من إجمالي <bdi>' + m.label + '</bdi> (<bdi><b>' + fmtN(ach) + '</b></bdi>) — فرق <bdi><b>' + (focusDiff > 0 ? '+' : '') + fmtN(focusDiff) + '</b></bdi> بسبب باقات غير مدرجة أو فرق <bdi>Sales / Activation</bdi>.</span>' +
       '</div>';
     }
     subHtml = focusDiffNote + '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">' +
@@ -7121,7 +7319,7 @@ async function fetchAutoMTDData(opts) {
             try {
               var metaM = await sb.from('mtd_meta').select('pkg_mix,daily,sales_data').eq('snapshot_date', dateIsoM).eq('kind', 'mobile').maybeSingle();
               if (metaM.data) {
-                MTD_PKGMIX = metaM.data.pkg_mix || null;
+                MTD_PKGMIX = (typeof cleanMtdPkgMixObj === 'function') ? cleanMtdPkgMixObj(metaM.data.pkg_mix || null) : (metaM.data.pkg_mix || null);
                 MTD_DAILY = metaM.data.daily || null;
                 MTD_SALES_DATA = metaM.data.sales_data || [];
               }
@@ -7578,6 +7776,39 @@ var MTD_PKG_DIM_COLS = ['Channel Manager','Regional Manager','Sinor supervisor',
 // 7 known package categories above by name pattern (everything else falls
 // into "Other / Add-ons"). Verified against real data: category sums add up
 // exactly to each row's own "Grand Total" column.
+// Auto-heal Excel PivotTable baseline leak (e.g. Nov 21 file where Fixed Sales leaks into all 698 tariff cells)
+function cleanTariffRowPivotLeak(valsMap, totalColsCount) {
+  if (!valsMap || totalColsCount < 20) return valsMap;
+  var keys = Object.keys(valsMap);
+  if (keys.length < totalColsCount * 0.7) return valsMap;
+  var minV = Infinity;
+  for (var i = 0; i < keys.length; i++) {
+    var n = Number(valsMap[keys[i]]);
+    if (isFinite(n) && n > 0 && n < minV) minV = n;
+  }
+  if (!isFinite(minV) || minV <= 0) return valsMap;
+  var eqCount = 0;
+  for (var j = 0; j < keys.length; j++) {
+    if (Number(valsMap[keys[j]]) === minV) eqCount++;
+  }
+  if (eqCount < totalColsCount * 0.5) return valsMap;
+  var cleaned = {};
+  for (var k = 0; k < keys.length; k++) {
+    var diff = Number(valsMap[keys[k]]) - minV;
+    if (diff > 0) cleaned[keys[k]] = diff;
+  }
+  return cleaned;
+}
+
+function cleanMtdPkgMixObj(pkg) {
+  if (!pkg || !Array.isArray(pkg.cols) || !Array.isArray(pkg.rows)) return pkg;
+  var nCols = pkg.cols.length;
+  pkg.rows.forEach(function (r) {
+    if (r && r.vals) r.vals = cleanTariffRowPivotLeak(r.vals, nCols);
+  });
+  return pkg;
+}
+
 function parsePkgMixSheet(wb) {
   var sheetName = wb.SheetNames.find(function(s){ return /tariffs per sto/i.test(s); });
   if (!sheetName) return null;
@@ -7614,7 +7845,8 @@ function parsePkgMixSheet(wb) {
     var code = String(row[storeColIdx]).trim().toUpperCase();
     if (!code || code === 'GRAND TOTAL') continue;
     var vals = {};
-    for (var ci3 = 0; ci3 < cols.length; ci3++) { var v = row[cols[ci3].ci]; if (v) vals[cols[ci3].ci] = Number(v) || 0; }
+    for (var ci3 = 0; ci3 < cols.length; ci3++) { var v = row[cols[ci3].ci]; if (v) { var nv = Number(v); if (isFinite(nv) && nv > 0) vals[cols[ci3].ci] = nv; } }
+    vals = cleanTariffRowPivotLeak(vals, cols.length);
     rows.push({ storeCode: code, vals: vals });
   }
   return { cols: cols, rows: rows };
@@ -9613,6 +9845,13 @@ function renderMTDKPIs() {
   makeKPI('mtd-kpi-fbb','FBB','fa-wifi','#2563eb','fbbTarget','fbbSubs','fbbProj');
   makeKPI('mtd-kpi-fixed','Fixed','fa-phone','#16a34a','fixedTarget','fixedSubs','fixedProj');
   makeKPI('mtd-kpi-fwa','WE Air','fa-broadcast-tower','#0891b2','fwaTarget','fwaSubs','fwaProj');
+  [['mtd-kpi-mobile','mobile'],['mtd-kpi-fbb','fbb'],['mtd-kpi-fixed','fixed'],['mtd-kpi-fwa','fwa']].forEach(function(pair){
+    var cardEl = document.getElementById(pair[0]);
+    if (!cardEl) return;
+    cardEl.style.cursor = 'pointer';
+    cardEl.title = 'اضغط للانتقال إلى تفاصيل باقات ' + pair[1].toUpperCase() + ' في سيكشن الباقات';
+    cardEl.onclick = function(){ jumpToMtdProductPackages(pair[1]); };
+  });
 
   // Wallet KPI (if loaded)
   var wKpi=document.getElementById('mtd-kpi-wallet');
@@ -9713,7 +9952,7 @@ function renderMTDProductGrid() {
     var gap=act-tgt, projGap=proj-tgt;
     var ac=mtdColor(pp), pc=mtdColor(projPP);
     var bW=Math.min(pp,100).toFixed(1), pbW=Math.min(projPP,100).toFixed(1);
-    return '<div style="background:white;border-radius:12px;padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);border-top:3px solid '+p.color+'">'+
+    return '<div onclick="jumpToMtdProductPackages(\''+p.key+'\')" title="اضغط للانتقال إلى تفاصيل باقات '+p.label+'" style="cursor:pointer;background:white;border-radius:12px;padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,0.07);border-top:3px solid '+p.color+'">'+
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:10px">'+
         '<i class="fas '+p.icon+'" style="color:'+p.color+';margin-right:5px"></i>'+p.label+'</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">'+
@@ -10101,7 +10340,38 @@ function renderMTDSummary() {
 }
 
 
-// ── Package Mix Breakdown (Tariffs Per Stoers) ───────────────────
+// ── Package Mix Breakdown (Unified Product & Sub-Tariffs View, MTD) ──
+var MTD_PKG_ACTIVE_PROD = 'mobile';
+
+function jumpToMtdProductPackages(prodKey) {
+  if (!prodKey || prodKey === 'wallet') return;
+  setMtdPkgProductFocus(prodKey);
+  var wrap = document.getElementById('mtd-pkgmix-wrap');
+  if (wrap && wrap.style.display !== 'none') {
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function setMtdPkgProductFocus(prodKey) {
+  MTD_PKG_ACTIVE_PROD = prodKey || 'mobile';
+  document.querySelectorAll('.mtd-pkg-prod-pill').forEach(function (btn) {
+    var active = btn.getAttribute('data-mtdpkgprod') === MTD_PKG_ACTIVE_PROD;
+    btn.classList.toggle('active', active);
+    btn.style.background = active ? '#5E2D91' : 'var(--gray-bg)';
+    btn.style.color = active ? '#fff' : 'var(--text-primary)';
+    btn.style.borderColor = active ? '#5E2D91' : 'var(--border)';
+  });
+  renderMTDPkgMix();
+}
+
+function getMtdColCanonicalCat(col) {
+  if (typeof classifyWeTariffPlan === 'function') {
+    var cls = classifyWeTariffPlan(col.label);
+    if (cls && cls.cat) return cls;
+  }
+  return { cat: col.cat || 'other', label: col.label, family: col.cat || 'Other' };
+}
+
 function renderMTDPkgMix() {
   var wrap = document.getElementById('mtd-pkgmix-wrap');
   if (!wrap) return;
@@ -10112,19 +10382,104 @@ function renderMTDPkgMix() {
   MTD_FILTERED.forEach(function(r){ codes[String(r.storeCode||'').trim().toUpperCase()] = true; });
   var rows = MTD_PKGMIX.rows.filter(function(r){ return codes[r.storeCode]; });
 
+  // Sum every raw column across the filtered rows (auto-healing any Pivot baseline leak)
+  var colSums = {};
+  MTD_PKGMIX.cols.forEach(function(c){ colSums[c.ci] = 0; });
+  var totalPkgCols = MTD_PKGMIX.cols.length;
+  rows.forEach(function(r){
+    var cleanVals = (typeof cleanTariffRowPivotLeak === 'function') ? cleanTariffRowPivotLeak(r.vals, totalPkgCols) : r.vals;
+    for (var ci in cleanVals) { if (colSums.hasOwnProperty(ci)) colSums[ci] += cleanVals[ci]; }
+  });
+
+  // Classify every column accurately via WE_TARIFF_STRUC_MAP so FBB/Fixed/WE Air NEVER pollute Mobile Other!
+  var colMeta = {};
+  MTD_PKGMIX.cols.forEach(function (c) {
+    var info = getMtdColCanonicalCat(c);
+    colMeta[c.ci] = info;
+    c._trueCat = info.cat;
+  });
+
+  var mobWrap = document.getElementById('mtd-pkg-mobile-wrap');
+  var focWrap = document.getElementById('mtd-pkg-product-focus');
+  var isMobile = (MTD_PKG_ACTIVE_PROD === 'mobile');
+  if (mobWrap) mobWrap.style.display = isMobile ? '' : 'none';
+  if (focWrap) focWrap.style.display = isMobile ? 'none' : 'block';
+
+  if (!isMobile && focWrap) {
+    var metaMap = {
+      gold:  { label: 'WE Gold (MTD)',            icon: '🥇', color: '#d97706', aKey: 'goldSubs',  tKey: 'goldTarget',  pKey: 'goldProj',  catKey: 'gold' },
+      fbb:   { label: 'FBB — Home Internet (MTD)',icon: '📶', color: '#2563eb', aKey: 'fbbSubs',   tKey: 'fbbTarget',   pKey: 'fbbProj',   catKey: 'fbb' },
+      fixed: { label: 'Fixed — Landline (MTD)',   icon: '☎️', color: '#16a34a', aKey: 'fixedSubs', tKey: 'fixedTarget', pKey: 'fixedProj', catKey: 'fixed' },
+      fwa:   { label: 'WE Air — FWA (MTD)',       icon: '📡', color: '#0891b2', aKey: 'fwaSubs',   tKey: 'fwaTarget',   pKey: 'fwaProj',   catKey: 'fwa' }
+    };
+    var m = metaMap[MTD_PKG_ACTIVE_PROD];
+    if (!m) return;
+    var ach = mtdSum(MTD_FILTERED, m.aKey);
+    var tgt = mtdSum(MTD_FILTERED, m.tKey);
+    var proj = mtdSum(MTD_FILTERED, m.pKey);
+    var achP = tgt > 0 ? (ach / tgt * 100).toFixed(1) : '0.0';
+    var projP = tgt > 0 ? (proj / tgt * 100).toFixed(1) : '0.0';
+
+    var grouped = {};
+    MTD_PKGMIX.cols.forEach(function (c) {
+      var v = colSums[c.ci] || 0;
+      if (!v) return;
+      var info = colMeta[c.ci];
+      if (info.cat !== m.catKey) return;
+      var lbl = info.label || c.label;
+      grouped[lbl] = (grouped[lbl] || 0) + v;
+    });
+    var subItems = Object.keys(grouped).map(function (lbl) { return { label: lbl, val: grouped[lbl] }; }).sort(function (a, b) { return b.val - a.val; });
+    var subSum = subItems.reduce(function (s, x) { return s + x.val; }, 0);
+    var diff = Math.round(ach - subSum);
+    var diffNote = (subItems.length > 0 && diff !== 0)
+      ? '<div dir="rtl" style="margin-bottom:10px;padding:8px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px;text-align:right;font-family:\'Cairo\',\'Inter\',sans-serif;line-height:1.6">' +
+          '<i class="fas fa-info-circle" style="flex-shrink:0"></i><span>مجموع تفاصيل شيت <bdi>Tariffs</bdi> هو <bdi><b>' + fmtN(subSum) + '</b></bdi> من إجمالي <bdi><b>' + fmtN(ach) + '</b></bdi> (فرق <bdi><b>' + (diff > 0 ? '+' : '') + fmtN(diff) + '</b></bdi> بسبب فرق <bdi>Sales / Activation</bdi> أو باقات غير مدرجة).</span></div>'
+      : '';
+    var cardsHtml = subItems.length > 0
+      ? '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">' + subItems.map(function (it) {
+          var share = (subSum > 0 ? (it.val / subSum * 100) : 0).toFixed(1);
+          return '<div class="prod-kpi-card" style="border-top:3px solid ' + m.color + '">' +
+            '<div class="prod-name">' + it.label + '</div>' +
+            '<div class="prod-ach" style="color:' + m.color + '">' + fmtN(it.val) + '</div>' +
+            '<div class="prod-target"><b>' + share + '%</b> of ' + m.label.replace(' (MTD)','') + '</div>' +
+            '<div class="prod-pct-bar" style="margin-top:6px"><div class="prod-pct-fill" style="width:' + Math.min(100, Number(share)) + '%;background:' + m.color + '"></div></div>' +
+          '</div>';
+        }).join('') + '</div>'
+      : '<div style="padding:12px 14px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);color:var(--text-muted);font-size:12px">' +
+          '<i class="fas fa-info-circle mr-1" style="color:' + m.color + '"></i>لا توجد أعمدة باقات فرعية لـ <b>' + m.label + '</b> في شيت <b>Tariffs Per Stoers</b> لهذا الملف (إجمالي ' + m.label + ' = <b>' + fmtN(ach) + '</b>).</div>';
+
+    focWrap.innerHTML =
+      '<div style="background:linear-gradient(135deg,' + m.color + ',#1e1b4b);border-radius:14px;padding:16px;margin-bottom:10px;color:white;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<span style="font-size:13px;font-weight:800">' + m.icon + ' ' + m.label + '</span>' +
+        '<span style="font-size:26px;font-weight:800">' + fmtN(ach) + '</span>' +
+        '<span style="font-size:11px;opacity:.9;width:100%">Target: <b>' + fmtN(tgt) + '</b> · Ach: <b>' + achP + '%</b> · Proj: <b>' + projP + '%</b></span>' +
+      '</div>' + diffNote + cardsHtml;
+    return;
+  }
+
   var totalMobile = mtdSum(MTD_FILTERED, 'mobileSubs');
   var totalEl = document.getElementById('mtd-pkg-total');
   if (totalEl) totalEl.textContent = fmtN(totalMobile);
 
-  // Sum every raw column across the filtered rows, then roll up by category
-  var colSums = {};
-  MTD_PKGMIX.cols.forEach(function(c){ colSums[c.ci] = 0; });
-  rows.forEach(function(r){
-    for (var ci in r.vals) { if (colSums.hasOwnProperty(ci)) colSums[ci] += r.vals[ci]; }
-  });
+  var MOBILE_CAT_KEYS = { kix:1, tazbeet:1, mifi:1, weClub:1, gold:1, weMix:1, payg:1, other:1 };
   var catSums = {};
   MTD_PKG_CATS.forEach(function(c){ catSums[c.key] = 0; });
-  MTD_PKGMIX.cols.forEach(function(c){ catSums[c.cat] = (catSums[c.cat]||0) + (colSums[c.ci]||0); });
+  MTD_PKGMIX.cols.forEach(function(c){
+    var tc = c._trueCat || c.cat || 'other';
+    if (!MOBILE_CAT_KEYS[tc]) return; // Exclude FBB, Fixed, WE Air from Mobile cards!
+    catSums[tc] = (catSums[tc]||0) + (colSums[c.ci]||0);
+  });
+
+  var mobPkgSum = Object.keys(catSums).reduce(function (s, k) { return s + (catSums[k] || 0); }, 0);
+  var mobDiff = Math.round(totalMobile - mobPkgSum);
+  var recEl = document.getElementById('mtd-pkg-reconcile-note');
+  if (recEl) {
+    recEl.innerHTML = (mobDiff !== 0)
+      ? '<div dir="rtl" style="margin-bottom:10px;padding:8px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px;text-align:right;font-family:\'Cairo\',\'Inter\',sans-serif;line-height:1.6">' +
+          '<i class="fas fa-info-circle" style="flex-shrink:0"></i><span>مجموع باقات الموبايل في شيت <bdi>Tariffs</bdi> هو <bdi><b>' + fmtN(mobPkgSum) + '</b></bdi> من إجمالي <bdi><b>' + fmtN(totalMobile) + '</b></bdi> (فرق <bdi><b>' + (mobDiff > 0 ? '+' : '') + fmtN(mobDiff) + '</b></bdi> بسبب فرق <bdi>Sales / Activation</bdi>).</span></div>'
+      : '';
+  }
 
   var gridEl = document.getElementById('mtd-pkg-grid');
   if (gridEl) {
@@ -10182,7 +10537,7 @@ function renderMTDPkgDetail(rows, colSums, totalMobile, storeMeta) {
   });
 
   var panels = MTD_PKG_CATS.filter(function(c){ return MTD_PKG_EXPANDED[c.key]; }).map(function(c){
-    var cols = MTD_PKGMIX.cols.filter(function(col){ return col.cat === c.key; })
+    var cols = MTD_PKGMIX.cols.filter(function(col){ return (col._trueCat || col.cat) === c.key; })
       .map(function(col){ return { ci: col.ci, label: col.label, v: colSums[col.ci]||0 }; })
       .filter(function(x){ return x.v > 0; })
       .sort(function(a,b){ return b.v - a.v; });
@@ -23831,5 +24186,245 @@ function renderFakiOnboardList() {
   setTimeout(syncFakiVisibilityWithAuth, 600);
 })();
 </script>
+
+<!-- ── Floating Edge Activation / Sales Switcher (v52) ── -->
+<div id="floating-mode-dock" aria-label="Quick Activation / Sales Toggle">
+  <button type="button" id="fmd-handle-btn" class="fmd-handle" onclick="toggleFloatingModeDock()" title="تبديل سريع بين Activation و Sales">
+    <i id="fmd-handle-icon" class="fas fa-bolt"></i>
+    <span id="fmd-handle-txt" class="fmd-tag">ACT</span>
+  </button>
+  <div class="fmd-panel">
+    <span id="fmd-scope-lbl" class="fmd-scope">ALL</span>
+    <button type="button" id="fmd-btn-act" class="fmd-btn" onclick="applyFloatingDataMode('activation')"><i class="fas fa-bolt mr-1"></i>Act</button>
+    <button type="button" id="fmd-btn-sal" class="fmd-btn" onclick="applyFloatingDataMode('sales')"><i class="fas fa-shopping-cart mr-1"></i>Sales</button>
+  </div>
+</div>
+<script>
+(function () {
+  var _fmdTimer = null;
+  window.syncFloatingModeDock = function () {
+    var dock = document.getElementById('floating-mode-dock');
+    if (!dock) return;
+    var mainApp = document.getElementById('main-app');
+    var visible = mainApp && !mainApp.classList.contains('hidden') && mainApp.style.display !== 'none';
+    dock.style.display = visible ? 'flex' : 'none';
+    if (!visible) return;
+
+    var isMtd = (typeof activeTab !== 'undefined' && activeTab === 'mtd');
+    var mode = isMtd ? (typeof MTD_MODE !== 'undefined' ? MTD_MODE : 'activation') : (typeof DASH_MODE !== 'undefined' ? DASH_MODE : 'activation');
+    var isAct = (mode === 'activation');
+
+    var handle = document.getElementById('fmd-handle-btn');
+    var icon = document.getElementById('fmd-handle-icon');
+    var txt = document.getElementById('fmd-handle-txt');
+    var scope = document.getElementById('fmd-scope-lbl');
+    var bAct = document.getElementById('fmd-btn-act');
+    var bSal = document.getElementById('fmd-btn-sal');
+
+    if (handle) handle.style.background = isAct ? 'linear-gradient(135deg,#5E2D91,#7c3aed)' : 'linear-gradient(135deg,#c0392b,#e11d48)';
+    if (icon) icon.className = isAct ? 'fas fa-bolt' : 'fas fa-shopping-cart';
+    if (txt) txt.textContent = isAct ? 'ACT' : 'SLS';
+    if (scope) scope.textContent = isMtd ? 'MTD' : 'ALL';
+    if (bAct) {
+      bAct.style.background = isAct ? '#5E2D91' : '#fff';
+      bAct.style.color = isAct ? '#fff' : '#4b5563';
+      bAct.style.borderColor = isAct ? '#5E2D91' : '#e5e7eb';
+    }
+    if (bSal) {
+      bSal.style.background = !isAct ? '#c0392b' : '#fff';
+      bSal.style.color = !isAct ? '#fff' : '#4b5563';
+      bSal.style.borderColor = !isAct ? '#c0392b' : '#e5e7eb';
+    }
+  };
+
+  window.toggleFloatingModeDock = function () {
+    var dock = document.getElementById('floating-mode-dock');
+    if (!dock) return;
+    dock.classList.toggle('open');
+    if (_fmdTimer) clearTimeout(_fmdTimer);
+    if (dock.classList.contains('open')) {
+      _fmdTimer = setTimeout(function () { dock.classList.remove('open'); }, 5000);
+    }
+  };
+
+  window.applyFloatingDataMode = function (mode) {
+    var isMtd = (typeof activeTab !== 'undefined' && activeTab === 'mtd');
+    if (isMtd && typeof setMTDMode === 'function') {
+      setMTDMode(mode);
+    } else if (typeof setDashMode === 'function') {
+      setDashMode(mode);
+    }
+    syncFloatingModeDock();
+    var dock = document.getElementById('floating-mode-dock');
+    if (dock) {
+      if (_fmdTimer) clearTimeout(_fmdTimer);
+      _fmdTimer = setTimeout(function () { dock.classList.remove('open'); }, 1200);
+    }
+  };
+
+  document.addEventListener('click', function (ev) {
+    var dock = document.getElementById('floating-mode-dock');
+    if (dock && dock.classList.contains('open') && !dock.contains(ev.target)) {
+      dock.classList.remove('open');
+    }
+  });
+
+  ['switchTab', 'setDashMode', 'setMTDMode'].forEach(function (fnName) {
+    if (typeof window[fnName] === 'function') {
+      var orig = window[fnName];
+      window[fnName] = function () {
+        var r = orig.apply(this, arguments);
+        try { syncFloatingModeDock(); } catch (e) {}
+        return r;
+      };
+    }
+  });
+  setInterval(function () { try { syncFloatingModeDock(); } catch (e) {} }, 1200);
+})();
+</script>
+
+
+<!-- ── Floating Right-Edge Quick Filter Dock (v53) ── -->
+<div id="floating-filter-dock" aria-label="Quick Filters">
+  <button type="button" id="ffd-handle-btn" class="ffd-handle" onclick="toggleFloatingFilterDock()" title="فتح الفلاتر السريعة">
+    <span id="ffd-active-badge" class="ffd-badge">0</span>
+    <i class="fas fa-sliders-h"></i>
+    <span class="ffd-tag">FLT</span>
+  </button>
+  <div class="ffd-panel" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:6px;border-bottom:1px solid rgba(148,163,184,0.25)">
+      <span id="ffd-title" style="font-size:11.5px;font-weight:800;color:#5E2D91"><i class="fas fa-filter mr-1"></i>Quick Filters</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button type="button" onclick="resetFloatingFilters()" style="padding:3px 8px;border-radius:7px;border:1px solid #e5e7eb;background:#f3f4f6;color:#374151;font-size:10px;font-weight:700;cursor:pointer"><i class="fas fa-undo mr-1"></i>Reset</button>
+        <button type="button" onclick="closeFloatingFilterDock()" style="padding:3px 7px;border-radius:7px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:10px;font-weight:800;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div id="ffd-fields-grid" class="ffd-grid"></div>
+  </div>
+</div>
+<script>
+(function () {
+  function getActiveFilterSpecs() {
+    var isMtd = (typeof activeTab !== 'undefined' && activeTab === 'mtd');
+    if (isMtd) {
+      return {
+        isMtd: true,
+        title: 'MTD Quick Filters',
+        fields: [
+          { id: 'mtd-f-region',  label: 'Region' },
+          { id: 'mtd-f-rm',      label: 'Regional Mgr' },
+          { id: 'mtd-f-sv',      label: 'Supervisor' },
+          { id: 'mtd-f-am',      label: 'Area Mgr' },
+          { id: 'mtd-f-cls',     label: 'Class' },
+          { id: 'mtd-f-partner', label: 'Partner' }
+        ]
+      };
+    }
+    return {
+      isMtd: false,
+      title: 'Quick Filters',
+      fields: [
+        { id: 'f-month',      label: 'Month' },
+        { id: 'f-regMgr',     label: 'Regional Mgr' },
+        { id: 'f-supervisor', label: 'Supervisor' },
+        { id: 'f-areaMgr',    label: 'Area Mgr' },
+        { id: 'f-partner',    label: 'Partner' },
+        { id: 'f-accMgr',     label: 'Account Mgr' }
+      ]
+    };
+  }
+
+  window.syncFloatingFilterDock = function () {
+    var dock = document.getElementById('floating-filter-dock');
+    if (!dock) return;
+    var mainApp = document.getElementById('main-app');
+    var visible = mainApp && !mainApp.classList.contains('hidden') && mainApp.style.display !== 'none';
+    dock.style.display = visible ? 'flex' : 'none';
+    if (!visible) return;
+
+    var spec = getActiveFilterSpecs();
+    var activeCount = 0;
+    spec.fields.forEach(function (f) {
+      var realEl = document.getElementById(f.id);
+      if (realEl && realEl.value) activeCount++;
+    });
+    var badge = document.getElementById('ffd-active-badge');
+    if (badge) {
+      badge.textContent = String(activeCount);
+      badge.style.display = activeCount > 0 ? 'flex' : 'none';
+    }
+    // Do NOT rebuild <select> innerHTML on interval — rebuilding closes open native dropdowns!
+  };
+
+  window.renderFloatingFilterFields = function () {
+    var grid = document.getElementById('ffd-fields-grid');
+    var titleEl = document.getElementById('ffd-title');
+    if (!grid) return;
+    var spec = getActiveFilterSpecs();
+    if (titleEl) titleEl.innerHTML = '<i class="fas fa-filter mr-1"></i>' + spec.title;
+
+    grid.innerHTML = spec.fields.map(function (f) {
+      var realEl = document.getElementById(f.id);
+      if (!realEl) return '';
+      var optsHtml = Array.from(realEl.options || []).map(function (o) {
+        var sel = (o.value === realEl.value) ? ' selected' : '';
+        return '<option value="' + String(o.value).replace(/"/g, '&quot;') + '"' + sel + '>' + String(o.textContent).replace(/</g, '&lt;') + '</option>';
+      }).join('');
+      return '<div class="ffd-field">' +
+        '<label>' + f.label + '</label>' +
+        '<select onchange="onFloatingFilterSelect(\'' + f.id + '\', this.value)">' + optsHtml + '</select>' +
+      '</div>';
+    }).join('');
+  };
+
+  window.onFloatingFilterSelect = function (realId, val) {
+    var realEl = document.getElementById(realId);
+    if (!realEl) return;
+    realEl.value = val;
+    var isMtd = (typeof activeTab !== 'undefined' && activeTab === 'mtd');
+    if (isMtd && typeof onMTDFilterChange === 'function') {
+      onMTDFilterChange();
+    } else if (typeof applyFilters === 'function') {
+      applyFilters();
+    }
+    syncFloatingFilterDock();
+    renderFloatingFilterFields();
+  };
+
+  window.resetFloatingFilters = function () {
+    var isMtd = (typeof activeTab !== 'undefined' && activeTab === 'mtd');
+    if (isMtd && typeof resetMTDFilters === 'function') {
+      resetMTDFilters();
+    } else if (typeof resetFilters === 'function') {
+      resetFilters();
+    }
+    syncFloatingFilterDock();
+    renderFloatingFilterFields();
+  };
+
+  window.toggleFloatingFilterDock = function () {
+    var dock = document.getElementById('floating-filter-dock');
+    if (!dock) return;
+    var opening = !dock.classList.contains('open');
+    dock.classList.toggle('open', opening);
+    if (opening) renderFloatingFilterFields();
+  };
+
+  window.closeFloatingFilterDock = function () {
+    var dock = document.getElementById('floating-filter-dock');
+    if (dock) dock.classList.remove('open');
+  };
+
+  document.addEventListener('click', function (ev) {
+    var dock = document.getElementById('floating-filter-dock');
+    if (dock && dock.classList.contains('open') && !dock.contains(ev.target)) {
+      dock.classList.remove('open');
+    }
+  });
+
+  setInterval(function () { try { syncFloatingFilterDock(); } catch (e) {} }, 1200);
+})();
+</script>
+
 </body>
 </html>
