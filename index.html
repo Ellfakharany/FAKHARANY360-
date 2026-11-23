@@ -3848,6 +3848,11 @@ function renderProductKPIs(containerId) {
     const isGreen = pp >= 100;
     const card = document.createElement('div');
     card.className = `prod-kpi-card ${isGreen?'green':'red'}`;
+    if (p.key !== 'wallet') {
+      card.style.cursor = 'pointer';
+      card.title = 'اضغط لعرض تفاصيل باقات ' + p.label + ' في تبويب Packages & Tariffs';
+      card.onclick = function () { if (typeof openProductInPackagesTab === 'function') openProductInPackagesTab(p.key); };
+    }
     card.innerHTML = `
       <div class="prod-name"><i class="fas ${p.icon} mr-1" style="color:${p.color}"></i>${p.label}</div>
       <div class="prod-ach kpi-animated" style="color:${isGreen?'#22c55e':'#ef4444'}">${fmtN(a)}</div>
@@ -4261,7 +4266,7 @@ function switchTab(name) {
     if (execBannerMtd) execBannerMtd.style.display = '';
   }
   // Lazy render
-  if (name==='overview')   { renderProductChart(); renderMonthlyTrend(); }
+  if (name==='overview')   { updateExecBanner(); renderExecKPIs(); renderProductKPIs('product-kpi-grid'); renderProductChart(); renderMonthlyTrend(); renderTeamPivot(); renderClassPerf(); renderMonthlyPerf(); }
   if (name==='products')   { renderProductKPIs('product-kpi-grid2'); renderProductDetail(); renderProductPct(); renderAchTrend(); }
   if (name==='tariff')     { switchTab('packages'); setPkgTariffSubView('tariff'); return; }
   if (name==='rankings')   renderAllRankings();
@@ -5563,6 +5568,16 @@ var PKG_ACTIVE_PRODUCT = 'mobile';
 var PKG_ACTIVE_GROUP_KEY = null;
 var PKG_FOCUS_GROUP_BY = 'supervisor';
 
+function openProductInPackagesTab(prodKey) {
+  if (!prodKey || prodKey === 'wallet') return;
+  PKG_ACTIVE_PRODUCT = prodKey;
+  PKG_ACTIVE_GROUP_KEY = null;
+  if (typeof setPkgTariffSubView === 'function') setPkgTariffSubView('packages');
+  switchTab('packages');
+  setPkgProductFocus(prodKey);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function setPkgProductFocus(prodKey) {
   PKG_ACTIVE_PRODUCT = prodKey || 'mobile';
   PKG_ACTIVE_GROUP_KEY = null;
@@ -5625,7 +5640,16 @@ function renderPkgSubTariffDrill() {
 
   var rowsHtml = '';
   if (subItems.length > 0) {
-    rowsHtml = subItems.map(function (item) {
+    var subTotalSum = subItems.reduce(function (s, x) { return s + (Number(x.val) || 0); }, 0);
+    var diffVal = Math.round(groupAch - subTotalSum);
+    var diffNotice = '';
+    if (diffVal !== 0) {
+      diffNotice = '<div style="margin-bottom:8px;padding:6px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11px;display:flex;align-items:center;gap:6px">' +
+        '<i class="fas fa-info-circle"></i>' +
+        '<span>مجموع الباقات الفرعية = <b>' + fmtN(subTotalSum) + '</b> من أصل <b>' + fmtN(groupAch) + '</b> (فرق <b>' + (diffVal > 0 ? '+' : '') + fmtN(diffVal) + '</b> بسبب باقات غير مصنّفة أو فرق Sales/Activation في شيت Tariffs).</span>' +
+      '</div>';
+    }
+    rowsHtml = diffNotice + subItems.map(function (item) {
       var barPct = groupAch > 0 ? Math.min(100, Math.round(item.val / groupAch * 100)) : 0;
       var mobPct = totalMobile > 0 ? (item.val / totalMobile * 100).toFixed(1) : '0.0';
       return '<div class="pkg-sub-row">' +
@@ -5672,7 +5696,16 @@ function renderPkgProductFocusView() {
 
   var subHtml = '';
   if (subItems.length > 0) {
-    subHtml = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">' +
+    var focusSubSum = subItems.reduce(function (s, it) { return s + (Number(it.val) || 0); }, 0);
+    var focusDiff = Math.round(ach - focusSubSum);
+    var focusDiffNote = '';
+    if (focusDiff !== 0) {
+      focusDiffNote = '<div style="margin-bottom:10px;padding:7px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;display:flex;align-items:center;gap:7px">' +
+        '<i class="fas fa-info-circle"></i>' +
+        '<span>تنبيه: مجموع تفاصيل شيت Tariffs = <b>' + fmtN(focusSubSum) + '</b> من أصل إجمالي ' + m.label + ' (<b>' + fmtN(ach) + '</b>) — فرق <b>' + (focusDiff > 0 ? '+' : '') + fmtN(focusDiff) + '</b> ناتج عن باقات غير مدرجة في شيت Tariffs أو فرق Sales/Activation.</span>' +
+      '</div>';
+    }
+    subHtml = focusDiffNote + '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">' +
       subItems.map(function (it) {
         var share = ach > 0 ? (it.val / ach * 100).toFixed(1) : '0.0';
         return '<div class="prod-kpi-card" style="border-top:3px solid ' + m.color + '">' +
@@ -7254,7 +7287,7 @@ function parseMTDFlat(raw) {
   var parsed = raw.map(function(row){
     var obj = {};
     Object.keys(row).forEach(function(k){
-      var mapped = MTD_COL_MAP[String(k).trim().toLowerCase()];
+      var mapped = MTD_COL_MAP[String(k).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()];
       if (!mapped) return;
       var v = row[k];
       if (MTD_TEXT_KEYS.indexOf(mapped) >= 0)
@@ -7309,22 +7342,45 @@ function parseMTDMultiLevel(ws) {
   // or directly "Mobile Target" if the group row already has the full combined label.
   function hdr(ci) {
     var fieldVal = aoa[fieldRowIdx][ci];
-    var fieldStr = (fieldVal===null||fieldVal===undefined) ? '' : String(fieldVal).trim();
+    var fieldStr = (fieldVal===null||fieldVal===undefined) ? '' : String(fieldVal).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
 
-    // collect non-empty group labels from the group rows for this column (closest first)
+    // Collect non-empty group labels from all group rows for this column (and left-fill merged cells for metric sub-fields)
     var labels = [];
     for (var gi = groupRows.length-1; gi >= 0; gi--) {
-      var v = aoa[groupRows[gi]][ci];
+      var rowG = aoa[groupRows[gi]] || [];
+      var v = rowG[ci];
+      if ((v === null || v === undefined || String(v).trim() === '') && /^(target|subscriptions|%|proj|proj\s*%)$/i.test(fieldStr)) {
+        for (var lc = ci - 1; lc >= Math.max(12, ci - 4); lc--) {
+          var lv = rowG[lc];
+          if (lv !== null && lv !== undefined && String(lv).trim() !== '') {
+            var lvStr = String(lv).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+            if (!/(target|subscriptions|%|proj)$/i.test(lvStr)) { v = lvStr; }
+            break;
+          }
+        }
+      }
       if (v !== null && v !== undefined && String(v).trim() !== '') {
-        labels.push(String(v).trim());
+        labels.push(String(v).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim());
       }
     }
-    // If the nearest group label already contains a space (e.g. "Mobile Target"),
-    // it's already the full combined name — field row will likely be null for it.
+
+    // Priority 1: If any label above already matches an exact MTD_COL_MAP key (e.g. "Fixed Target", "Mobile Subscriptions"), return it directly!
+    for (var li = 0; li < labels.length; li++) {
+      var candDirect = labels[li].toLowerCase();
+      if (MTD_COL_MAP[candDirect]) return labels[li];
+    }
+    // Priority 2: Combine label + fieldStr (without duplicating fieldStr if label already ends with it)
+    if (fieldStr) {
+      for (var li2 = 0; li2 < labels.length; li2++) {
+        var lbl = labels[li2];
+        var combined = lbl.toLowerCase().endsWith(fieldStr.toLowerCase()) ? lbl : (lbl + ' ' + fieldStr);
+        if (MTD_COL_MAP[combined.toLowerCase()]) return combined;
+      }
+    }
     if (labels.length > 0) {
       var nearest = labels[0];
-      if (nearest.indexOf(' ') > 0 && !fieldStr) return nearest; // e.g. "Mobile Target"
-      if (fieldStr) return nearest + ' ' + fieldStr;             // e.g. "FWA" + "Target" -> "FWA Target"
+      if (nearest.indexOf(' ') > 0 && !fieldStr) return nearest;
+      if (fieldStr) return nearest.toLowerCase().endsWith(fieldStr.toLowerCase()) ? nearest : (nearest + ' ' + fieldStr);
       return nearest;
     }
     return fieldStr || ('Col_' + ci);
