@@ -828,6 +828,49 @@ input *, textarea *, select * {
 }
 @media print { #floating-filter-dock { display: none !important; } }
 
+/* ── Auto-Peek / Edge-Tuck Screenshot-Friendly Mode (v55) ── */
+#floating-mode-dock .fmd-handle,
+#floating-filter-dock .ffd-handle {
+  position: relative;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease, width 0.2s ease;
+}
+/* Extended invisible thumb hit-target so tapping the tucked edge is effortless */
+#floating-mode-dock .fmd-handle::after {
+  content: '';
+  position: absolute;
+  top: -8px; bottom: -8px; left: 0; right: -16px;
+}
+#floating-filter-dock .ffd-handle::after {
+  content: '';
+  position: absolute;
+  top: -8px; bottom: -8px; right: 0; left: -16px;
+}
+/* Tucked state (default after 5s idle — only a sleek 7px translucent edge lip shows) */
+#floating-mode-dock.tucked:not(.open) .fmd-handle {
+  transform: translateX(-23px);
+  opacity: 0.26;
+  box-shadow: none;
+}
+#floating-mode-dock.tucked:not(.open) .fmd-handle:hover {
+  transform: translateX(0);
+  opacity: 1;
+}
+#floating-filter-dock.tucked:not(.open) .ffd-handle {
+  transform: translateX(23px);
+  opacity: 0.26;
+  box-shadow: none;
+}
+#floating-filter-dock.tucked:not(.open) .ffd-handle:hover {
+  transform: translateX(0);
+  opacity: 1;
+}
+#floating-filter-dock.tucked:not(.open) .ffd-badge {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+
 
 </style>
 </head>
@@ -24188,7 +24231,7 @@ function renderFakiOnboardList() {
 </script>
 
 <!-- ── Floating Edge Activation / Sales Switcher (v52) ── -->
-<div id="floating-mode-dock" aria-label="Quick Activation / Sales Toggle">
+<div id="floating-mode-dock" class="tucked" aria-label="Quick Activation / Sales Toggle">
   <button type="button" id="fmd-handle-btn" class="fmd-handle" onclick="toggleFloatingModeDock()" title="تبديل سريع بين Activation و Sales">
     <i id="fmd-handle-icon" class="fas fa-bolt"></i>
     <span id="fmd-handle-txt" class="fmd-tag">ACT</span>
@@ -24285,7 +24328,7 @@ function renderFakiOnboardList() {
 
 
 <!-- ── Floating Right-Edge Quick Filter Dock (v53) ── -->
-<div id="floating-filter-dock" aria-label="Quick Filters">
+<div id="floating-filter-dock" class="tucked" aria-label="Quick Filters">
   <button type="button" id="ffd-handle-btn" class="ffd-handle" onclick="toggleFloatingFilterDock()" title="فتح الفلاتر السريعة">
     <span id="ffd-active-badge" class="ffd-badge">0</span>
     <i class="fas fa-sliders-h"></i>
@@ -24423,6 +24466,71 @@ function renderFakiOnboardList() {
   });
 
   setInterval(function () { try { syncFloatingFilterDock(); } catch (e) {} }, 1200);
+})();
+</script>
+
+
+<script>
+(function () {
+  var _tuckTimers = { mode: null, filter: null };
+  function scheduleTuck(key, dockId, delayMs) {
+    if (_tuckTimers[key]) clearTimeout(_tuckTimers[key]);
+    _tuckTimers[key] = setTimeout(function () {
+      var d = document.getElementById(dockId);
+      if (d && !d.classList.contains('open')) d.classList.add('tucked');
+    }, delayMs || 5000);
+  }
+  function wakeDock(key, dockId) {
+    var d = document.getElementById(dockId);
+    if (!d) return;
+    d.classList.remove('tucked');
+    scheduleTuck(key, dockId, 5000);
+  }
+
+  // Wrap toggleFloatingModeDock & applyFloatingDataMode
+  if (typeof window.toggleFloatingModeDock === 'function') {
+    var origToggleMode = window.toggleFloatingModeDock;
+    window.toggleFloatingModeDock = function () {
+      wakeDock('mode', 'floating-mode-dock');
+      origToggleMode.apply(this, arguments);
+      var d = document.getElementById('floating-mode-dock');
+      if (d && !d.classList.contains('open')) scheduleTuck('mode', 'floating-mode-dock', 5000);
+    };
+  }
+  if (typeof window.applyFloatingDataMode === 'function') {
+    var origApplyMode = window.applyFloatingDataMode;
+    window.applyFloatingDataMode = function () {
+      wakeDock('mode', 'floating-mode-dock');
+      origApplyMode.apply(this, arguments);
+      scheduleTuck('mode', 'floating-mode-dock', 5000);
+    };
+  }
+
+  // Wrap toggleFloatingFilterDock & closeFloatingFilterDock
+  if (typeof window.toggleFloatingFilterDock === 'function') {
+    var origToggleFlt = window.toggleFloatingFilterDock;
+    window.toggleFloatingFilterDock = function () {
+      wakeDock('filter', 'floating-filter-dock');
+      origToggleFlt.apply(this, arguments);
+      var d = document.getElementById('floating-filter-dock');
+      if (d && !d.classList.contains('open')) scheduleTuck('filter', 'floating-filter-dock', 5000);
+    };
+  }
+  if (typeof window.closeFloatingFilterDock === 'function') {
+    var origCloseFlt = window.closeFloatingFilterDock;
+    window.closeFloatingFilterDock = function () {
+      origCloseFlt.apply(this, arguments);
+      scheduleTuck('filter', 'floating-filter-dock', 5000);
+    };
+  }
+
+  // When clicking outside either open dock, tuck it back after 5s
+  document.addEventListener('click', function (ev) {
+    var dm = document.getElementById('floating-mode-dock');
+    if (dm && !dm.contains(ev.target) && !dm.classList.contains('open')) scheduleTuck('mode', 'floating-mode-dock', 5000);
+    var df = document.getElementById('floating-filter-dock');
+    if (df && !df.contains(ev.target) && !df.classList.contains('open')) scheduleTuck('filter', 'floating-filter-dock', 5000);
+  });
 })();
 </script>
 
