@@ -6457,29 +6457,77 @@ async function loadRecentUploads() {
   if (!container) return;
   container.innerHTML = '⏳ جاري التحميل...';
   try {
-    function distinctVals(rows, field) {
+    function distinctVals(rows, field, maxItems) {
       var seen = {}, out = [];
-      (rows || []).forEach(function (r) { if (!seen[r[field]]) { seen[r[field]] = true; out.push(r[field]); } });
-      return out.slice(0, 8);
+      (rows || []).forEach(function (r) { if (r[field] && !seen[r[field]]) { seen[r[field]] = true; out.push(r[field]); } });
+      return maxItems ? out.slice(0, maxItems) : out;
+    }
+    function sortMonthDesc(arr) {
+      return arr.slice().sort(function (a, b) {
+        var ma = String(a).match(/^(\d{1,2})-(\d{4})$/);
+        var mb = String(b).match(/^(\d{1,2})-(\d{4})$/);
+        if (ma && mb) {
+          var ya = Number(ma[2]) * 100 + Number(ma[1]);
+          var yb = Number(mb[2]) * 100 + Number(mb[1]);
+          return yb - ya;
+        }
+        if (ma && !mb) return -1;
+        if (!ma && mb) return 1;
+        return String(b).localeCompare(String(a));
+      });
     }
     var mobileRes = await sb.from('mtd_mobile').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
     var walletRes = await sb.from('mtd_wallet').select('snapshot_date').order('snapshot_date', { ascending: false }).limit(500);
-    var closureRes = await sb.from('monthly_closure').select('month').order('month', { ascending: false }).limit(1000);
-    var mDates = distinctVals(mobileRes.data, 'snapshot_date');
-    var wDates = distinctVals(walletRes.data, 'snapshot_date');
-    var allClosureMonths = distinctVals(closureRes.data, 'month');
-    var cMonths = allClosureMonths.filter(function (m) { return String(m || '').indexOf('EVAL-') !== 0; });
-    var eMonths = allClosureMonths.filter(function (m) { return String(m || '').indexOf('EVAL-') === 0; }).map(function (m) { return String(m).replace(/^EVAL-/, ''); });
+    var evalRes = await sb.from('monthly_closure').select('month').like('month', 'EVAL-%').limit(200);
+
+    // Fetch all Closure months cleanly (excluding EVAL-% and paginating past PostgREST 1000-row cap)
+    var closureRowsAll = [];
+    var cFrom = 0, cPage = 1000;
+    while (cFrom < 10000) {
+      var cRes = await sb.from('monthly_closure').select('month').not('month', 'like', 'EVAL-%').order('month', { ascending: false }).range(cFrom, cFrom + cPage - 1);
+      if (cRes.error || !cRes.data || cRes.data.length === 0) break;
+      closureRowsAll = closureRowsAll.concat(cRes.data);
+      if (cRes.data.length < cPage) break;
+      cFrom += cPage;
+    }
+
+    var mDates = distinctVals(mobileRes.data, 'snapshot_date', 8);
+    var wDates = distinctVals(walletRes.data, 'snapshot_date', 8);
+    var cMonths = sortMonthDesc(distinctVals(closureRowsAll, 'month', 0)).slice(0, 12);
+    var eMonths = sortMonthDesc(distinctVals(evalRes.data, 'month', 0).map(function (m) { return String(m).replace(/^EVAL-/, ''); })).slice(0, 14);
+
+    window._uploadSecOpen = window._uploadSecOpen || { mobile: false, wallet: false, closure: false, eval: false };
+    window.toggleUploadSection = function (kind) {
+      window._uploadSecOpen[kind] = !window._uploadSecOpen[kind];
+      var body = document.getElementById('upload-sec-body-' + kind);
+      var btn = document.getElementById('upload-sec-btn-' + kind);
+      var open = !!window._uploadSecOpen[kind];
+      if (body) body.style.display = open ? 'block' : 'none';
+      if (btn) btn.innerHTML = open ? 'إخفاء <i class="fas fa-chevron-up"></i>' : 'إظهار <i class="fas fa-chevron-down"></i>';
+    };
 
     function section(label, values, kind) {
-      var html = '<div style="font-weight:700;color:#16a34a;margin:6px 0 4px">' + label + '</div>';
-      if (values.length === 0) { html += '<div style="color:#9ca3af;margin-bottom:6px">مفيش بيانات</div>'; return html; }
-      values.forEach(function (v) {
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6">' +
-          '<span>' + v + '</span>' +
-          '<button onclick="deleteSnapshot(\'' + kind + '\',\'' + v + '\')" style="color:#dc2626;background:none;border:1px solid #fecaca;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer"><i class="fas fa-trash-alt"></i> امسح</button>' +
-          '</div>';
-      });
+      var isOpen = !!window._uploadSecOpen[kind];
+      var countBadge = '<span style="background:#dcfce7;color:#15803d;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-inline-start:6px">' + values.length + '</span>';
+      var toggleBtn = '<button type="button" id="upload-sec-btn-' + kind + '" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;cursor:pointer">' +
+        (isOpen ? 'إخفاء <i class="fas fa-chevron-up"></i>' : 'إظهار <i class="fas fa-chevron-down"></i>') + '</button>';
+      var html = '<div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;overflow:hidden;background:#fff">' +
+        '<div onclick="toggleUploadSection(\'' + kind + '\')" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#f9fafb;cursor:pointer;user-select:none">' +
+        '<span style="font-weight:700;color:#16a34a;font-size:12px">' + label + countBadge + '</span>' +
+        toggleBtn +
+        '</div>' +
+        '<div id="upload-sec-body-' + kind + '" style="display:' + (isOpen ? 'block' : 'none') + ';padding:4px 10px;max-height:210px;overflow-y:auto">';
+      if (values.length === 0) {
+        html += '<div style="color:#9ca3af;padding:4px 0;font-size:11px">مفيش بيانات</div>';
+      } else {
+        values.forEach(function (v) {
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:12px">' +
+            '<span>' + v + '</span>' +
+            '<button onclick="deleteSnapshot(\'' + kind + '\',\'' + v + '\')" style="color:#dc2626;background:none;border:1px solid #fecaca;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer"><i class="fas fa-trash-alt"></i> امسح</button>' +
+            '</div>';
+        });
+      }
+      html += '</div></div>';
       return html;
     }
     container.innerHTML = section('📱 Mobile (MTD)', mDates, 'mobile') + section('💰 Wallet (MTD)', wDates, 'wallet') + section('🗓️ Closure (شهري)', cMonths, 'closure') + section('📋 Evaluation (تقييم المديرين)', eMonths, 'eval');
