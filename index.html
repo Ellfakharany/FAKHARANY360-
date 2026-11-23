@@ -871,6 +871,8 @@ async function fetchAllMonthsData() {
       row._rawMobileSubs = row.mobileSubs;
       row._rawFixedSubs = row.fixedSubs;
       row._rawFbbSubs = row.fbbSubs;
+      row._rawGoldSubs = row.goldSubs;
+      row._rawWeMixSubs = row.weMixSubs;
       all.push(row);
     });
     if (data.length < pageSize) break;
@@ -1140,6 +1142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         style="padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s">
         <i class="fas fa-shopping-cart mr-1"></i>Sales
       </button>
+      <span id="dash-mode-status-badge" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#f3f4f6;color:#4b5563"></span>
       <span style="font-size:10px;color:#9ca3af">(بيفرق بس في Mobile / Fixed / FBB — باقي المنتجات زي ما هي)</span>
     </div>
     <!-- Row 0: Classification Slicer -->
@@ -1654,12 +1657,30 @@ document.addEventListener('DOMContentLoaded', function() {
         </button>
       </div>
 
+      <!-- Product Selector Bar (Mobile, WE Gold, FBB, Fixed, WE Air — excluding Wallet) -->
+      <div id="pkg-product-selector" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px">
+        <span style="font-size:10.5px;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-inline-end:4px"><i class="fas fa-cubes mr-1" style="color:var(--we-purple)"></i>Product:</span>
+        <button type="button" class="pkg-prod-pill active" data-pkgprod="mobile" onclick="setPkgProductFocus('mobile')" style="padding:5px 12px;border-radius:999px;border:1.5px solid #5E2D91;background:#5E2D91;color:#fff;font-size:11px;font-weight:700;cursor:pointer">📱 Mobile</button>
+        <button type="button" class="pkg-prod-pill" data-pkgprod="gold" onclick="setPkgProductFocus('gold')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">🥇 WE Gold</button>
+        <button type="button" class="pkg-prod-pill" data-pkgprod="fbb" onclick="setPkgProductFocus('fbb')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">📶 FBB</button>
+        <button type="button" class="pkg-prod-pill" data-pkgprod="fixed" onclick="setPkgProductFocus('fixed')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">☎️ Fixed</button>
+        <button type="button" class="pkg-prod-pill" data-pkgprod="fwa" onclick="setPkgProductFocus('fwa')" style="padding:5px 12px;border-radius:999px;border:1.5px solid var(--border);background:var(--gray-bg);color:var(--text-primary);font-size:11px;font-weight:700;cursor:pointer">📡 WE Air</button>
+        <span style="font-size:10px;color:var(--text-muted);margin-inline-start:auto">اضغط على أي كارت باقة لعرض تفاصيل الباقات الفرعية</span>
+      </div>
+
       <!-- Total Mobile Header Banner -->
       <div id="pkg-mobile-header" class="mb-4"></div>
 
       <!-- Summary KPI Cards -->
-      <div id="pkg-summary-kpis" class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-5"></div>
+      <div id="pkg-summary-kpis" class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4"></div>
 
+      <!-- Interactive Sub-Tariff Drilldown Panel (when clicking any Mobile package card) -->
+      <div id="pkg-subtariff-drill" class="mb-5"></div>
+
+      <!-- Dedicated Product Focus View (when WE Gold, FBB, Fixed, or WE Air is selected) -->
+      <div id="pkg-product-focus-wrap" style="display:none" class="mb-5"></div>
+
+      <div id="pkg-mobile-sections-wrap">
       <!-- Main Package Cards -->
       <div id="pkg-main-cards" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-5"></div>
 
@@ -1701,6 +1722,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <table id="pkg-detail-table" class="data-table w-full text-xs"></table>
         </div>
       </div>
+      </div><!-- /#pkg-mobile-sections-wrap -->
       </div>
 
       <!-- Sub-View 2: Tariff Mix -->
@@ -2261,16 +2283,64 @@ function backupSalesActivationFields(rows) {
     try { ensureDynamicYearMonthsRegistered(rows); } catch (e) {}
   }
   rows.forEach(function(r){
-    r._salesMobile = (r._rawMobileSubs !== undefined ? r._rawMobileSubs : r.mobileSubs) || 0;
-    r._salesFixed  = (r._rawFixedSubs  !== undefined ? r._rawFixedSubs  : r.fixedSubs)  || 0;
-    r._salesFbb    = (r._rawFbbSubs    !== undefined ? r._rawFbbSubs    : r.fbbSubs)    || 0;
-    r._actMobile = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ? r.mobileSubsAct : r._salesMobile;
-    r._actFixed  = (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ? r.fixedSubsAct  : r._salesFixed;
-    r._actFbb    = (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null) ? r.fbbSubsAct    : r._salesFbb;
+    if (r._rawMobileSubs === undefined) r._rawMobileSubs = r.mobileSubs || 0;
+    if (r._rawFixedSubs  === undefined) r._rawFixedSubs  = r.fixedSubs  || 0;
+    if (r._rawFbbSubs    === undefined) r._rawFbbSubs    = r.fbbSubs    || 0;
+    if (r._rawGoldSubs   === undefined) r._rawGoldSubs   = r.goldSubs   || 0;
+    if (r._rawWeMixSubs  === undefined) r._rawWeMixSubs  = r.weMixSubs  || 0;
+
+    r._salesMobile = (r.mobileSubsSales !== undefined && r.mobileSubsSales !== null) ? Number(r.mobileSubsSales) : (Number(r._rawMobileSubs) || 0);
+    r._salesFixed  = (r.fixedSubsSales  !== undefined && r.fixedSubsSales  !== null) ? Number(r.fixedSubsSales)  : (Number(r._rawFixedSubs)  || 0);
+    r._salesFbb    = (r.fbbSubsSales    !== undefined && r.fbbSubsSales    !== null) ? Number(r.fbbSubsSales)    : (Number(r._rawFbbSubs)    || 0);
+    r._salesGold   = (r.goldSubsSales   !== undefined && r.goldSubsSales   !== null) ? Number(r.goldSubsSales)   : (Number(r._rawGoldSubs)   || 0);
+    r._salesWeMix  = (r.weMixSubsSales  !== undefined && r.weMixSubsSales  !== null) ? Number(r.weMixSubsSales)  : (Number(r._rawWeMixSubs)  || 0);
+
+    r._hasSeparateAct = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ||
+                        (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ||
+                        (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null);
+
+    r._actMobile = (r.mobileSubsAct !== undefined && r.mobileSubsAct !== null) ? Number(r.mobileSubsAct) : r._salesMobile;
+    r._actFixed  = (r.fixedSubsAct  !== undefined && r.fixedSubsAct  !== null) ? Number(r.fixedSubsAct)  : r._salesFixed;
+    r._actFbb    = (r.fbbSubsAct    !== undefined && r.fbbSubsAct    !== null) ? Number(r.fbbSubsAct)    : r._salesFbb;
+    r._actGold   = (r.goldSubsAct   !== undefined && r.goldSubsAct   !== null) ? Number(r.goldSubsAct)   : r._salesGold;
+    r._actWeMix  = (r.weMixSubsAct  !== undefined && r.weMixSubsAct  !== null) ? Number(r.weMixSubsAct)  : r._salesWeMix;
+
     r.mobileSubs = DASH_MODE === 'activation' ? r._actMobile : r._salesMobile;
     r.fixedSubs  = DASH_MODE === 'activation' ? r._actFixed  : r._salesFixed;
     r.fbbSubs    = DASH_MODE === 'activation' ? r._actFbb    : r._salesFbb;
+    r.goldSubs   = DASH_MODE === 'activation' ? r._actGold   : r._salesGold;
+    r.weMixSubs  = DASH_MODE === 'activation' ? r._actWeMix  : r._salesWeMix;
   });
+}
+
+function updateDashModeStatusBadge() {
+  var badge = document.getElementById('dash-mode-status-badge');
+  if (!badge) return;
+  var pool = (typeof filteredData !== 'undefined' && filteredData && filteredData.length) ? filteredData : RAW_DATA;
+  if (!pool || !pool.length) { badge.textContent = ''; return; }
+  if (DASH_MODE === 'sales') {
+    badge.style.background = '#fef2f2';
+    badge.style.color = '#991b1b';
+    badge.textContent = '📊 عرض أرقام Sales (Database)';
+    return;
+  }
+  var byMonth = {};
+  pool.forEach(function (r) {
+    if (!r.month) return;
+    if (!byMonth[r.month]) byMonth[r.month] = { hasAct: false, hasDiff: false };
+    if (r._hasSeparateAct) byMonth[r.month].hasAct = true;
+    if (r._salesMobile !== r._actMobile || r._salesFbb !== r._actFbb || r._salesFixed !== r._actFixed) byMonth[r.month].hasDiff = true;
+  });
+  var missing = Object.keys(byMonth).filter(function (m) { return !byMonth[m].hasAct || !byMonth[m].hasDiff; });
+  if (missing.length === 0) {
+    badge.style.background = '#dcfce7';
+    badge.style.color = '#166534';
+    badge.textContent = '✅ عرض Activation الفعلي (من شيت IDLE)';
+  } else {
+    badge.style.background = '#fef3c7';
+    badge.style.color = '#92400e';
+    badge.textContent = '⚠️ بدون IDLE Activation منفصل (معروض Sales) لـ: ' + missing.join(', ');
+  }
 }
 
 // ── Data Type toggle (Overview/Products/Rankings/Heatmap/Charts/Package Mix
@@ -2288,6 +2358,8 @@ function setDashMode(mode) {
     r.mobileSubs = mode === 'activation' ? r._actMobile : r._salesMobile;
     r.fixedSubs  = mode === 'activation' ? r._actFixed  : r._salesFixed;
     r.fbbSubs    = mode === 'activation' ? r._actFbb    : r._salesFbb;
+    r.goldSubs   = mode === 'activation' ? r._actGold   : r._salesGold;
+    r.weMixSubs  = mode === 'activation' ? r._actWeMix  : r._salesWeMix;
   });
   document.querySelectorAll('.dash-mode-act-btn').forEach(function(b){
     b.style.background = mode==='activation' ? '#5E2D91' : 'white';
@@ -2339,6 +2411,7 @@ const charts = {};
 // ── Boot ──────────────────────────────────────────────────────────────────────
 // ── App initializer (called AFTER login) ─────────────────────────────────────
 let appInitialized = false;
+let appBooting = false;
 
 function initApp() { initAppWithData([]); }
 function initAppWithData(injectedData) {
@@ -2364,13 +2437,16 @@ function initAppWithData(injectedData) {
   // for that month only, while months loaded at page-load stayed fine.
   backupSalesActivationFields(RAW_DATA);
 
-  if (appInitialized) {
-    // App already booted — just refresh the derived view with the new data
-    // instead of redoing the one-time UI boot sequence below.
+  if (appInitialized || appBooting) {
+    // App already booted (or currently booting) — refresh filters & view cleanly without duplicating DOM options.
     filteredData = [...RAW_DATA];
-    applyFilters(); // applyFilters() already calls populateCascade(RAW_DATA) and renderAll()
+    if (appInitialized) {
+      initFilters();
+      applyFilters();
+    }
     return;
   }
+  appBooting = true;
 
   const loadEl = document.getElementById('loading-screen');
   if (loadEl) { loadEl.style.display = 'flex'; loadEl.style.zIndex = '9998'; }
@@ -2389,6 +2465,7 @@ function initAppWithData(injectedData) {
       var appEl = document.getElementById('main-app');
       if (appEl) { appEl.classList.remove('hidden'); appEl.style.display = 'flex'; }
       appInitialized = true;
+      appBooting = false;
       window.scrollTo(0, 0);
     }, 400);
   });
@@ -2502,6 +2579,7 @@ const chartDefaults = () => ({
 function setProductFilter(prod) {
   activeProduct = prod;
   document.querySelectorAll('.prod-pill').forEach(b => b.classList.toggle('active', b.dataset.prod === prod));
+  if (typeof updateDashModeStatusBadge === 'function') updateDashModeStatusBadge();
   renderAll();
 }
 
@@ -2594,20 +2672,41 @@ function clearStoreFilter() {
 
 
 function initFilters() {
-  const months = [...new Set(RAW_DATA.map(r => r.month))].sort((a,b) => MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+  const months = [...new Set(RAW_DATA.map(r => r.month).filter(Boolean))].sort((a, b) => {
+    const ia = MONTH_ORDER.indexOf(a), ib = MONTH_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    const pa = String(a).split('-'), pb = String(b).split('-');
+    if (pa.length === 2 && pb.length === 2) return (Number(pa[1]) * 100 + Number(pa[0])) - (Number(pb[1]) * 100 + Number(pb[0]));
+    return String(a).localeCompare(String(b));
+  });
   const sel = document.getElementById('f-month');
-  months.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = (MONTH_LABELS[m]||m) + ' ' + m.split('-')[1]; sel.appendChild(o); });
+  if (sel) {
+    const prevMonth = sel.value;
+    sel.innerHTML = '<option value="">All Months</option>';
+    months.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = (MONTH_LABELS[m] || m) + (String(m).includes('-') && !String(MONTH_LABELS[m] || '').includes(m.split('-')[1]) ? (' ' + m.split('-')[1]) : '');
+      if (m === prevMonth) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
   populateCascade(RAW_DATA);
   buildStoreOptions(RAW_DATA);
-  // Build classification pills
+  // Rebuild classification pills cleanly (preserve 'All' button, avoid duplicates)
   const classes = [...new Set(RAW_DATA.map(r => r.classification).filter(Boolean))].sort();
   const cs = document.getElementById('class-slicer');
-  classes.forEach(c => {
-    const b = document.createElement('button');
-    b.className = 'class-pill'; b.dataset.cls = c;
-    b.setAttribute('onclick', `setClassFilter('${c}')`);
-    b.textContent = c; cs.appendChild(b);
-  });
+  if (cs) {
+    cs.querySelectorAll('.class-pill:not([data-cls="all"])').forEach(el => el.remove());
+    classes.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'class-pill' + (activeClass === c ? ' active' : '');
+      b.dataset.cls = c;
+      b.setAttribute('onclick', `setClassFilter('${c}')`);
+      b.textContent = c;
+      cs.appendChild(b);
+    });
+  }
 }
 
 function populateCascade(base) {
@@ -5460,8 +5559,209 @@ function insightCard(icon, tag, title, body, bg, color, action) {
 
 
 // ── Packages ──────────────────────────────────────────────────────────────────
-function renderPackages() {
+var PKG_ACTIVE_PRODUCT = 'mobile';
+var PKG_ACTIVE_GROUP_KEY = null;
+var PKG_FOCUS_GROUP_BY = 'supervisor';
+
+function setPkgProductFocus(prodKey) {
+  PKG_ACTIVE_PRODUCT = prodKey || 'mobile';
+  PKG_ACTIVE_GROUP_KEY = null;
+  document.querySelectorAll('.pkg-prod-pill').forEach(function (btn) {
+    var active = btn.getAttribute('data-pkgprod') === PKG_ACTIVE_PRODUCT;
+    btn.classList.toggle('active', active);
+    btn.style.background = active ? '#5E2D91' : 'var(--gray-bg)';
+    btn.style.color = active ? '#fff' : 'var(--text-primary)';
+    btn.style.borderColor = active ? '#5E2D91' : 'var(--border)';
+  });
+  renderPackages();
+}
+
+function togglePkgCardDrill(groupKey) {
+  PKG_ACTIVE_GROUP_KEY = (PKG_ACTIVE_GROUP_KEY === groupKey) ? null : groupKey;
   renderPkgSummaryKPIs();
+  renderPkgSubTariffDrill();
+}
+
+function collectSubTariffsForCategory(catKey) {
+  var totals = {};
+  var byStore = {};
+  // 1. Check Closure extraTariffs on filteredData
+  (filteredData || []).forEach(function (r) {
+    var catObj = r.extraTariffs && r.extraTariffs[catKey];
+    if (!catObj) return;
+    Object.keys(catObj).forEach(function (lbl) {
+      var v = Number(catObj[lbl]) || 0;
+      if (!v) return;
+      totals[lbl] = (totals[lbl] || 0) + v;
+      if (!byStore[lbl]) byStore[lbl] = [];
+      byStore[lbl].push({ store: r.store || r.storeCode, supervisor: r.supervisor || '', areaManager: r.areaManager || '', val: v });
+    });
+  });
+  var items = Object.keys(totals).map(function (lbl) {
+    return { label: lbl, val: totals[lbl], stores: (byStore[lbl] || []).sort(function (a, b) { return b.val - a.val; }) };
+  }).sort(function (a, b) { return b.val - a.val; });
+  return { items: items, source: 'closure' };
+}
+
+function renderPkgSubTariffDrill() {
+  var el = document.getElementById('pkg-subtariff-drill');
+  if (!el) return;
+  if (!PKG_ACTIVE_GROUP_KEY || PKG_ACTIVE_PRODUCT !== 'mobile') { el.innerHTML = ''; return; }
+  var g = PKG_GROUPS.find(function (x) { return x.key === PKG_ACTIVE_GROUP_KEY; });
+  if (!g) { el.innerHTML = ''; return; }
+
+  var totalMobile = sum(filteredData, 'mobileSubs');
+  var groupAch = sum(filteredData, g.aKey);
+  var subItems = [];
+
+  if (g.subs && g.subs.length > 0) {
+    subItems = g.subs.map(function (s) {
+      return { label: s.label, val: sum(filteredData, s.key) };
+    }).filter(function (x) { return x.val > 0; }).sort(function (a, b) { return b.val - a.val; });
+  } else {
+    var res = collectSubTariffsForCategory(g.key);
+    subItems = res.items;
+  }
+
+  var rowsHtml = '';
+  if (subItems.length > 0) {
+    rowsHtml = subItems.map(function (item) {
+      var barPct = groupAch > 0 ? Math.min(100, Math.round(item.val / groupAch * 100)) : 0;
+      var mobPct = totalMobile > 0 ? (item.val / totalMobile * 100).toFixed(1) : '0.0';
+      return '<div class="pkg-sub-row">' +
+        '<span class="pkg-sub-name" style="min-width:170px">' + item.label + '</span>' +
+        '<div class="pkg-sub-bar-wrap"><div class="pkg-sub-bar" style="width:' + barPct + '%;background:' + g.color + '"></div></div>' +
+        '<span class="pkg-sub-val" style="color:' + g.color + '">' + fmtN(item.val) + '</span>' +
+        '<span class="pkg-sub-pct" title="' + barPct + '% of ' + g.label + '">' + barPct + '% of ' + g.label + ' · ' + mobPct + '% Mob</span>' +
+        '</div>';
+    }).join('');
+  } else {
+    rowsHtml = '<div style="padding:12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:12px;line-height:1.6">' +
+      '<i class="fas fa-info-circle mr-1"></i>' +
+      'إجمالي <b>' + g.label + '</b> في الفلتر الحالي = <b>' + fmtN(groupAch) + '</b>، لكن تفاصيل الباقات الفرعية (Sub-Tariffs) غير محفوظة في بيانات الـ Closure القديمة للشهر ده. ' +
+      'ارفع ملف الـ Closure بالنسخة الجديدة من شاشة <b>Upload Data</b> أو راجع شيت <b>Tariffs Per Stoers</b> في تبويب <b>MTD</b> لعرض التفاصيل الكاملة فوراً.' +
+      '</div>';
+  }
+
+  el.innerHTML = '<div class="chart-card" style="border-top:4px solid ' + g.color + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">' +
+    '<div style="font-size:14px;font-weight:800;color:' + g.color + '">' + g.icon + ' ' + g.label + ' — Sub-Tariffs Breakdown (' + fmtN(groupAch) + ')</div>' +
+    '<button type="button" onclick="togglePkgCardDrill(\'' + g.key + '\')" style="padding:3px 10px;border-radius:8px;border:1px solid var(--border);background:var(--gray-bg);font-size:11px;font-weight:700;cursor:pointer">✕ إغلاق</button>' +
+    '</div>' + rowsHtml + '</div>';
+}
+
+function renderPkgProductFocusView() {
+  var wrap = document.getElementById('pkg-product-focus-wrap');
+  if (!wrap) return;
+  var metaMap = {
+    gold:  { label: 'WE Gold',  icon: '🥇', color: '#d97706', aKey: 'goldSubs',  tKey: 'goldTarget',  catKey: 'gold' },
+    fbb:   { label: 'FBB (Home Internet)', icon: '📶', color: '#2563eb', aKey: 'fbbSubs',   tKey: 'fbbTarget',   catKey: 'fbb' },
+    fixed: { label: 'Fixed (Landline)',    icon: '☎️', color: '#16a34a', aKey: 'fixedSubs', tKey: 'fixedTarget', catKey: 'fixed' },
+    fwa:   { label: 'WE Air (FWA)',        icon: '📡', color: '#0891b2', aKey: 'fwaSubs',   tKey: 'fwaTarget',   catKey: 'fwa' }
+  };
+  var m = metaMap[PKG_ACTIVE_PRODUCT];
+  if (!m) { wrap.innerHTML = ''; return; }
+
+  var ach = sum(filteredData, m.aKey);
+  var tgt = sum(filteredData, m.tKey);
+  var achPct = pct(ach, tgt);
+  var gap = ach - tgt;
+  var gapClr = gap >= 0 ? '#16a34a' : '#ef4444';
+  var subRes = collectSubTariffsForCategory(m.catKey);
+  var subItems = subRes.items;
+
+  var subHtml = '';
+  if (subItems.length > 0) {
+    subHtml = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">' +
+      subItems.map(function (it) {
+        var share = ach > 0 ? (it.val / ach * 100).toFixed(1) : '0.0';
+        return '<div class="prod-kpi-card" style="border-top:3px solid ' + m.color + '">' +
+          '<div class="prod-name">' + it.label + '</div>' +
+          '<div class="prod-ach" style="color:' + m.color + '">' + fmtN(it.val) + '</div>' +
+          '<div class="prod-target"><b>' + share + '%</b> of ' + m.label + '</div>' +
+          '<div class="prod-pct-bar" style="margin-top:6px"><div class="prod-pct-fill" style="width:' + Math.min(100, Number(share)) + '%;background:' + m.color + '"></div></div>' +
+          '</div>';
+      }).join('') + '</div>';
+  } else {
+    subHtml = '<div style="padding:12px 14px;border-radius:10px;background:#f8fafc;border:1px solid var(--border);color:var(--text-muted);font-size:12px;margin-bottom:14px">' +
+      '<i class="fas fa-info-circle mr-1" style="color:' + m.color + '"></i>' +
+      (m.catKey === 'gold'
+        ? 'تفاصيل باقات <b>WE Gold</b> الفرعية (مثل Standalone 300 والباقات الأعلى) بتتقرأ تلقائياً من شيت <b>Tariffs Per Stoers</b> عند رفع ملف Closure بالنسخة الجديدة (v42) أو من شيت MTD.'
+        : 'شيت الإكسل الحالي بيحتوي على إجمالي <b>Target</b> و <b>Achievement</b> لـ <b>' + m.label + '</b> بدون أعمدة باقات فرعية في <b>Tariffs Per Stoers</b> — وأول ما تتضاف أعمدة باقات فرعية في الشيت هتظهر هنا تلقائياً.') +
+      '</div>';
+  }
+
+  // Group entity table for selected product
+  var grpKey = PKG_FOCUS_GROUP_BY || 'supervisor';
+  var buckets = {};
+  (filteredData || []).forEach(function (r) {
+    var k = r[grpKey] || 'Unknown';
+    if (!buckets[k]) buckets[k] = { name: k, ach: 0, tgt: 0, subMap: {} };
+    buckets[k].ach += Number(r[m.aKey]) || 0;
+    buckets[k].tgt += Number(r[m.tKey]) || 0;
+    var extra = r.extraTariffs && r.extraTariffs[m.catKey];
+    if (extra) {
+      Object.keys(extra).forEach(function (lbl) {
+        buckets[k].subMap[lbl] = (buckets[k].subMap[lbl] || 0) + (Number(extra[lbl]) || 0);
+      });
+    }
+  });
+  var rowsArr = Object.values(buckets).sort(function (a, b) { return b.ach - a.ach; });
+  var topSubCols = subItems.slice(0, 5).map(function (s) { return s.label; });
+
+  var tblHead = '<thead><tr><th>' + grpKey.toUpperCase() + '</th><th>Target</th><th>Achievement</th><th>Ach %</th><th>Gap</th>' +
+    topSubCols.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead>';
+  var tblBody = '<tbody>' + rowsArr.slice(0, 60).map(function (b) {
+    var p = pct(b.ach, b.tgt);
+    var gVal = b.ach - b.tgt;
+    var pClr = p >= 100 ? '#16a34a' : p >= 90 ? '#d97706' : '#ef4444';
+    return '<tr><td style="font-weight:700">' + b.name + '</td><td>' + fmtN(b.tgt) + '</td><td style="font-weight:800;color:' + m.color + '">' + fmtN(b.ach) + '</td>' +
+      '<td style="font-weight:700;color:' + pClr + '">' + p + '%</td>' +
+      '<td style="font-weight:700;color:' + (gVal >= 0 ? '#16a34a' : '#ef4444') + '">' + (gVal >= 0 ? '+' : '') + fmtN(gVal) + '</td>' +
+      topSubCols.map(function (c) { return '<td>' + fmtN(b.subMap[c] || 0) + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</tbody>';
+
+  wrap.innerHTML =
+    '<div class="pkg-mobile-banner mb-4" style="background:linear-gradient(135deg,' + m.color + ',#1e1b4b)">' +
+      '<span class="pkg-mob-label">' + m.icon + ' ' + m.label + '</span>' +
+      '<span class="pkg-mob-value">' + fmtN(ach) + '</span>' +
+      '<span class="pkg-mob-sub">Target: ' + fmtN(tgt) + ' · Ach: ' + achPct + '% · <span style="color:' + (gap >= 0 ? '#bbf7d0' : '#fecaca') + '">' + (gap >= 0 ? '+' : '') + fmtN(gap) + '</span></span>' +
+    '</div>' +
+    subHtml +
+    '<div class="chart-card">' +
+      '<div class="chart-title">' + m.icon + ' ' + m.label + ' Breakdown by Entity</div>' +
+      '<div class="flex gap-2 mb-3 flex-wrap">' +
+        ['supervisor', 'areaManager', 'store', 'month'].map(function (gk) {
+          var active = grpKey === gk;
+          var lbls = { supervisor: 'By Supervisor', areaManager: 'By Area Mgr', store: 'By Store', month: 'By Month' };
+          return '<button type="button" class="toggle-btn ' + (active ? 'active' : '') + '" onclick="PKG_FOCUS_GROUP_BY=\'' + gk + '\';renderPkgProductFocusView()">' + lbls[gk] + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div class="overflow-auto"><table class="data-table w-full text-xs">' + tblHead + tblBody + '</table></div>' +
+    '</div>';
+}
+
+function renderPackages() {
+  var isMobile = (PKG_ACTIVE_PRODUCT === 'mobile');
+  var hdr = document.getElementById('pkg-mobile-header');
+  var kpis = document.getElementById('pkg-summary-kpis');
+  var drill = document.getElementById('pkg-subtariff-drill');
+  var mobSections = document.getElementById('pkg-mobile-sections-wrap');
+  var focusWrap = document.getElementById('pkg-product-focus-wrap');
+
+  if (hdr) hdr.style.display = isMobile ? '' : 'none';
+  if (kpis) kpis.style.display = isMobile ? '' : 'none';
+  if (drill) drill.style.display = isMobile ? '' : 'none';
+  if (mobSections) mobSections.style.display = isMobile ? '' : 'none';
+  if (focusWrap) focusWrap.style.display = isMobile ? 'none' : 'block';
+
+  if (!isMobile) {
+    renderPkgProductFocusView();
+    return;
+  }
+
+  renderPkgSummaryKPIs();
+  renderPkgSubTariffDrill();
   renderPkgMainCards();
   renderPkgDonut();
   renderPkgTrend();
@@ -5482,7 +5782,7 @@ function renderPkgSummaryKPIs() {
       <div class="pkg-mobile-banner">
         <span class="pkg-mob-label">📊 Total Mobile Sales</span>
         <span class="pkg-mob-value">${fmtN(totalMobile)}</span>
-        <span class="pkg-mob-sub">Distribution across packages shown below as % of this total</span>
+        <span class="pkg-mob-sub">Distribution across packages shown below as % of this total (اضغط على أي كارت لعرض الباقات الفرعية)</span>
       </div>`;
   }
 
@@ -5492,8 +5792,9 @@ function renderPkgSummaryKPIs() {
     const achPct = pct(a, t);
     const mobPct = totalMobile > 0 ? (a / totalMobile * 100).toFixed(1) : 0;
     const achColor = achPct >= 100 ? '#22c55e' : achPct >= 90 ? '#eab308' : '#ef4444';
-    return `<div class="prod-kpi-card" style="border-top:3px solid ${g.color}">
-      <div class="prod-name">${g.icon} ${g.label}</div>
+    const isSel = (PKG_ACTIVE_GROUP_KEY === g.key);
+    return `<div onclick="togglePkgCardDrill('${g.key}')" class="prod-kpi-card" style="cursor:pointer;border-top:3px solid ${g.color};${isSel ? 'box-shadow:0 0 0 2px ' + g.color + ';transform:translateY(-2px)' : ''}">
+      <div class="prod-name">${g.icon} ${g.label} <span style="font-size:9px;opacity:.7">${isSel ? '▲' : '▼'}</span></div>
       <div class="prod-ach kpi-animated" style="color:${g.color}">${fmtN(a)}</div>
       <div class="prod-target" style="font-size:10px">
         <span style="color:${achColor};font-weight:700">${achPct}% of target</span>
@@ -7109,17 +7410,26 @@ function parseIDLESheet(wb) {
     if (fStr !== 'All Sales' && fStr !== 'All Activation') continue;
     var grp = null;
     for (var r2 = headerRowIdx - 1; r2 >= Math.max(0, headerRowIdx - 3) && !grp; r2--) {
-      var gv = (aoa[r2] || [])[ci2];
-      if (typeof gv === 'string' && gv.trim() !== '') grp = gv.trim();
+      var rowAbove = aoa[r2] || [];
+      for (var lc = ci2; lc >= Math.max(0, ci2 - 2) && !grp; lc--) {
+        var gv = rowAbove[lc];
+        if (typeof gv === 'string' && gv.trim() !== '' && !/^All\s+(Sales|Activation)$/i.test(gv.trim())) {
+          grp = gv.trim();
+        }
+      }
     }
     if (grp) colLabel[ci2] = grp + ' ' + fStr;
   }
 
   function findProductCols(productLabel) {
     var salesCol = -1, actCol = -1;
+    var normTargetSales = (productLabel + ' all sales').toLowerCase().replace(/\s+/g, ' ');
+    var normTargetAct   = (productLabel + ' all activation').toLowerCase().replace(/\s+/g, ' ');
     for (var ci = 0; ci < totalCols; ci++) {
-      if (colLabel[ci] === productLabel + ' All Sales') salesCol = ci;
-      if (colLabel[ci] === productLabel + ' All Activation') actCol = ci;
+      if (!colLabel[ci]) continue;
+      var cl = String(colLabel[ci]).trim().toLowerCase().replace(/\s+/g, ' ');
+      if (cl === normTargetSales) salesCol = ci;
+      if (cl === normTargetAct)   actCol = ci;
     }
     return { salesCol: salesCol, actCol: actCol };
   }
@@ -7471,49 +7781,58 @@ function parseDatabaseSheetClosure(wb) {
 }
 
 function parseIdleSheetClosure(wb) {
-  var ws = wb.Sheets['IDLE'];
-  if (!ws) return {};
   try {
-    var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-
-    // Same bug class as parseDatabaseSheetClosure: this used to assume the
-    // header row always sits at a fixed aoa[5] and data always starts at a
-    // fixed row 8. That happened to still match the current file's layout,
-    // but any month whose IDLE sheet had a different number of leading rows
-    // (older format, or any future column change) would silently misread
-    // the wrong row/column — and because num() treats an out-of-range or
-    // undefined cell as 0 instead of throwing, the result is a silent,
-    // convincing-looking "0 Activation" instead of a visible error. Anchor
-    // off "StoreCodeBSS" dynamically instead, exactly like the Database
-    // sheet parser.
-    var fieldRowIdx = -1;
-    for (var fi = 0; fi < Math.min(20, aoa.length); fi++) {
-      if (aoa[fi] && aoa[fi][0] === 'StoreCodeBSS') { fieldRowIdx = fi; break; }
-    }
-    if (fieldRowIdx < 0) return {}; // no recognizable header — fall back gracefully
-
-    var headerIdx = fieldRowIdx - 2;
-    var header = (headerIdx >= 0 ? aoa[headerIdx] : null) || [];
-    var cols = {};
-    ['Mobile', 'Fixed', 'FBB'].forEach(function (prod) {
-      cols[prod + 'Sales'] = findTotalColClosure(header, prod, 'All Sales');
-      cols[prod + 'Act'] = findTotalColClosure(header, prod, 'All Activation');
-    });
+    var parsed = (typeof parseIDLESheet === 'function') ? parseIDLESheet(wb) : null;
+    if (!parsed) return {};
     var out = {};
-    var dataStartRow = fieldRowIdx + 1;
-    for (var i = dataStartRow; i < aoa.length; i++) {
-      var r = aoa[i];
-      if (!r) continue;
-      var code = r[0];
-      if (code === null || code === undefined || r[1] === null || r[1] === undefined) continue;
-      code = normCodeClosure(code);
-      (function () {
-        function num(col) { var v = r[col]; return (v === null || v === undefined) ? 0 : Number(v); }
-        out[code] = { mobileSubsAct: num(cols['MobileAct']), fixedSubsAct: num(cols['FixedAct']), fbbSubsAct: num(cols['FBBAct']) };
-      })();
-    }
+    Object.keys(parsed).forEach(function (code) {
+      var d = parsed[code];
+      if (!d) return;
+      var entry = {
+        mobileSubsSales: Number(d.mobileSales) || 0,
+        mobileSubsAct:   Number(d.mobileAct)   || 0,
+        fixedSubsSales:  Number(d.fixedSales)  || 0,
+        fixedSubsAct:    Number(d.fixedAct)    || 0,
+        fbbSubsSales:    Number(d.fbbSales)    || 0,
+        fbbSubsAct:      Number(d.fbbAct)      || 0
+      };
+      if (d.goldSales !== null && d.goldSales !== undefined) entry.goldSubsSales = Number(d.goldSales) || 0;
+      if (d.goldAct !== null && d.goldAct !== undefined)     entry.goldSubsAct   = Number(d.goldAct)   || 0;
+      if (d.wemixSales !== null && d.wemixSales !== undefined) entry.weMixSubsSales = Number(d.wemixSales) || 0;
+      if (d.wemixAct !== null && d.wemixAct !== undefined)     entry.weMixSubsAct   = Number(d.wemixAct)   || 0;
+      out[normCodeClosure(code)] = entry;
+    });
     return out;
-  } catch (e) { return {}; } // older workbooks without the Sales/Activation split — fall back gracefully
+  } catch (e) {
+    console.warn('[Closure IDLE] parse failed:', e.message);
+    return {};
+  }
+}
+
+// ── Official WE Telecom Tariff Structure Classifier (790 plans from Tariffs struc.xlsx) ──
+var WE_TARIFF_STRUC_MAP = {"fmm we air we gold 200 main":["gold","We Air · EGP 200","We Air"],"fmm we gold 200 main":["gold","FMM · EGP 200","FMM"],"fmm we gold mobile 200 main":["gold","Stand Alone · EGP 200","Stand Alone"],"fmm we gold 400 main":["gold","FMM · EGP 400","FMM"],"fmm we gold mobile 400 main":["gold","Stand Alone · EGP 400","Stand Alone"],"fmm we gold mobile 600 main":["gold","Stand Alone · EGP 600","Stand Alone"],"fmm we gold mobile 800 main":["gold","Stand Alone · EGP 800","Stand Alone"],"fmm we gold 800 main":["gold","FMM · EGP 800","FMM"],"fmm we air we gold 400 main":["gold","We Air · EGP 400","We Air"],"fmm we gold 1500 main":["gold","FMM · EGP 1500","FMM"],"fmm we gold mobile 1500 main":["gold","Stand Alone · EGP 1500","Stand Alone"],"fmm we gold 1000 main":["gold","FMM · EGP 1000","FMM"],"fmm we gold 600 main":["gold","FMM · EGP 600","FMM"],"fmm we air we gold 800 main":["gold","We Air · EGP 800","We Air"],"fmm we air we gold 1500 main":["gold","We Air · EGP 1500","We Air"],"fmm we air we gold 1000 main":["gold","We Air · EGP 1000","We Air"],"fmm we gold mobile 1000 main":["gold","Stand Alone · EGP 1000","Stand Alone"],"fmm we air we gold 600 main":["gold","We Air · EGP 600","We Air"],"fmm we gold 200":["gold","FMM · EGP 200","FMM"],"we gold - port-in":["gold","FMM",""],"we gold 5":["gold","FMM","Postpaid"],"fmm we air we gold 200":["gold","We Air · EGP 200","We Air"],"fmm we gold mobile 200":["gold","Stand Alone · EGP 200","Stand Alone"],"fmm we air we gold 400":["gold","We Air · EGP 400","We Air"],"fmm we gold mobile 800":["gold","Stand Alone · EGP 800","Stand Alone"],"fmm we air we gold 1500":["gold","We Air · EGP 1500","We Air"],"fmm we gold 400":["gold","FMM · EGP 400","FMM"],"fmm we gold 600":["gold","FMM · EGP 600","FMM"],"fmm we air we gold 600":["gold","We Air · EGP 600","We Air"],"fmm we gold 800":["gold","FMM · EGP 800","FMM"],"fmm we air we gold 800":["gold","We Air · EGP 800","We Air"],"fmm we gold 1000":["gold","FMM · EGP 1000","FMM"],"fmm we air we gold 1000":["gold","We Air · EGP 1000","We Air"],"fmm we gold 1500":["gold","FMM · EGP 1500","FMM"],"we gold 200":["gold","FMM · EGP 200","FMM"],"we gold 200 main":["gold","FMM · EGP 200","FMM"],"we gold 400":["gold","FMM · EGP 400","FMM"],"we gold 400 main":["gold","FMM · EGP 400","FMM"],"we gold 600":["gold","FMM · EGP 600","FMM"],"we gold 600 main":["gold","FMM · EGP 600","FMM"],"we gold 800":["gold","FMM · EGP 800","FMM"],"we gold 800 main":["gold","FMM · EGP 800","FMM"],"we gold 1000":["gold","FMM · EGP 1000","FMM"],"we gold 1000 main":["gold","FMM · EGP 1000","FMM"],"we gold 1500":["gold","FMM · EGP 1500","FMM"],"we gold 1500 main":["gold","FMM · EGP 1500","FMM"],"fmm we gold mobile 400":["gold","Stand Alone · EGP 400","Stand Alone"],"fmm we gold mobile 600":["gold","Stand Alone · EGP 600","Stand Alone"],"fmm we gold mobile 1000":["gold","Stand Alone · EGP 1000","Stand Alone"],"fmm we gold mobile 1500":["gold","Stand Alone · EGP 1500","Stand Alone"],"fmm we gold 260 main":["gold","FMM · EGP 260","FMM"],"fmm we gold 525 main":["gold","FMM · EGP 525","FMM"],"we gold mobile 260 main":["gold","Stand Alone · EGP 260","Stand Alone"],"we gold mobile 525 main":["gold","Stand Alone · EGP 525","Stand Alone"],"fmm we gold 1300 main":["gold","FMM · EGP 1300","FMM"],"we gold mobile 1050 main":["gold","Stand Alone · EGP 1050","Stand Alone"],"fmm we gold 775 main":["gold","FMM · EGP 775","FMM"],"we gold mobile 775 main":["gold","Stand Alone · EGP 775","Stand Alone"],"we gold mobile 1300 main":["gold","Stand Alone · EGP 1300","Stand Alone"],"fmm we gold 2000 main":["gold","FMM · EGP 2000","FMM"],"fmm we air we gold 1300":["gold","We Air · EGP 1300","We Air"],"fmm we air we gold 1300 main":["gold","We Air · EGP 1300","We Air"],"fmm we air we gold 2000 main":["gold","We Air · EGP 2000","We Air"],"fmm we air we gold 260 main":["gold","We Air · EGP 260","We Air"],"fmm we air we gold 525 main":["gold","We Air · EGP 525","We Air"],"fmm we gold 1050 main":["gold","FMM · EGP 1050","FMM"],"we gold mobile 2000 main":["gold","Stand Alone · EGP 2000","Stand Alone"],"fmm we air we gold 1050 main":["gold","We Air · EGP 1050","We Air"],"fmm we air we gold 260":["gold","We Air · EGP 260","We Air"],"fmm we air we gold 775 main":["gold","We Air · EGP 775","We Air"],"fmm we gold 260":["gold","FMM · EGP 260","FMM"],"we gold mobile 260":["gold","Stand Alone · EGP 260","Stand Alone"],"fvm we gold 35 ftth main":["gold","FMM · EGP 35","FMM"],"we gold 1050 super 600":["gold","FMM · EGP 1050","FMM"],"we gold 775 super 600gb":["gold","FMM · EGP 775","FMM"],"we gold 1050 super 400":["gold","FMM · EGP 1050","FMM"],"fvm we gold 65 ftth main":["gold","FMM · EGP 65","FMM"],"we gold 1300 super 1000":["gold","FMM · EGP 1300","FMM"],"we gold 1300 super 600":["gold","FMM · EGP 1300","FMM"],"we gold mobile 1300":["gold","Stand Alone · EGP 1300","Stand Alone"],"fmm we gold 525":["gold","FMM · EGP 525","FMM"],"fmm we gold 775":["gold","FMM · EGP 775","FMM"],"we gold mobile 775":["gold","Stand Alone · EGP 775","Stand Alone"],"we gold mobile 525":["gold","Stand Alone · EGP 525","Stand Alone"],"fmm we air we gold 525":["gold","We Air · EGP 525","We Air"],"we gold mobile 1050":["gold","Stand Alone · EGP 1050","Stand Alone"],"fmm we gold 1050":["gold","FMM · EGP 1050","FMM"],"we gold":["gold","FMM","WE Gold"],"fmm we gold 300 main":["gold","FMM · EGP 300","FMM"],"we gold mobile 600 main":["gold","Stand Alone · EGP 600","Stand Alone"],"we gold mobile 2300 main":["gold","Stand Alone · EGP 2300","Stand Alone"],"we gold mobile 300 main":["gold","Stand Alone · EGP 300","Stand Alone"],"we gold mobile 890 main":["gold","Stand Alone · EGP 890","Stand Alone"],"fmm we gold 2300 main":["gold","FMM · EGP 2300","FMM"],"we gold mobile 1200 main":["gold","Stand Alone · EGP 1200","Stand Alone"],"fmm we gold 890 main":["gold","FMM · EGP 890","FMM"],"fmm we air we gold 300 main":["gold","We Air · EGP 300","We Air"],"we gold mobile 1500 main":["gold","Stand Alone · EGP 1500","Stand Alone"],"fmm we air we gold 2300 main":["gold","We Air · EGP 2300","We Air"],"fmm we gold 1200 main":["gold","FMM · EGP 1200","FMM"],"fmm we air we gold 1200 main":["gold","We Air · EGP 1200","We Air"],"fmm we air we gold 890 main":["gold","We Air · EGP 890","We Air"],"fmm we gold 300":["gold","FMM · EGP 300","FMM"],"we air we gold 800 main":["fwa","WE Air EGP 800","WE Gold"],"we air we gold 1500 main":["fwa","WE Air EGP 1500","WE Gold"],"we air we gold 600 main":["fwa","WE Air EGP 600","WE Gold"],"we air we gold 1000 main":["fwa","WE Air EGP 1000","WE Gold"],"we air we gold 200 main":["fwa","WE Air EGP 200","WE Gold"],"we air we gold 400 main":["fwa","WE Air EGP 400","WE Gold"],"we air we gold 200":["fwa","WE Air EGP 200","WE Gold"],"we air we gold 400":["fwa","WE Air EGP 400","WE Gold"],"we air we gold 600":["fwa","WE Air EGP 600","WE Gold"],"we air we gold 800":["fwa","WE Air EGP 800","WE Gold"],"we air we gold 1000":["fwa","WE Air EGP 1000","WE Gold"],"we air we gold 1500":["fwa","WE Air EGP 1500","WE Gold"],"we air we gold 1050 main":["fwa","WE Air EGP 1050","WE Gold"],"we air we gold 2000 main":["fwa","WE Air EGP 2000","WE Gold"],"we air we gold 260 main":["fwa","WE Air EGP 260","WE Gold"],"we air we gold 525 main":["fwa","WE Air EGP 525","WE Gold"],"we air we gold 1300 main":["fwa","WE Air EGP 1300","WE Gold"],"we air we gold 775 main":["fwa","WE Air EGP 775","WE Gold"],"we air we gold 1300":["fwa","WE Air EGP 1300","WE Gold"],"we gold 260 - we air 150":["fwa","WE Air EGP 260","WE Gold"],"we gold 525 - we air 150":["fwa","WE Air EGP 525","WE Gold"],"we gold 2000 - we air 650":["fwa","WE Air EGP 2000","WE Gold"],"we gold 1300 - we air 250":["fwa","WE Air EGP 1300","WE Gold"],"we gold 775 - we air 150":["fwa","WE Air EGP 775","WE Gold"],"we gold 1050 - we air 250":["fwa","WE Air EGP 1050","WE Gold"],"we air we gold 260":["fwa","WE Air EGP 260","WE Gold"],"fbm we gold 200 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 200 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 400 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 200 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 600 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 400 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 800 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1000 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 800 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1500 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1000 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1500 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 600 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 260 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 525 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 525 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 260 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 775 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 260 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1050 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2000 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1300 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 775 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1050 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 775 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"we gold 260 super 250gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 775 super 250gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 260 super 140gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 260 super 200gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 525 super 140gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 525 super 200gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 260 super 400gb":["fbb","WE Gold (FBB)","WE Gold"],"we gold 525 super 250gb":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2000 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1050 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 260 adsl":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 525 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2000 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 300 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 300 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 890 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1200 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 600 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 890 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 300 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1200 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2300 adsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 890 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2300 vdsl main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1500 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 1200 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"fbm we gold 2300 ftth main":["fbb","WE Gold (FBB)","WE Gold"],"we ardy 25 - quarterly":["fixed","WE 20","Fixed"],"we ardy 20 - quarterly":["fixed","WE 20","Fixed"],"we ardy 25 quarterly":["fixed","WE 20","Fixed"],"we ardy business 55- monthly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy business 55 - monthly (msan-post)":["fixed","WE Ardy Business","Fixed"],"fvm we gold 20 msan main":["fixed","FVM WE Gold 20","Fixed"],"we ardy 40 - quarterly":["fixed","WE 35","Fixed"],"we ardy business 80- monthly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy - 25":["fixed","WE 20","Fixed"],"we ardy 70 - quarterly":["fixed","WE 65","Fixed"],"we ardy business 55 - monthly (ftth)":["fixed","WE Ardy Business","Fixed"],"we أرضي":["fixed","WE 20","Fixed"],"we أرضي - م":["fixed","WE 20","Fixed"],"وي 20":["fixed","WE 20","Fixed"],"we ardy business 55 - quarterly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy business 80 - quarterly (msan)":["fixed","WE Ardy Business","Fixed"],"governmental 45 - quarterly (msan)":["fixed","Governmental","Fixed"],"we ardy 25 - annual":["fixed","WE 20","Fixed"],"we ardy (25)":["fixed","WE 20","Fixed"],"we ardy business 55 - quarterly (ftth)":["fixed","WE Ardy Business","Fixed"],"we ardy extra":["fixed","WE 20","Fixed"],"we ardy - (25)":["fixed","WE 20","Fixed"],"we ardy postpaid - tdm":["fixed","WE 20","Fixed"],"we ardy prepaid ftth - quarterly":["fixed","WE Ardy Quarterly","Fixed"],"we ardy prepaid msan - quarterly":["fixed","WE Ardy Quarterly","Fixed"],"we ardy 40 quarterly":["fixed","WE 35","Fixed"],"we ardy business 80 - monthly(msan-post)":["fixed","WE Ardy Business","Fixed"],"corporate - we ardy 25 - tdm":["fixed","WE 20","Fixed"],"fvm we gold 20 ftth main":["fixed","FVM WE Gold 20","Fixed"],"super telephonet - 145":["fixed","Telephonet","Fixed"],"super telephonet - 230":["fixed","Telephonet","Fixed"],"fmc main plan kayan 1":["fixed","Kayan","Fixed"],"fmc main plan ftth lit classic":["fixed","WE FV FMC","Fixed"],"fmc main plan kayan 2":["fixed","Kayan","Fixed"],"we ardy - (40)":["fixed","WE 35","Fixed"],"super telephonet - 90":["fixed","Telephonet","Fixed"],"we ardy business 55 - quarterly (tdm-post)":["fixed","WE Ardy Business","Fixed"],"fmc main plan ftth lit extra":["fixed","WE FV FMC","Fixed"],"we ardy 35 - quarterly":["fixed","WE Ardy 35","Fixed"],"we ardy 35 quarterly":["fixed","WE Ardy 35","Fixed"],"we ardy 75 - quarterly":["fixed","WE Ardy 75","Fixed"],"we ardy - 35":["fixed","WE Ardy 35","Fixed"],"we ardy - (35)":["fixed","WE Ardy 35","Fixed"],"we ardy 20":["fixed","WE Ardy 20","Fixed"],"we ardy 35 - annual":["fixed","WE Ardy 35","Fixed"],"we fv fmc main plan – msan":["fixed","WE FV FMC","Fixed"],"we ardy (35)":["fixed","WE Ardy 35","Fixed"],"we ardy business 60 - quarterly (msan)":["fixed","WE Ardy Business 60","Fixed"],"we ardy business 60- monthly (msan)":["fixed","WE Ardy Business 60","Fixed"],"we ardy business 60 - monthly (msan-post)":["fixed","WE Ardy Business 60","Fixed"],"fvm we gold 35 msan main":["fixed","FVM WE Gold 35","Fixed"],"we ardy 45 - quarterly":["fixed","WE Ardy 45","Fixed"],"governmental 55 - quarterly (msan)":["fixed","Governmental","Fixed"],"we ardy 75 quarterly":["fixed","WE Ardy 75","Fixed"],"we ardy business 60 - monthly (ftth)":["fixed","WE Ardy Business 60","Fixed"],"we ardy business 60 - quarterly (ftth)":["fixed","WE Ardy Business 60","Fixed"],"we ardy 35 annual":["fixed","WE Ardy 35","Fixed"],"we ardy (premium)":["fixed","WE Ardy Premium","Fixed"],"we ardy business 85 - quarterly (msan)":["fixed","WE Ardy Business 85","Fixed"],"corporate - we ardy 35 - tdm":["fixed","WE Ardy Business 35","Fixed"],"we ardy 35 monthly":["fixed","WE Ardy 35","Fixed"],"we ardy 45 quarterly":["fixed","WE Ardy 45","Fixed"],"we ardy business 60 - monthly (ftth-post)":["fixed","WE Ardy Business 60","Fixed"],"we ardy 45 - annual":["fixed","WE Ardy 45","Fixed"],"we ardy - 45":["fixed","WE Ardy 45","Fixed"],"we ardy business 85- monthly (msan)":["fixed","WE Ardy Business 85","Fixed"],"we ardy (45)":["fixed","WE Ardy 45","Fixed"],"we ardy business 85 - monthly(msan-post)":["fixed","WE Ardy Business 85","Fixed"],"we ardy triple play ftth":["fixed","WE Ardy","Fixed"],"we ardy 45 annual":["fixed","WE Ardy 45","Fixed"],"we ardy buisiness-quarterly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy triple play msan":["fixed","WE Ardy","Fixed"],"we ardy - 75":["fixed","WE Ardy 75","Fixed"],"fvm we gold 20 msan free main":["fixed","FVM WE Gold 20","Fixed"],"we ardy 75 - annual":["fixed","WE Ardy 75","Fixed"],"we ardy (75)":["fixed","WE Ardy 75","Fixed"],"we ardy 40 annual":["fixed","WE Ardy 40","Fixed"],"we ardy 50 - annual":["fixed","WE Ardy 50","Fixed"],"we ardy 40 - annual":["fixed","WE Ardy 40","Fixed"],"we ardy (40)":["fixed","WE Ardy 40","Fixed"],"we ardy - 40":["fixed","WE Ardy 40","Fixed"],"we ardy 50 - quarterly":["fixed","WE Ardy 50","Fixed"],"we ardy 80 - quarterly":["fixed","WE Ardy 80","Fixed"],"we ardy 80 quarterly":["fixed","WE Ardy 80","Fixed"],"we ardy business 65 - quarterly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy business 65- monthly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy business 65 - quarterly (ftth)":["fixed","WE Ardy Business","Fixed"],"we ardy business 65 - monthly (ftth)":["fixed","WE Ardy Business","Fixed"],"we ardy business 65 - monthly (msan-post)":["fixed","WE Ardy Business","Fixed"],"we ardy business 65 - monthly (ftth-post)":["fixed","WE Ardy Business","Fixed"],"we ardy business 90 - quarterly (ftth)":["fixed","WE Ardy Business","Fixed"],"we ardy - 50":["fixed","WE Ardy 50","Fixed"],"we ardy business 90 - quarterly (msan)":["fixed","WE Ardy Business","Fixed"],"we ardy business 90- monthly (msan)":["fixed","WE Ardy 90","Fixed"],"governmental 60 - quarterly (ftth)":["fixed","Governmental","Fixed"],"governmental 60 - quarterly (msan)":["fixed","Governmental","Fixed"],"onehome - super (200gb + 600min)":["fixed","One Home Super","Fixed"],"onehome super (200gb + 600min)":["fixed","One Home Super","Fixed"],"onehome super (150gb + 600min)":["fixed","One Home Super","Fixed"],"onehome super (250gb + 600min)":["fixed","One Home Super","Fixed"],"onehome - super (250gb + 600min)":["fixed","One Home Super","Fixed"],"onehome - super (150gb + 600min)":["fixed","One Home Super","Fixed"],"onehome super (400gb + 600min)":["fixed","One Home Super","Fixed"],"onehome super (300gb + 600min)":["fixed","One Home Super","Fixed"],"we ardy 50 quarterly":["fixed","WE Ardy 50","Fixed"],"we onehome prepaid ftth monthly":["fixed","One Home Super","Fixed"],"enterprise onehome super (150 gb + 2200min)":["fixed","One Home Super","Fixed"],"enterprise onehome super (200 gb + 2200min)":["fixed","One Home Super","Fixed"],"onehome ultra (750gb + 600min)":["fixed","One Home Super","Fixed"],"enterprise onehome super (250 gb + 2200min)":["fixed","One Home Super","Fixed"],"enterprise onehome - super (250 gb + 2200min)":["fixed","One Home Super","Fixed"],"fvm we gold 35 ftth free main":["fixed","FVM WE Gold 35","Fixed"],"onehome - super (250gb + 3750min)":["fixed","One Home Super","Fixed"],"enterprise onehome super (200 gb + 3700min)":["fixed","One Home Super","Fixed"],"fvm we gold 20 ftth free main":["fixed","FVM WE Gold 20","Fixed"],"onehome - super (300gb + 3750min)":["fixed","One Home Super","Fixed"],"12 pt":["payg","12 PT (PAYG)","PAYG"],"nitro mifi 200. 23":["mifi","Data SIM-MIFI EGP 200","Data SIM-MIFI"],"tkafol and karama - main":["other","Takafol and Karama","Takafol and Karama"],"nitro mifi 100. 10":["mifi","Data SIM-MIFI EGP 100","Data SIM-MIFI"],"nitro mifi 450. 50":["mifi","Data SIM-MIFI EGP 450","Data SIM-MIFI"],"nitro mifi 10. 625 mbs":["mifi","Data SIM-MIFI EGP 10","Data SIM-MIFI"],"nitro mifi 20. 1":["mifi","Data SIM-MIFI EGP 20","Data SIM-MIFI"],"nitro mifi 40. 3250 mbs":["mifi","Data SIM-MIFI EGP 40","Data SIM-MIFI"],"nitro mifi 70. 6250 mbs":["mifi","Data SIM-MIFI EGP 70","Data SIM-MIFI"],"we air 450":["fwa","WE Air EGP 450","FWA"],"employee":["other","Employee","Employee"],"we air 300":["fwa","WE Air EGP 300","FWA"],"nitro mifi":["mifi","Data SIM-MIFI","Data SIM-MIFI"],"we air 200":["fwa","WE Air EGP 200","FWA"],"annual data sim - 10000 mb":["mifi","Data SIM-MIFI 10000 MB","Data SIM-MIFI"],"we air 700":["fwa","WE Air EGP 700","FWA"],"indigo plus 195":["other","Indigo EGP 195","Indigo"],"we business value 520 - open":["other","Corporate EGP 520","Corporate"],"we business value 350 - open":["other","Corporate EGP 350","Corporate"],"bypass sp08":["other","Bypass","Bypass"],"annual data sim":["mifi","Data SIM-MIFI","Data SIM-MIFI"],"internet fixed lte air 4g":["fwa","WE Air","FWA"],"we business value 115 - control":["other","Corporate EGP 115","Corporate"],"we business - control 40":["other","Corporate EGP 40","Corporate"],"we business internet egp 200. 23500 mb (control)":["other","Corporate EGP 200","Corporate"],"we business value 230 - open":["other","Corporate EGP 230","Corporate"],"we business value 115 - open":["other","Corporate EGP 115","Corporate"],"fmm main plan indigo 210 super 1 speed":["other","Indigo EGP 210","Indigo"],"we business value 350 - control":["other","Corporate EGP 350","Corporate"],"we business value 230 - control":["other","Corporate EGP 230","Corporate"],"we business value 55 - control":["other","Corporate EGP 55","Corporate"],"we business internet egp 100. 10000 mb (control)":["other","Corporate EGP 100","Corporate"],"we business value 520 - control":["other","Corporate EGP 520","Corporate"],"indigo plus landline":["other","Indigo","Indigo"],"we air 850":["fwa","WE Air EGP 850","FWA"],"super 1 speed (3000 gb) - 12 months":["fbb","Annual","Super"],"super 2 speed (3000 gb) - 12 months":["fbb","Annual","Super"],"super 1 speed (7200 gb) - 12 months":["fbb","Annual","Super"],"super 1 speed (4800 gb) - 12 months":["fbb","Annual","Offer"],"super 3 speed (3000 gb) - 12 months":["fbb","Annual","Super"],"super 1 speed (12 tb) - 12 months":["fbb","Annual","Super"],"ultra 1 speed (3000 gb) - 12 months":["fbb","Annual","Ultra"],"super 2 speed (7200 gb) - 12 months":["fbb","Annual","Super"],"mega 1 speed (3000 gb) - 12 months":["fbb","Annual","Mega"],"nitro mifi 260":["mifi","Data SIM-MIFI EGP 260","Data SIM-MIFI"],"nitro mifi 50":["mifi","Data SIM-MIFI EGP 50","Data SIM-MIFI"],"nitro mifi 130":["mifi","Data SIM-MIFI EGP 130","Data SIM-MIFI"],"we air 250- prepaid":["fwa","WE Air EGP 250","FWA"],"we air 1100- prepaid":["fwa","WE Air EGP 1100","FWA"],"we air 400- prepaid":["fwa","WE Air EGP 400","FWA"],"nitro mifi 13":["mifi","Data SIM-MIFI EGP 13","Data SIM-MIFI"],"nitro mifi 90":["mifi","Data SIM-MIFI EGP 90","Data SIM-MIFI"],"nitro mifi 25":["mifi","Data SIM-MIFI EGP 25","Data SIM-MIFI"],"nitro mifi 585":["mifi","Data SIM-MIFI EGP 585","Data SIM-MIFI"],"we air 900- prepaid":["fwa","WE Air EGP 900","FWA"],"we air 600- prepaid":["fwa","WE Air EGP 600","FWA"],"we air 600- postpaid":["fwa","WE Air EGP 600","FWA"],"we air 4g":["fwa","WE Air","FWA"],"we business internet 260 control":["other","Corporate EGP 260","Corporate"],"we business internet 130 control":["other","Corporate EGP 130","Corporate"],"we business value 150 - control":["other","Corporate EGP 150","Corporate"],"we business value 300 - control":["other","Corporate EGP 300","Corporate"],"we air 400- postpaid":["fwa","WE Air EGP 400","FWA"],"we air 250- postpaid":["fwa","WE Air EGP 250","FWA"],"we air 4g -post":["other","Corporate","Corporate"],"we business value 450 - open":["other","Corporate EGP 450","Corporate"],"we ardy postpaid - msan":["fixed","WE Ardy Postpaid","WE Ardy Postpaid"],"tkafol and karama":["other","Takafol and Karama","Takafol and Karama"],"we air 900- postpaid":["fwa","WE Air EGP 900","FWA"],"we air 1400- prepaid":["fwa","WE Air EGP 1400","FWA"],"we life 950 - 2":["fbb","WE Life - IPTV","WE Life - IPTV"],"super 3 speed (4800 gb) - 12 months":["fbb","Annual","Super"],"we life 950 - 1":["fbb","WE Life - IPTV","WE Life - IPTV"],"vtl 100- m2m":["mifi","Data SIM-MIFI EGP 100","Data SIM-MIFI"],"vtl 135- m2m":["mifi","Data SIM-MIFI EGP 135","Data SIM-MIFI"],"vtl 170 m2m":["mifi","Data SIM-MIFI EGP 170","Data SIM-MIFI"],"super 2 speed (4800 gb) - 12 months":["fbb","Annual","Super"],"we life 1600 - 2":["fbb","WE Life - IPTV","WE Life - IPTV"],"mega 2 speed (3000 gb) - 12 months":["fbb","Annual","Mega"],"vtl 200- m2m":["mifi","Data SIM-MIFI EGP 200","Data SIM-MIFI"],"we life 1600 - 1":["fbb","WE Life - IPTV","WE Life - IPTV"],"mega 1 speed (12 tb) - 12 months":["fbb","Annual","Mega"],"we ardy (we life 325)":["fixed","WE Ardy - WE Life","WE Ardy - WE Life"],"onehome - super (300gb + 600min)":["fbb","Super speed (300 GB)","Super"],"onehome - super (750gb + 600min)":["fbb","Super speed (750 GB)","Super"],"enterprise onehome super (400 gb + 2200min)":["fbb","Super speed (400 GB)","Super"],"onehome super (150gb + 3750min)":["fbb","Super speed (150 GB)","Super"],"enterprise onehome - ultra (250 gb + 2200min)":["fbb","Ultra Speed (250 GB)","Ultra"],"onehome - ultra (250gb + 600min)":["fbb","Ultra Speed (250 GB)","Ultra"],"onehome ultra (250gb + 600min)":["fbb","Ultra Speed (250 GB)","Ultra"],"onehome - super (1500gb + 600min)":["fbb","Super speed (1500 GB)","Super"],"onehome mega (1500gb + 600min)":["fbb","Mega speed (1500 GB)","Mega"],"onehome super (4800gb + 45000min)":["fbb","Annual","Super"],"onehome super (750gb + 3750min)":["fbb","Super speed (750 GB)","Super"],"super 1 speed (6000 gb)- 12 months":["fbb","Annual","Super"],"enterprise onehome super (400 gb + 3700min)":["fbb","Super speed (400 GB)","Super"],"enterprise onehome - super (150 gb + 2200min)":["fbb","Super speed (150 GB)","Super"],"super 2 speed (6000 gb)- 12 months":["fbb","Annual","Super"],"we onehome prepaid ftth annual":["fbb","Annual","Super"],"super 1 speed (2400 gb)- 12 months":["fbb","Annual","Super"],"super 3 speed (6000 gb)- 12 months":["fbb","Annual","Super"],"onehome - super (3000gb + 7200min)":["fbb","Annual","Super"],"enterprise onehome - super (200 gb + 2200min)":["fbb","Super speed (200 GB)","Super"],"onehome super (300gb + 3750min)":["fbb","Super speed (300 GB)","Super"],"onehome super (400gb + 3750min)":["fbb","Super speed (400 GB)","Super"],"we onehome prepaid msan - vdsl annual":["fbb","Annual","Super"],"onehome super (1800gb + 7200min)":["fbb","Annual","Super"],"onehome max fh (1500gb + 600min)":["fbb","MAX Speed ( 1.5 TB )","MAX Speed"],"onehome - mega (750gb + 3750min)":["fbb","Mega speed (750 GB)","Mega"],"onehome - super (18tb + 7200min)":["fbb","Annual","Super"],"onehome super (500gb + 3750min)":["fbb","Super speed (500 GB)","Super"],"super 1 speed (200 gb)":["fbb","Super speed (200 GB)","Super"],"super 1 we mix":["fbb","We MIX (FBB)","WE Mix"],"super 1 speed (250 gb)":["fbb","Super speed (250 GB)","Super"],"super 1 speed (140 gb)":["fbb","Super speed (140 GB)","Super"],"super 1 speed (400 gb)":["fbb","Super speed (400 GB)","Super"],"super 3 speed (200 gb)":["fbb","Super speed (200 GB)","Super"],"super 3 speed (400 gb)":["fbb","Super speed (400 GB)","Super"],"super 2 speed (200 gb)":["fbb","Super speed (200 GB)","Super"],"super 2 speed (140 gb)":["fbb","Super speed (140 GB)","Super"],"mega 1 speed (250 gb)":["fbb","Mega Speed (250 GB)","Mega"],"super 2 speed (250 gb)":["fbb","Super speed (250 GB)","Super"],"super 3 we mix":["fbb","We MIX (FBB)","WE Mix"],"super 2 speed (400 gb)":["fbb","Super speed (400 GB)","Super"],"super 3 speed (250 gb)":["fbb","Super speed (250 GB)","Super"],"super 2 we mix":["fbb","We MIX (FBB)","WE Mix"],"super 3 speed (140 gb)":["fbb","Super speed (140 GB)","Super"],"mega 2 speed (250 gb)":["fbb","Mega Speed (250 GB)","Mega"],"super 1 speed (600 gb)":["fbb","Super speed (600 GB)","Super"],"mega 1 speed 1 tb - 1 month":["fbb","Mega Speed (1000 GB)","Mega"],"super 2 speed 1 tb - 1 month":["fbb","Super speed (1000 GB)","Super"],"super 2 speed (600 gb)":["fbb","Super speed (600 GB)","Super"],"ultra 1 speed (600 gb)":["fbb","Ultra Speed (600 GB)","Ultra"],"super 3 speed (600 gb)":["fbb","Super speed (600 GB)","Super"],"super 1 speed 1 tb - 1 month":["fbb","Super speed (1000 GB)","Super"],"ultra 1 speed (250 gb)":["fbb","Ultra Speed (250 GB)","Ultra"],"mega 2 speed (600 gb)":["fbb","Mega Speed (600 GB)","Mega"],"super 3 speed 1 tb - 1 month":["fbb","Super speed (1000 GB)","Super"],"mega 1 speed (600 gb)":["fbb","Mega Speed (600 GB)","Mega"],"ultra 2 speed (250 gb)":["fbb","Ultra Speed (250 GB)","Ultra"],"streamerz 1":["fbb","Offer","Offer"],"max speed fh":["fbb","MAX Speed","MAX Speed"],"ultra 2 speed (600 gb)":["fbb","Ultra Speed (600 GB)","Ultra"],"plus 1":["fbb","Offer","Offer"],"max speed sv":["fbb","MAX Speed","MAX Speed"],"super speed adsl postpaid":["fbb","Super","Super"],"gaming":["fbb","Gaming","Gaming"],"we space sa7el 1 (1tb)":["fbb","WE SPACE","WE SPACE"],"we space sa7el 3 (1tb)":["fbb","WE SPACE","WE SPACE"],"mega 2 speed 1 tb - 1 month":["fbb","Mega Speed (1000 GB)","Mega"],"post-paid main_plan 50 mbps fh fmc":["fbb","Indigo (FBB)","Indigo"],"super speed vdsl postpaid":["fbb","Super","Super"],"super speed - adsl - postpaid (0 gb) fmc":["fbb","Super","Super"],"we ioe adsl primary prepaid":["fbb","WE IOE","WE IOE"],"we mix adsl primary prepaid":["fbb","We MIX (FBB)","WE Mix"],"we ioe vdsl primary prepaid":["fbb","WE IOE","WE IOE"],"corporate super speed 1 - (140 gb) - al":["fbb","Corporate","Corporate"],"we ioe adsl primary postpaid (0 gb) fmc":["fbb","WE IOE","WE IOE"],"we mix vdsl primary prepaid":["fbb","We MIX (FBB)","WE Mix"],"sonic streamerz vdsl":["fbb","Gaming","Gaming"],"we mix ftth primary prepaid":["fbb","We MIX (FBB)","WE Mix"],"corporate super speed 2 - (400 gb) - al":["fbb","Corporate","Corporate"],"we ioe ftth primary prepaid":["fbb","WE IOE","WE IOE"],"pre-paid main_plan 30 mbps al":["fbb","Prepaid (FBB)","Prepaid"],"gamerz 1":["fbb","Gaming","Gaming"],"corporate super speed 2 - (140 gb) - al":["fbb","Corporate","Corporate"],"corporate super speed 1 - (250 gb) - al":["fbb","Corporate","Corporate"],"corporate super speed 1 - (200 gb) - al":["fbb","Corporate","Corporate"],"post-paid main plan al":["fbb","Indigo (FBB)","Indigo"],"pre-paid adsl":["fbb","Prepaid (FBB)","Prepaid"],"super speed - vdsl - postpaid (0 gb) fmc":["fbb","Super","Super"],"plus 2":["fbb","Offer","Offer"],"we space sahel 1- (1tb)":["fbb","WE SPACE","WE SPACE"],"fbm main plan indigo 240 super 1 speed adsl (140g)":["fbb","Indigo (FBB)","Indigo"],"fbm we gold 1300 vdsl main":["fbb","WE Gold (FBB)","FBB"],"max+ speed ( 1 tb )":["fbb","MAX+ Speed ( 1 TB )","MAX Speed"],"super 1 speed (150 gb)":["fbb","Super speed (150 GB)","Super"],"super 2 speed (150 gb)":["fbb","Super speed (150 GB)","Super"],"super 3 speed (150 gb)":["fbb","Super speed (150 GB)","Super"],"super 1 speed (300 gb)":["fbb","Super speed (300 GB)","Super"],"super 1 speed (750 gb)":["fbb","Super speed (750 GB)","Super"],"super 2 speed (750 gb)":["fbb","Super speed (750 GB)","Super"],"super 1 speed (50 gb)":["fbb","Super speed (50 GB)","Super"],"super 2 speed (1500 gb) – 1 month":["fbb","Super speed (1500 GB)","Super"],"super 3 speed (1500 gb) – 1 month":["fbb","Super speed (1500 GB)","Super"],"super 3 speed (750 gb)":["fbb","Super speed (750 GB)","Super"],"super 1 speed (500 gb)":["fbb","Super speed (500 GB)","Super"],"super 3 speed (50 gb)":["fbb","Super speed (50 GB)","Super"],"super 3 speed (300 gb)":["fbb","Super speed (300 GB)","Super"],"super 2 speed (500 gb)":["fbb","Super speed (500 GB)","Super"],"super 1 speed (1500 gb) – 1 month":["fbb","Super speed (1500 GB)","Super"],"super 3 speed (500 gb)":["fbb","Super speed (1500 GB)","Super"],"super 2 speed (300 gb)":["fbb","Super speed (300 GB)","Super"],"super 2 speed (50 gb)":["fbb","Super speed (50 GB)","Super"],"ultra 2 speed (750 gb)":["fbb","Ultra Speed (750 GB)","Ultra"],"ultra 2 speed (500 gb)":["fbb","Ultra Speed (500 GB)","Ultra"],"mega 2 speed (500 gb)":["fbb","Mega Speed (500GB)","Mega"],"mega 1 speed (500 gb)":["fbb","Mega Speed (500GB)","Mega"],"ultra 1 speed (500 gb)":["fbb","Ultra Speed (500 GB)","Ultra"],"ultra 1 speed (750 gb)":["fbb","Ultra Speed (750 GB)","Ultra"],"super 1 speed (new 100 gb)":["fbb","Super speed (100 GB)","Super"],"super 2 speed (new 100 gb)":["fbb","Super speed (100 GB)","Super"],"super 3 speed (new 100 gb)":["fbb","Super speed (100 GB)","Super"],"student offer":["other","Student","Student"],"kix fn":["other","Voice Add on","Voice Add on"],"kix revamp fn":["other","Voice Add on","Voice Add on"],"new extra 500 we minutes tazbeet revamp":["other","Voice Add on EGP 500","Voice Add on"],"new extra 500 we minutes kix revamp.":["other","Voice Add on EGP 500","Voice Add on"],"schools students line":["other","Student","Student"],"employee basic":["other","Employee","Employee"],"kix 30. 320 kix. 7 days":["other","Voice Add on EGP 30","Voice Add on"],"kix revamp 22. 100 kix. 7 days":["other","Voice Add on EGP 22","Voice Add on"],"extra 500 we minutes.":["other","Voice Add on EGP 500","Voice Add on"],"kix 40. 480 kix. 7 days":["other","Voice Add on EGP 40","Voice Add on"],"mega 1 speed (750 gb)":["fbb","Mega speed (750 GB)","Mega"],"we air we gold 300 main":["fwa","WE Air EGP 300","FWA"],"we air we gold 2300 main":["fwa","WE Air EGP 2300","FWA"],"we air we gold 1200 main":["fwa","WE Air EGP 1200","FWA"],"we air we gold 890 main":["fwa","WE Air EGP 890","FWA"],"we air 1270- postpaid":["fwa","WE Air EGP 1270","FWA"],"we air 1600- postpaid":["fwa","WE Air EGP 1600","FWA"],"prepaid x plus 50":["other","MI Add on EGP 50","MI Add on"],"nitro prime 200. 23":["other","MI Add on EGP 200","MI Add on"],"nitro prime 10. 625 mbs":["other","MI Add on EGP 10","MI Add on"],"nitro prime 100. 10":["other","MI Add on EGP 100","MI Add on"],"nitro prime 40. 3250 mbs":["other","MI Add on EGP 40","MI Add on"],"nitro prime 70. 6250 mbs":["other","MI Add on EGP 70","MI Add on"],"nitro prime 20. 1":["other","MI Add on EGP 20","MI Add on"],"nitro prime 450. 50":["other","MI Add on EGP 450","MI Add on"],"prepaid x 20":["other","MI Add on EGP 20","MI Add on"],"nitro post 70. 6250 mbs":["other","MI Add on EGP 70","MI Add on"],"nitro post onetime 450. 50":["other","MI Add on EGP 450","MI Add on"],"daily streaming":["other","MI Add on","MI Add on"],"internet 20":["other","MI Add on EGP 20","MI Add on"],"nitro post 10. 625 mbs":["other","MI Add on EGP 10","MI Add on"],"nitro post 100. 10":["other","MI Add on EGP 100","MI Add on"],"nitro post 200. 23":["other","MI Add on EGP 200","MI Add on"],"nitro extra daily 1le":["other","MI Add on EGP 1","MI Add on"],"daily bundle":["other","MI Add on","MI Add on"],"nitro post 20. 1":["other","MI Add on EGP 20","MI Add on"],"nitro post 40. 3250 mbs":["other","MI Add on EGP 40","MI Add on"],"weekly streaming bundle":["other","MI Add on","MI Add on"],"monthly streaming bundle":["other","MI Add on","MI Add on"],"nitro post 450. 50":["other","MI Add on EGP 450","MI Add on"],"we air 100 add-on":["other","MI Add on EGP 100","MI Add on"],"we air 45 add-on":["other","MI Add on EGP 45","MI Add on"],"we air 15 add-on":["other","MI Add on EGP 15","MI Add on"],"prepaid x 65":["other","MI Add on EGP 65","MI Add on"],"nitro prime 90. prepaid":["other","MI Add on EGP 90","MI Add on"],"nitro prime 130. prepaid":["other","MI Add on EGP 130","MI Add on"],"nitro prime 260. prepaid":["other","MI Add on EGP 260","MI Add on"],"nitro post 260. renewable":["other","MI Add on EGP 260","MI Add on"],"nitro prime 585. prepaid":["other","MI Add on EGP 585","MI Add on"],"nitro prime 25. prepaid":["other","MI Add on EGP 25","MI Add on"],"nitro prime 50. prepaid":["other","MI Add on EGP 50","MI Add on"],"extra daily 6.5 l.e":["other","MI Add on EGP 6.5","MI Add on"],"nitro prime 13. prepaid":["other","MI Add on EGP 13","MI Add on"],"extra daily 1.25 l.e":["other","MI Add on EGP 1.25","MI Add on"],"daily streaming bundle one time":["other","MI Add on","MI Add on"],"prepaid x 25":["other","MI Add on EGP 25","MI Add on"],"monthly streaming bundle one time":["other","MI Add on","MI Add on"],"nitro post 130. renewable":["other","MI Add on EGP 130","MI Add on"],"nitro post 13- renewable":["other","MI Add on EGP 13","MI Add on"],"extra bundle 1gb- egp 25":["other","MI Add on EGP 25","MI Add on"],"nitro post 90. renewable":["other","MI Add on EGP 90","MI Add on"],"we air 130 add-on prepaid":["other","MI Add on EGP 130","MI Add on"],"weekly streaming bundle one time":["other","MI Add on","MI Add on"],"nitro post 50. renewable":["other","MI Add on EGP 50","MI Add on"],"nitro post 585. onetime":["other","MI Add on EGP 585","MI Add on"],"nitro post 25. renewable":["other","MI Add on EGP 25","MI Add on"],"we air 60 add-on prepaid":["other","MI Add on EGP 60","MI Add on"],"we air 20 add-on prepaid":["other","MI Add on EGP 20","MI Add on"],"postpaid x 65":["other","MI Add on EGP 65","MI Add on"],"nitro post 585. renewable":["other","MI Add on EGP 585","MI Add on"],"postpaid x 25":["other","MI Add on EGP 25","MI Add on"],"extra kix 60":["other","MI Add on EGP 60","MI Add on"],"nitro post 150. renewable":["other","MI Add on EGP 150","MI Add on"],"nitro post 675. onetime":["other","MI Add on EGP 675","MI Add on"],"nitro post 58. renewable":["other","MI Add on EGP 58","MI Add on"],"nitro post 300. renewable":["other","MI Add on EGP 300","MI Add on"],"nitro post 105. renewable":["other","MI Add on EGP 105","MI Add on"],"nitro post 29. renewable":["other","MI Add on EGP 29","MI Add on"],"nitro post 15. renewable":["other","MI Add on EGP 15","MI Add on"],"nitro prime 300. prepaid":["other","MI Add on EGP 300","MI Add on"],"nitro prime 29. prepaid":["other","MI Add on EGP 29","MI Add on"],"nitro prime 675. prepaid":["other","MI Add on EGP 675","MI Add on"],"nitro prime 105. prepaid":["other","MI Add on EGP 105","MI Add on"],"nitro prime 58. prepaid":["other","MI Add on EGP 58","MI Add on"],"nitro prime 150. prepaid":["other","MI Add on EGP 150","MI Add on"],"prepaid x 75":["other","MI Add on EGP 75","MI Add on"],"nitro prime 15. prepaid":["other","MI Add on EGP 15","MI Add on"],"we air 23 add-on prepaid":["other","MI Add on EGP 23","MI Add on"],"prepaid x 29":["other","MI Add on EGP 29","MI Add on"],"we air 69 add-on prepaid":["other","MI Add on EGP 69","MI Add on"],"we air 150 add-on prepaid":["other","MI Add on EGP 150","MI Add on"],"extra daily 1.50 l.e":["other","MI Add on EGP 1.5","MI Add on"],"extra 1gb- egp 29":["other","MI Add on EGP 29","MI Add on"],"nitro post 675. renewable":["other","MI Add on EGP 675","MI Add on"],"internet egp 58- 6000 mb":["other","MI Add on EGP 58","MI Add on"],"kix 30. 7 days":["other","MI Add on EGP 30","MI Add on"],"corporate confirmed ownership add-on":["other","MI Add on","MI Add on"],"corporate denied ownership add-on":["other","MI Add on","MI Add on"],"deny of ownership":["other","MI Add on","MI Add on"],"extra daily 7.5 l.e":["other","MI Add on EGP 7.5","MI Add on"],"alo 100":["other","Prepaid EGP 100","Prepaid"],"alo 300":["other","Prepaid EGP 300","Prepaid"],"we mix mm main plan":["weMix","WE Mix","WE Mix"],"super kix 35":["kix","Kix EGP 35","Control Kix"],"super kix 25":["kix","Kix EGP 25","Control Kix"],"we club 25":["weClub","WE Club EGP 25","WE Club"],"new control tazbeet 30":["tazbeet","Tazbeet EGP 30","Control Tazbeet"],"new control tazbeet 40":["tazbeet","Tazbeet EGP 40","Control Tazbeet"],"kix plus 25":["kix","Kix EGP 25","Control Kix"],"we club 100":["weClub","WE Club EGP 100","WE Club"],"super kix 20":["kix","Kix EGP 20","Control Kix"],"new control tazbeet 110":["tazbeet","Tazbeet EGP 110","Control Tazbeet"],"super kix 45":["kix","Kix EGP 45","Control Kix"],"super kix 100":["kix","Kix EGP 100","Control Kix"],"super kix 65":["kix","Kix EGP 65","Control Kix"],"new control tazbeet 70":["tazbeet","Tazbeet EGP 70","Control Tazbeet"],"we club 65":["weClub","WE Club EGP 65","WE Club"],"super kix 80":["kix","Kix EGP 80","Control Kix"],"kix plus 35":["kix","Kix EGP 35","Control Kix"],"we club 40":["weClub","WE Club EGP 40","WE Club"],"kix plus 17":["kix","Kix EGP 17","Control Kix"],"new control tazbeet":["tazbeet","Control Tazbeet","Control Tazbeet"],"control kix 20":["kix","Kix EGP 20","Control Kix"],"we club":["weClub","WE Club","WE Club"],"super kix":["kix","Control Kix","Control Kix"],"we mix mm prepaid":["weMix","WE Mix","WE Mix"],"control kix 12":["kix","Kix EGP 12","Control Kix"],"kix plus 45":["kix","Kix EGP 45","Control Kix"],"control kix 30":["kix","Kix EGP 30","Control Kix"],"control tazbeet 40":["tazbeet","Tazbeet EGP 40","Control Tazbeet"],"control tazbeet 100":["tazbeet","Tazbeet EGP 100","Control Tazbeet"],"control kix 40":["kix","Kix EGP 40","Control Kix"],"kix plus":["kix","Control Kix","Control Kix"],"kix plus 75":["kix","Kix EGP 75","Control Kix"],"control tazbeet 25":["tazbeet","Tazbeet EGP 25","Control Tazbeet"],"control tazbeet 65":["tazbeet","Tazbeet EGP 65","Control Tazbeet"],"new kix 17":["kix","Kix EGP 17","Control Kix"],"control kix 60":["kix","Kix EGP 60","Control Kix"],"control ahlawy 30":["other","Control Ahlawy EGP 30","Control Ahlawy"],"control kix":["kix","Control Kix","Control Kix"],"control tazbeet":["tazbeet","Control Tazbeet","Control Tazbeet"],"new kix 25":["kix","Kix EGP 25","Control Kix"],"new kix 35":["kix","Kix EGP 35","Control Kix"],"new kix 45":["kix","Kix EGP 45","Control Kix"],"kix 20":["kix","Kix EGP 20","Control Kix"],"kix 40":["kix","Kix EGP 40","Control Kix"],"kix 30":["kix","Kix EGP 30","Control Kix"],"kix 12":["kix","Kix EGP 12","Control Kix"],"control 20":["other","Control EGP 20","Control"],"kix 60":["kix","Kix EGP 60","Control Kix"],"control 12":["other","Control EGP 12","Control"],"super kix 32":["kix","Kix EGP 32","Control Kix"],"new control tazbeet 50":["tazbeet","Tazbeet EGP 50","Control Tazbeet"],"super kix 85":["kix","Kix EGP 85","Control Kix"],"new control tazbeet 145":["tazbeet","Tazbeet EGP 145","Control Tazbeet"],"super kix 105":["kix","Kix EGP 105","Control Kix"],"we club 130":["weClub","WE Club EGP 130","WE Club"],"super kix 60":["kix","Kix EGP 60","Control Kix"],"we club 85":["weClub","WE Club EGP 85","WE Club"],"new control tazbeet 90":["tazbeet","Tazbeet EGP 90","Control Tazbeet"],"control tazbeet 85":["tazbeet","Tazbeet EGP 85","Control Tazbeet"],"kix 15":["kix","Kix EGP 15","Control Kix"],"kix 25":["kix","Kix EGP 25","Control Kix"],"we club 32":["weClub","WE Club EGP 32","WE Club"],"we club 50":["weClub","WE Club EGP 50","WE Club"],"super kix 130":["kix","Kix EGP 130","Control Kix"],"kix 80":["kix","Kix EGP 80","Control Kix"],"control tazbeet 32":["tazbeet","Tazbeet EGP 32","Control Tazbeet"],"alo egypt 300":["other","Prepaid EGP 300","Prepaid"],"control tazbeet 50":["tazbeet","Tazbeet EGP 50","Control Tazbeet"],"kix plus 32":["kix","Kix EGP 32","Control Kix"],"kix":["kix","Control Kix","Control Kix"],"alo egypt 100":["other","Prepaid EGP 100","Prepaid"],"control tazbeet 130":["tazbeet","Tazbeet EGP 130","Control Tazbeet"],"kix 50":["kix","Kix EGP 50","Control Kix"],"prepaid":["other","Prepaid","Prepaid"],"control 40":["other","Control EGP 40","Control"],"kix plus 100":["kix","Kix EGP 100","Control Kix"],"control egp 25- 1600 units":["other","Control EGP 25","Control"],"control 25":["other","Control EGP 25","Control"],"kix plus 22":["kix","Kix EGP 22","Control Kix"],"kix plus 60":["kix","Kix EGP 60","Control Kix"],"new kix 32":["kix","Kix EGP 32","Control Kix"],"new kix 22":["kix","Kix EGP 22","Control Kix"],"control 15":["other","Control EGP 15","Control"],"control 80":["other","Control EGP 80","Control"],"control 50":["other","Control EGP 50","Control"],"control egp 50- 4000 units":["other","Control EGP 50","Control"],"control kix 80":["kix","Kix EGP 80","Control Kix"],"super kix 37":["kix","Kix EGP 37","Control Kix"],"super kix 52":["kix","Kix EGP 52","Control Kix"],"new control tazbeet 46":["tazbeet","Tazbeet EGP 46","Control Tazbeet"],"super kix 120":["kix","Kix EGP 120","Control Kix"],"super kix 29":["kix","Kix EGP 29","Control Kix"],"new control tazbeet 58":["tazbeet","Tazbeet EGP 58","Control Tazbeet"],"new control tazbeet 105":["tazbeet","Tazbeet EGP 105","Control Tazbeet"],"new control tazbeet 165":["tazbeet","Tazbeet EGP 165","Control Tazbeet"],"super kix 69":["kix","Kix EGP 69","Control Kix"],"super kix 98":["kix","Kix EGP 98","Control Kix"],"we club 37":["weClub","WE Club EGP 37","WE Club"],"super kix 150":["kix","Kix EGP 150","Control Kix"],"we club 58":["weClub","WE Club EGP 58","WE Club"],"control tazbeet 150":["tazbeet","Tazbeet EGP 150","Control Tazbeet"],"we club 150":["weClub","WE Club EGP 150","WE Club"],"control tazbeet 98":["tazbeet","Tazbeet EGP 98","Control Tazbeet"],"we club 98":["weClub","WE Club EGP 98","WE Club"],"kix 46":["kix","Kix EGP 46","Control Kix"],"control tazbeet 58":["tazbeet","Tazbeet EGP 58","Control Tazbeet"],"kix 29":["kix","Kix EGP 29","Control Kix"],"kix 17":["kix","Kix EGP 17","Control Kix"],"control tazbeet 37":["tazbeet","Tazbeet EGP 37","Control Tazbeet"],"kix 92":["kix","Kix EGP 92","Control Kix"],"new kix 37":["kix","Kix EGP 37","Control Kix"],"kix 58":["kix","Kix EGP 58","Control Kix"],"kix plus 69":["kix","Kix EGP 69","Control Kix"],"kix plus 115":["kix","Kix EGP 115","Control Kix"],"we life 325 - ftth primary":["fbb","WE Life - IPTV","WE Life - IPTV"],"we ardy postpaid - ftth":["fixed","WE Ardy Postpaid","WE Ardy Postpaid"],"we life 325 - 2":["fbb","WE Life - IPTV","WE Life - IPTV"],"super 3 speed (12 tb) - 12 months":["fbb","Annual","Super"],"ultra 1 speed (7200 gb) - 12 months":["fbb","Annual","Ultra"],"we air 1400- postpaid":["fwa","WE Air EGP 1400","FWA"],"we air 1100- postpaid":["fwa","WE Air EGP 1100","FWA"],"wallet":["wallet","Wallet","Wallet"],"nitro mifi 15":["mifi","Data SIM-MIFI EGP 15","Data SIM-MIFI"],"nitro mifi 150":["mifi","Data SIM-MIFI EGP 150","Data SIM-MIFI"],"nitro mifi 300":["mifi","Data SIM-MIFI EGP 300","Data SIM-MIFI"],"nitro mifi 29":["mifi","Data SIM-MIFI EGP 29","Data SIM-MIFI"],"nitro mifi 58":["mifi","Data SIM-MIFI EGP 58","Data SIM-MIFI"],"nitro mifi 105":["mifi","Data SIM-MIFI EGP 105","Data SIM-MIFI"],"nitro mifi 675":["mifi","Data SIM-MIFI EGP 675","Data SIM-MIFI"],"max+ speed ( 1500 gb )":["fbb","MAX Speed ( 1.5 TB )","MAX Speed"],"super 1 speed (9000 gb) - 12 months":["fbb","Annual","Super"],"we air 460- postpaid":["fwa","WE Air EGP 460","FWA"],"we air 290- postpaid":["fwa","WE Air EGP 290","FWA"],"we air 1040- postpaid":["fwa","WE Air EGP 1040","FWA"],"we air 690- postpaid":["fwa","WE Air EGP 690","FWA"],"we air 290- prepaid":["fwa","WE Air EGP 290","FWA"],"we air 460- prepaid":["fwa","WE Air EGP 460","FWA"],"we air 1040- prepaid":["fwa","WE Air EGP 1040","FWA"],"we air 690- prepaid":["fwa","WE Air EGP 690","FWA"],"we air 1270- prepaid":["fwa","WE Air EGP 1270","FWA"],"we air 1600- prepaid":["fwa","WE Air EGP 1600","FWA"],"?mega 1 speed (1500 gb) – 1 month":["fbb","Mega speed (1500 GB)","Mega"],"?mega 2 speed (1500 gb) – 1 month":["fbb","Mega speed (1500 GB)","Mega"],"mega 2 speed (750 gb)":["fbb","Mega speed (750 GB)","Mega"],"ultra 2 speed (9000 gb) - 12 months":["fbb","Annual","Ultra"],"mega 1 speed (18 tb) - 12 months":["fbb","Annual","Mega"],"mega 1 speed (9000 gb) - 12 months":["fbb","Annual","Mega"],"super 2 speed (18 tb) - 12 months":["fbb","Annual","Super"],"ultra 2 speed (3000 gb) - 12 months":["fbb","Annual","Ultra"],"we ardy (we life 375)":["fixed","WE Ardy - WE Life","WE Ardy - WE Life"],"we life 375 - 2":["fbb","WE Life - IPTV","WE Life - IPTV"],"onehome - super (400gb + 600min)":["fbb","Super speed (400 GB)","Super"],"onehome - super (500gb + 600min)":["fbb","Super speed (500 GB)","Super"],"onehome - mega (1500gb + 600min)":["fbb","Mega speed (1500 GB)","Mega"],"onehome - mega (250gb + 600min)":["fbb","Mega Speed (250 GB)","Mega"],"onehome super (750gb + 600min)":["fbb","Super speed (750 GB)","Super"],"onehome super (500gb + 600min)":["fbb","Super speed (500 GB)","Super"],"onehome - mega (500gb + 600min)":["fbb","Mega Speed (500GB)","Mega"],"super 2 speed (9000 gb) - 12 months":["fbb","Annual","Super"],"ultra 1 speed (9000 gb) - 12 months":["fbb","Annual","Ultra"],"onehome":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"elite 3tb":["fbb","IPTV","IPTV"],"we onehome prepaid msan - adsl monthly":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"we onehome prepaid msan - vdsl monthly":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"we onehome-enterprise- prepaid - ftth":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"we onehome-enterpirse- prepaid- msan - vdsl":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"onehome mega (250gb + 600min)":["fbb","Mega Speed (250 GB)","Mega"],"we one home-enterprise- prepaid- msan - adsl":["fbb","ONEHOME(FBB)","ONEHOME(FBB)"],"onehome super (1500gb + 600min)":["fbb","Mega speed (1500 GB)","Mega"],"onehome - super (750gb + 3750min)":["fbb","Super speed (750 GB)","Super"],"onehome - ultra (750gb + 600min)":["fbb","Ultra Speed (750 GB)","Ultra"],"onehome super (200gb + 3750min)":["fbb","Super speed (200 GB)","Super"],"enterprise onehome - super (250 gb +3700min)":["fbb","Super speed (250 GB)","Super"],"onehome - super (200gb + 3750min)":["fbb","Super speed (200 GB)","Super"],"onehome - super (150gb + 3750min)":["fbb","Super speed (150 GB)","Super"],"onehome - ultra (500gb + 600min)":["fbb","Ultra Speed (500 GB)","Super"],"onehome super (250gb + 3750min)":["fbb","Super speed (250 GB)","Super"],"enterprise onehome - ultra (750 gb + 2200min)":["fbb","Ultra Speed (750 GB)","Ultra"],"onehome - super (400gb + 3750min)":["fbb","Super speed (400 GB)","Super"]};
+function classifyWeTariffPlan(rawLabel) {
+  var clean = String(rawLabel || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  var low = clean.toLowerCase();
+  if (WE_TARIFF_STRUC_MAP[low]) {
+    var hit = WE_TARIFF_STRUC_MAP[low];
+    return { cat: hit[0], label: hit[1], family: hit[2] };
+  }
+  // Smart fallback rules matching Tariffs struc.xlsx hierarchy
+  if (/^fbm\b/i.test(low) || (/gold/i.test(low) && /(adsl|vdsl|ftth|super\s*\d+\s*gb)/i.test(low))) return { cat: 'fbb', label: clean, family: 'WE Gold (FBB)' };
+  if (/^fvm\b/i.test(low) || /we\s*ardy|أرضي|وي\s*20|telephonet|we\s*fv\s*fmc|kayan|governmental/i.test(low)) return { cat: 'fixed', label: clean, family: 'Fixed' };
+  if (/^(we\s*air|internet\s*fixed\s*lte\s*air)/i.test(low) && !/add[-\s]?on/i.test(low)) return { cat: 'fwa', label: clean, family: 'WE Air (FWA)' };
+  if (/gold/i.test(low)) {
+    var gk = /mobile/i.test(low) ? 'Stand Alone' : (/we\s*air/i.test(low) ? 'We Air' : 'FMM');
+    var pm = clean.match(/\b(200|260|300|400|525|600|775|800|890|1000|1050|1200|1300|1500|2000|2300)\b/);
+    return { cat: 'gold', label: gk + (pm ? ' · EGP ' + pm[1] : ' · ' + clean), family: gk };
+  }
+  if (/(super|mega|ultra|max\+?\s*speed|onehome|we\s*life|we\s*space|we\s*ioe|gamerz|streamerz|elite\s*3tb|adsl|vdsl|ftth)/i.test(low)) return { cat: 'fbb', label: clean, family: 'FBB' };
+  if (/mifi|data\s*sim|vtl\s*\d+/i.test(low)) return { cat: 'mifi', label: clean, family: 'Data SIM-MIFI' };
+  if (/we\s*club/i.test(low)) return { cat: 'weClub', label: clean, family: 'WE Club' };
+  if (/we\s*mix/i.test(low)) return { cat: 'weMix', label: clean, family: 'WE Mix' };
+  if (/^12\s*pt$/i.test(low)) return { cat: 'payg', label: '12 PT (PAYG)', family: 'PAYG' };
+  return { cat: 'other', label: clean, family: 'Other' };
 }
 
 function parseTariffsSheetClosure(wb) {
@@ -7550,7 +7869,7 @@ function parseTariffsSheetClosure(wb) {
     if (code === null || code === undefined) continue;
     code = normCodeClosure(code);
     var low = 0, mid = 0, high = 0, pt12 = 0;
-    var kixFields = {}, tazFields = {};
+    var kixFields = {}, tazFields = {}, extraTariffs = {};
     for (var jj in colLabels) {
       var label2 = colLabels[jj];
       var v = r[jj];
@@ -7560,7 +7879,15 @@ function parseTariffsSheetClosure(wb) {
       if (lowLabel.indexOf('grand total') >= 0) continue;
       var isKix = lowLabel.indexOf('kix') >= 0;
       var isTaz = lowLabel.indexOf('tazbeet') >= 0;
-      if (!isKix && !isTaz) continue;
+      if (!isKix && !isTaz) {
+        if (/^(storecodebss|branchname|store|partner|classification|region|account|channel|area|supervisor|regional)/i.test(lowLabel)) continue;
+        var cls = classifyWeTariffPlan(label2);
+        var extraCat = cls.cat || 'other';
+        var extraLbl = cls.label || label2;
+        if (!extraTariffs[extraCat]) extraTariffs[extraCat] = {};
+        extraTariffs[extraCat][extraLbl] = (extraTariffs[extraCat][extraLbl] || 0) + Number(v);
+        continue;
+      }
       v = Number(v);
       var m = label2.match(/(\d+)(?!.*\d)/);
       if (!m) {
@@ -7575,7 +7902,7 @@ function parseTariffsSheetClosure(wb) {
       if (isKix) kixFields['kix' + n] = (kixFields['kix' + n] || 0) + v;
       else tazFields['taz' + n] = (tazFields['taz' + n] || 0) + v;
     }
-    out[code] = Object.assign({ lowT: low, midT: mid, highT: high, pt12: pt12 }, kixFields, tazFields);
+    out[code] = Object.assign({ lowT: low, midT: mid, highT: high, pt12: pt12, extraTariffs: extraTariffs }, kixFields, tazFields);
   }
   return out;
 }
@@ -7656,10 +7983,19 @@ function buildMonthRowsClosure(mobileWb, wepayWb, monthStr) {
       weClubTarget: base.weClubTarget, weClubSubs: base.weClubSubs,
       paygTarget: base.paygTarget, paygSubs: base.paygSubs,
     };
-    if (idl) { row.mobileSubsAct = idl.mobileSubsAct; row.fixedSubsAct = idl.fixedSubsAct; row.fbbSubsAct = idl.fbbSubsAct; }
+    if (idl) {
+      row.mobileSubsSales = idl.mobileSubsSales; row.mobileSubsAct = idl.mobileSubsAct;
+      row.fixedSubsSales  = idl.fixedSubsSales;  row.fixedSubsAct  = idl.fixedSubsAct;
+      row.fbbSubsSales    = idl.fbbSubsSales;    row.fbbSubsAct    = idl.fbbSubsAct;
+      if (idl.goldSubsSales !== undefined)  row.goldSubsSales  = idl.goldSubsSales;
+      if (idl.goldSubsAct !== undefined)    row.goldSubsAct    = idl.goldSubsAct;
+      if (idl.weMixSubsSales !== undefined) row.weMixSubsSales = idl.weMixSubsSales;
+      if (idl.weMixSubsAct !== undefined)   row.weMixSubsAct   = idl.weMixSubsAct;
+    }
     if (dailyByCode[code]) { row.dailyMobile = dailyByCode[code]; }
     if (dailyWalletByCode[code]) { row.dailyWallet = dailyWalletByCode[code]; }
     Object.keys(t).forEach(function (k) { if (k.indexOf('kix') === 0 || k.indexOf('taz') === 0) row[k] = t[k]; });
+    if (t.extraTariffs && Object.keys(t.extraTariffs).length) row.extraTariffs = t.extraTariffs;
     rows.push(row);
   });
   return rows;
