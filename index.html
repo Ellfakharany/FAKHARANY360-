@@ -1067,35 +1067,89 @@ async function doLogin() {
 //  scripts/convert_closure.py + the GitHub Action), protected by login.
 //  Paginated since PostgREST caps a single request at 1000 rows.
 // ══════════════════════════════════════════════════════════════
-async function fetchAllMonthsData() {
+// ── Instant-Load IndexedDB Cache (Stale-While-Revalidate, v56) ──
+var F360Cache = (function () {
+  var DB_NAME = 'fakharany360_idb_v1', STORE = 'kv', TTL_MS = 24 * 60 * 60 * 1000;
+  function openDB() {
+    return new Promise(function (resolve, reject) {
+      if (typeof indexedDB === 'undefined') return reject(new Error('No IDB'));
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function (e) { e.target.result.createObjectStore(STORE); };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function (e) { reject(e.target.error); };
+    });
+  }
+  return {
+    get: async function (key) {
+      try {
+        var db = await openDB();
+        return await new Promise(function (resolve) {
+          var tx = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+          tx.onsuccess = function () {
+            var val = tx.result;
+            if (!val || !val.savedAt || (Date.now() - val.savedAt > TTL_MS)) return resolve(null);
+            resolve(val);
+          };
+          tx.onerror = function () { resolve(null); };
+        });
+      } catch (e) { return null; }
+    },
+    set: async function (key, payload) {
+      try {
+        var db = await openDB();
+        await new Promise(function (resolve) {
+          var tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put(Object.assign({ savedAt: Date.now() }, payload), key);
+          tx.oncomplete = function () { resolve(); };
+          tx.onerror = function () { resolve(); };
+        });
+      } catch (e) {}
+    },
+    clearAll: async function () {
+      try {
+        var db = await openDB();
+        await new Promise(function (resolve) {
+          var tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).clear();
+          tx.oncomplete = function () { resolve(); };
+          tx.onerror = function () { resolve(); };
+        });
+      } catch (e) {}
+    }
+  };
+})();
+
+function _computeClosureFingerprint(rows, evalRows) {
+  var mSum = 0, fSum = 0, fxSum = 0;
+  for (var i = 0; i < rows.length; i++) {
+    mSum  += Number(rows[i]._rawMobileSubs !== undefined ? rows[i]._rawMobileSubs : rows[i].mobileSubs) || 0;
+    fSum  += Number(rows[i]._rawFbbSubs    !== undefined ? rows[i]._rawFbbSubs    : rows[i].fbbSubs)    || 0;
+    fxSum += Number(rows[i]._rawFixedSubs  !== undefined ? rows[i]._rawFixedSubs  : rows[i].fixedSubs)  || 0;
+  }
+  return rows.length + '|' + Math.round(mSum) + '|' + Math.round(fSum) + '|' + Math.round(fxSum) + '|' + (evalRows ? evalRows.length : 0);
+}
+
+async function _fetchAllMonthsFromSupabaseLive() {
   const pageSize = 1000;
   let from = 0;
   const all = [];
+  const evalRows = [];
+  let evalEmails = null, evalReasons = null;
   while (true) {
     const { data, error } = await sb.from('monthly_closure').select('row').order('month', { ascending: true }).range(from, from + pageSize - 1);
     if (error) throw new Error('Supabase monthly_closure query failed: ' + error.message);
     if (!data || data.length === 0) break;
-    if (from === 0) window.EVAL_SUPABASE_RAW_ROWS = [];
     data.forEach(function (r) {
       var row = r.row;
       if (row && row._isEvalMeta) {
         if (row.evalMonth === "EMAILS_MAP") {
-          if (row.emailsMap) window.EVAL_SUPABASE_EMAILS_MAP = row.emailsMap;
-          if (row.noEvalReasonsMap) window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP = row.noEvalReasonsMap;
+          if (row.emailsMap) evalEmails = row.emailsMap;
+          if (row.noEvalReasonsMap) evalReasons = row.noEvalReasonsMap;
         } else if (Array.isArray(row.records)) {
-          window.EVAL_SUPABASE_RAW_ROWS.push({ month: row.evalMonth, records: row.records, updatedAt: row.updatedAt });
+          evalRows.push({ month: row.evalMonth, records: row.records, updatedAt: row.updatedAt });
         }
         return;
       }
-      // Capture pristine, NEVER-mutated copies of the Sales fields the
-      // instant they arrive from Supabase. setDashMode() below swaps
-      // row.mobileSubs/fixedSubs/fbbSubs in place between Sales/Activation
-      // for rendering — if that ever ran on a row before this capture, or
-      // if the backup function ran twice on an already-toggled row, the
-      // original Sales number would be lost for good until a hard reload.
-      // Keeping a dedicated immutable copy means the backup step can always
-      // safely restore the correct value no matter how many times toggles
-      // or refreshes happen in between.
       row._rawMobileSubs = row.mobileSubs;
       row._rawFixedSubs = row.fixedSubs;
       row._rawFbbSubs = row.fbbSubs;
@@ -1106,13 +1160,47 @@ async function fetchAllMonthsData() {
     if (data.length < pageSize) break;
     from += pageSize;
   }
-  window.__mtdFailedMonths = []; // kept for compatibility with existing alert-handling code
-  return all;
+  window.EVAL_SUPABASE_RAW_ROWS = evalRows;
+  if (evalEmails) window.EVAL_SUPABASE_EMAILS_MAP = evalEmails;
+  if (evalReasons) window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP = evalReasons;
+  window.__mtdFailedMonths = [];
+  var cacheKey = 'closure::' + (currentUser || 'anon');
+  var fp = _computeClosureFingerprint(all, evalRows);
+  F360Cache.set(cacheKey, { rows: all, evalRows: evalRows, evalEmails: evalEmails, evalReasons: evalReasons, fingerprint: fp });
+  return { rows: all, fingerprint: fp };
+}
+
+async function fetchAllMonthsData(opts) {
+  var force = !!(opts && opts.force);
+  var cacheKey = 'closure::' + (currentUser || 'anon');
+  if (!force) {
+    var cached = await F360Cache.get(cacheKey);
+    if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+      window.EVAL_SUPABASE_RAW_ROWS = cached.evalRows || [];
+      if (cached.evalEmails) window.EVAL_SUPABASE_EMAILS_MAP = cached.evalEmails;
+      if (cached.evalReasons) window.EVAL_SUPABASE_NO_EVAL_REASONS_MAP = cached.evalReasons;
+      window.__mtdFailedMonths = [];
+      // Silent background revalidation (Stale-While-Revalidate)
+      setTimeout(function () {
+        _fetchAllMonthsFromSupabaseLive().then(function (live) {
+          if (live && live.fingerprint !== cached.fingerprint) {
+            RAW_DATA = live.rows;
+            if (typeof syncEvalFromSupabaseRows === 'function') syncEvalFromSupabaseRows();
+            if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
+          }
+        }).catch(function (e) { console.warn('[BG Sync] closure skipped:', e.message); });
+      }, 250);
+      return cached.rows;
+    }
+  }
+  var res = await _fetchAllMonthsFromSupabaseLive();
+  return res.rows;
 }
 
 async function doLogout() {
   if (!confirm('متأكد إنك عايز تسجّل خروج؟')) return;
   try { await sb.auth.signOut(); } catch (e) { console.warn('[Auth] signOut error:', e.message); }
+  try { await F360Cache.clearAll(); } catch (e) {}
   localStorage.removeItem('fakharany_uname');
   currentUser = null; currentRole = null; currentSupabaseUserId = null;
   location.reload();
@@ -1124,7 +1212,7 @@ async function refreshAllData() {
   if (icon) icon.classList.add('fa-spin');
   if (btn) btn.disabled = true;
   try {
-    RAW_DATA = await fetchAllMonthsData();
+    RAW_DATA = await fetchAllMonthsData({ force: true });
     try { await fetchAutoMTDData({ force: true }); } catch (e) { console.warn('[MTD Auto] refresh failed:', e.message); }
     if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
   } catch (e) {
@@ -1644,6 +1732,9 @@ document.addEventListener('DOMContentLoaded', function() {
                   </button>
                   <button id="mgr-view-summary" onclick="setMgrViewMode('summary')" style="padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s">
                     <i class="fas fa-trophy mr-1"></i>Summary & Ranking
+                  </button>
+                  <button id="mgr-view-criteria" onclick="setMgrViewMode('criteria')" style="padding:6px 14px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:white;color:#5E2D91;transition:all .2s;border-left:1px solid #e5e7eb">
+                    <i class="fas fa-award mr-1"></i>Annual Criteria
                   </button>
                 </div>
               </div>
@@ -7119,7 +7210,7 @@ async function deleteSnapshot(kind, value) {
     if (kind === 'eval') {
       var resE = await sb.from('monthly_closure').delete().eq('month', 'EVAL-' + value).eq('store_code', '__EVAL_2026__').select('store_code');
       if (resE.error) throw new Error(resE.error.message);
-      RAW_DATA = await fetchAllMonthsData();
+      RAW_DATA = await fetchAllMonthsData({ force: true });
       if (typeof syncEvalFromSupabaseRows === 'function') syncEvalFromSupabaseRows();
       if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
     } else if (kind === 'closure') {
@@ -7128,7 +7219,7 @@ async function deleteSnapshot(kind, value) {
       if (!resC.data || resC.data.length === 0) {
         throw new Error('السيرفر رجّع نجاح لكن مافيش صفوف اتمسحت فعليًا — الأغلب إن فيه RLS policy على جدول monthly_closure بتسمح بالقراءة بس مش بالمسح (DELETE). راجع Supabase → Authentication → Policies وضيف policy تسمح بالـ DELETE للـ role اللي بيستخدمه الداشبورد.');
       }
-      RAW_DATA = await fetchAllMonthsData();
+      RAW_DATA = await fetchAllMonthsData({ force: true });
       if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
     } else {
       var table = kind === 'mobile' ? 'mtd_mobile' : 'mtd_wallet';
@@ -7196,7 +7287,7 @@ async function handleAdminClosureUpload() {
 
     statusEl.style.color = '#16a34a';
     statusEl.textContent = '✅ اتحمل ' + rows.length + ' فرع لشهر ' + monthStr;
-    RAW_DATA = await fetchAllMonthsData();
+    RAW_DATA = await fetchAllMonthsData({ force: true });
     if (typeof initAppWithData === 'function') initAppWithData(RAW_DATA);
     await loadRecentUploads();
   } catch (err) {
@@ -13777,7 +13868,7 @@ function sortMgrAggList(list) {
 // ── UI Toggles & Filter Handlers ──
 function setMgrViewMode(mode) {
   MGR_VIEW_MODE = mode;
-  ['bymonth', 'bymanager', 'summary'].forEach(function (m) {
+  ['bymonth', 'bymanager', 'summary', 'criteria'].forEach(function (m) {
     var b = document.getElementById('mgr-view-' + m);
     if (b) {
       b.style.background = (m === mode) ? '#5E2D91' : 'white';
@@ -14458,6 +14549,8 @@ function renderManagersPerf() {
     container.innerHTML = renderMgrByMonthStackedHTML(model, effMode);
   } else if (MGR_VIEW_MODE === 'bymanager') {
     container.innerHTML = renderMgrByManagerStackedHTML(model, effMode);
+  } else if (MGR_VIEW_MODE === 'criteria') {
+    container.innerHTML = renderMgrAnnualCriteriaHTML(model);
   } else {
     container.innerHTML = renderMgrSummaryTableHTML(model, effMode);
   }
@@ -14674,6 +14767,825 @@ function renderMgrByManagerStackedHTML(model, effMode) {
 }
 
 // ── VIEW 3: Consolidated Summary & Ranking Table (with Click-to-Expand Monthly History) ──
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── VIEW 4: ANNUAL CRITERIA & REGIONAL BELL CURVE (A:20% / B:60% / C:20%) ──
+// ══════════════════════════════════════════════════════════════════════════════
+var MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+var MGR_CRITERIA_THRESHOLDS = { mobile: 100, gold: 100, fbb: 90, wallet: 90 };
+var MGR_CRITERIA_CAP = 0; // 0 = No Cap, 120 or 150 optional (Admin)
+var MGR_CRITERIA_MIN_MONTHS = 6; // < 6 months => auto C (Option A: counted inside 20% C quota)
+var MGR_CRITERIA_GRADE_FILTER = 'ALL'; // 'ALL' | 'A' | 'B' | 'C' | 'MET4'
+var MGR_LAST_CRITERIA_DATA = null;
+
+function isMgrCriteriaAdmin() {
+  return (typeof currentRole !== 'undefined' && currentRole === 'admin');
+}
+
+function updateMgrCriteriaWeight(key, val) {
+  if (!isMgrCriteriaAdmin()) return;
+  var n = Math.max(0, Math.min(100, Number(val) || 0));
+  MGR_CRITERIA_WEIGHTS[key] = n;
+  renderManagersPerf();
+}
+
+function updateMgrCriteriaCap(val) {
+  if (!isMgrCriteriaAdmin()) return;
+  MGR_CRITERIA_CAP = Number(val) || 0;
+  renderManagersPerf();
+}
+
+function resetMgrCriteriaWeights() {
+  if (!isMgrCriteriaAdmin()) return;
+  MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+  MGR_CRITERIA_CAP = 0;
+  renderManagersPerf();
+}
+
+function setMgrCriteriaGradeFilter(f) {
+  MGR_CRITERIA_GRADE_FILTER = f;
+  renderManagersPerf();
+}
+
+function computeMgrAnnualCriteria(model) {
+  var w = MGR_CRITERIA_WEIGHTS;
+  var th = MGR_CRITERIA_THRESHOLDS;
+  var cap = Number(MGR_CRITERIA_CAP) || 0;
+  var wSum = (w.mobile + w.gold + w.fbb + w.wallet) || 100;
+
+  var rawList = (model && model.byManager ? model.byManager : []).map(function (mgr) {
+    var agg = mgr.agg || {};
+    var pg = agg.prodGaps || {};
+    var mobObj = pg.mobile || { target: 0, ach: 0, pct: 0 };
+    var goldObj = pg.gold || { target: 0, ach: 0, pct: 0 };
+    var fbbObj = pg.fbb || { target: 0, ach: 0, pct: 0 };
+    var payObj = pg.wallet || { target: 0, ach: 0, pct: 0 };
+
+    var mobPct = mobObj.target > 0 ? (mobObj.ach / mobObj.target * 100) : (agg.effMobPct || 0);
+    var goldPct = goldObj.target > 0 ? (goldObj.ach / goldObj.target * 100) : 0;
+    var fbbPct = fbbObj.target > 0 ? (fbbObj.ach / fbbObj.target * 100) : 0;
+    var payPct = payObj.target > 0 ? (payObj.ach / payObj.target * 100) : 0;
+
+    var metMob = mobPct >= th.mobile;
+    var metGold = goldPct >= th.gold;
+    var metFbb = fbbPct >= th.fbb;
+    var metPay = payPct >= th.wallet;
+    var metCount = (metMob ? 1 : 0) + (metGold ? 1 : 0) + (metFbb ? 1 : 0) + (metPay ? 1 : 0);
+
+    var nMob = (mobPct / th.mobile) * 100;
+    var nGold = (goldPct / th.gold) * 100;
+    var nFbb = (fbbPct / th.fbb) * 100;
+    var nPay = (payPct / th.wallet) * 100;
+    if (cap > 0) {
+      nMob = Math.min(nMob, cap);
+      nGold = Math.min(nGold, cap);
+      nFbb = Math.min(nFbb, cap);
+      nPay = Math.min(nPay, cap);
+    }
+
+    var score = (nMob * w.mobile + nGold * w.gold + nFbb * w.fbb + nPay * w.wallet) / wSum;
+    var monthsCount = (mgr.monthEntries || []).length;
+    var isUnder6 = monthsCount < MGR_CRITERIA_MIN_MONTHS;
+    var s = mgr.sample || {};
+    var regional = (s.regionalManager && String(s.regionalManager).trim()) ? String(s.regionalManager).trim() : 'Unassigned';
+    var evalPct = (agg.evalScore !== null && agg.evalScore !== undefined && !isNaN(agg.evalScore)) ? (agg.evalScore * 100) : null;
+
+    return {
+      mgr: mgr,
+      key: mgr.key,
+      label: mgr.label,
+      oracleId: mgr.oracleId || '',
+      regional: regional,
+      areaManager: s.areaManager || '—',
+      supervisor: (s.supervisor && s.supervisor !== 'Unassigned') ? s.supervisor : '—',
+      branchesTxt: (mgr.uniqueBranchNames || []).join(' ← '),
+      branchCount: (mgr.uniqueBranchNames || []).length,
+      movedAcrossYear: !!mgr.movedAcrossYear,
+      monthsCount: monthsCount,
+      isUnder6: isUnder6,
+      mobPct: mobPct, mobAch: mobObj.ach, mobTgt: mobObj.target, metMob: metMob,
+      goldPct: goldPct, goldAch: goldObj.ach, goldTgt: goldObj.target, metGold: metGold,
+      fbbPct: fbbPct, fbbAch: fbbObj.ach, fbbTgt: fbbObj.target, metFbb: metFbb,
+      payPct: payPct, payAch: payObj.ach, payTgt: payObj.target, metPay: metPay,
+      metCount: metCount,
+      all4Met: metCount === 4,
+      gatePassed: (metMob && metGold),
+      gateLabel: (metMob && metGold) ? 'Passed' : (!metMob && !metGold ? 'Missed Mob & Gold' : (!metMob ? 'Missed Mobile <100%' : 'Missed Gold <100%')),
+      score: score,
+      evalPct: evalPct,
+      warnCount: agg.warnCount || 0,
+      grade: 'B',
+      gradeReason: '',
+      regionalRank: 0,
+      regionalTotal: 0,
+      globalRank: 0,
+      evalRank: null
+    };
+  });
+
+  // Compute explanatory Annual Eval Rank
+  var withEval = rawList.filter(function (x) { return x.evalPct !== null; }).slice()
+    .sort(function (a, b) { return b.evalPct - a.evalPct; });
+  withEval.forEach(function (x, i) { x.evalRank = i + 1; });
+
+  var cmpPerf = function (a, b) {
+    // Hard Dual Gate: Mobile >= 100% AND WE Gold >= 100% always ranks above those who missed either gate
+    if (a.gatePassed !== b.gatePassed) return a.gatePassed ? -1 : 1;
+    if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
+    if (Math.abs(b.mobPct - a.mobPct) > 1e-6) return b.mobPct - a.mobPct;
+    if (Math.abs(b.goldPct - a.goldPct) > 1e-6) return b.goldPct - a.goldPct;
+    if (Math.abs(b.fbbPct - a.fbbPct) > 1e-6) return b.fbbPct - a.fbbPct;
+    return b.payPct - a.payPct;
+  };
+
+  // Group by Regional Manager for Bell Curve (Option A: 20% A / 60% B / 20% C, <6M inside 20% C quota)
+  var byReg = {};
+  rawList.forEach(function (item) {
+    if (!byReg[item.regional]) byReg[item.regional] = [];
+    byReg[item.regional].push(item);
+  });
+
+  var regionalSummaries = [];
+  Object.keys(byReg).sort().forEach(function (regName) {
+    var grp = byReg[regName];
+    var N = grp.length;
+    var quotaA = Math.round(N * 0.20);
+    var quotaC = Math.round(N * 0.20);
+
+    var under6 = grp.filter(function (x) { return x.isUnder6; }).sort(cmpPerf);
+    var eligible = grp.filter(function (x) { return !x.isUnder6; }).sort(cmpPerf);
+
+    under6.forEach(function (x) {
+      x.grade = 'C';
+      x.gradeReason = '< 6 شهور (C تلقائي)';
+    });
+
+    var countA = Math.min(quotaA, eligible.length);
+    var remainingC = Math.max(0, quotaC - under6.length);
+    var eligibleC = Math.min(remainingC, Math.max(0, eligible.length - countA));
+    var countB = Math.max(0, eligible.length - countA - eligibleC);
+
+    for (var i = 0; i < eligible.length; i++) {
+      if (i < countA) {
+        eligible[i].grade = 'A';
+        eligible[i].gradeReason = 'Top 20% Regional';
+      } else if (i < countA + countB) {
+        eligible[i].grade = 'B';
+        eligible[i].gradeReason = 'Middle 60% Regional';
+      } else {
+        eligible[i].grade = 'C';
+        eligible[i].gradeReason = 'Bottom 20% Regional';
+      }
+    }
+
+    var orderedReg = eligible.concat(under6);
+    orderedReg.forEach(function (x, idx) {
+      x.regionalRank = idx + 1;
+      x.regionalTotal = N;
+    });
+
+    var totalC = eligibleC + under6.length;
+    regionalSummaries.push({
+      regional: regName,
+      total: N,
+      under6: under6.length,
+      countA: countA,
+      countB: countB,
+      countC: totalC,
+      pctA: N ? (countA / N * 100) : 0,
+      pctB: N ? (countB / N * 100) : 0,
+      pctC: N ? (totalC / N * 100) : 0,
+      met4: grp.filter(function (x) { return x.all4Met; }).length
+    });
+  });
+
+  // Sort overall display list: eligible (>=6M) first by score desc, then <6M by score desc
+  var sortedAll = rawList.slice().sort(function (a, b) {
+    if (a.isUnder6 !== b.isUnder6) return a.isUnder6 ? 1 : -1;
+    return cmpPerf(a, b);
+  });
+  sortedAll.forEach(function (x, i) { x.globalRank = i + 1; });
+
+  var tot = sortedAll.length;
+  var totA = sortedAll.filter(function (x) { return x.grade === 'A'; }).length;
+  var totB = sortedAll.filter(function (x) { return x.grade === 'B'; }).length;
+  var totC = sortedAll.filter(function (x) { return x.grade === 'C'; }).length;
+  var totUnder6 = sortedAll.filter(function (x) { return x.isUnder6; }).length;
+  var totMet4 = sortedAll.filter(function (x) { return x.all4Met; }).length;
+  var totGate = sortedAll.filter(function (x) { return x.gatePassed && !x.isUnder6; }).length;
+
+  var result = {
+    items: sortedAll,
+    regionalSummaries: regionalSummaries,
+    totals: {
+      total: tot,
+      A: totA, B: totB, C: totC,
+      pctA: tot ? (totA / tot * 100) : 0,
+      pctB: tot ? (totB / tot * 100) : 0,
+      pctC: tot ? (totC / tot * 100) : 0,
+      under6: totUnder6,
+      met4: totMet4,
+      gatePassed: totGate
+    },
+    weights: Object.assign({}, w),
+    weightSum: w.mobile + w.gold + w.fbb + w.wallet,
+    cap: cap
+  };
+  MGR_LAST_CRITERIA_DATA = result;
+  return result;
+}
+
+function renderMgrAnnualCriteriaHTML(model) {
+  var data = computeMgrAnnualCriteria(model);
+  var isAdmin = isMgrCriteriaAdmin();
+  var w = data.weights;
+  var wSum = data.weightSum;
+  var t = data.totals;
+  var gf = MGR_CRITERIA_GRADE_FILTER;
+
+  var filtered = data.items.filter(function (x) {
+    if (gf === 'A') return x.grade === 'A';
+    if (gf === 'B') return x.grade === 'B';
+    if (gf === 'C') return x.grade === 'C';
+    if (gf === 'MET4') return x.all4Met;
+    if (gf === 'GATE') return x.gatePassed && !x.isUnder6;
+    return true;
+  });
+
+  // 1. Weights & Controls Strip (Admin editable vs Viewer read-only)
+  var weightsBarHTML = '';
+  if (isAdmin) {
+    var sumColor = wSum === 100 ? '#15803d' : '#b91c1c';
+    var sumBg = wSum === 100 ? '#dcfce7' : '#fee2e2';
+    weightsBarHTML =
+      '<div style="background:#faf5ff;border:1.5px solid #d8b4fe;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<span style="background:#5E2D91;color:white;font-size:10px;font-weight:800;padding:3px 9px;border-radius:8px"><i class="fas fa-sliders-h mr-1"></i>Admin Live Weights</span>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">Mobile <input type="number" min="0" max="100" value="' + w.mobile + '" onchange="updateMgrCriteriaWeight(\'mobile\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #c084fc;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">WE Gold <input type="number" min="0" max="100" value="' + w.gold + '" onchange="updateMgrCriteriaWeight(\'gold\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #f59e0b;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">FBB <input type="number" min="0" max="100" value="' + w.fbb + '" onchange="updateMgrCriteriaWeight(\'fbb\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #3b82f6;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">WE Pay <input type="number" min="0" max="100" value="' + w.wallet + '" onchange="updateMgrCriteriaWeight(\'wallet\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #ec4899;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<span style="background:' + sumBg + ';color:' + sumColor + ';font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:8px">Sum: ' + wSum + '%' + (wSum === 100 ? ' ✓' : ' ⚠️') + '</span>' +
+          '<label style="font-size:10.5px;font-weight:700;color:#4b5563;display:inline-flex;align-items:center;gap:4px">Cap: <select onchange="updateMgrCriteriaCap(this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:10.5px;font-weight:700;background:white">' +
+            '<option value="0"' + (data.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
+            '<option value="120"' + (data.cap === 120 ? ' selected' : '') + '>120%</option>' +
+            '<option value="150"' + (data.cap === 150 ? ' selected' : '') + '>150%</option>' +
+          '</select></label>' +
+          '<button onclick="resetMgrCriteriaWeights()" style="padding:4px 9px;border-radius:7px;border:1px solid #d1d5db;background:white;color:#374151;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-undo mr-1"></i>Reset</button>' +
+        '</div>' +
+        '<button onclick="exportMgrAnnualCriteriaExcel(this)" style="padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Annual Criteria</button>' +
+      '</div>';
+  } else {
+    weightsBarHTML =
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700;color:#334155">' +
+          '<span style="background:#5E2D91;color:white;font-size:10px;font-weight:800;padding:3px 9px;border-radius:8px"><i class="fas fa-award mr-1"></i>Annual Criteria Weights</span>' +
+          '<span>Mobile <strong>' + w.mobile + '%</strong> (≥100%)</span> • ' +
+          '<span>WE Gold <strong>' + w.gold + '%</strong> (≥100%)</span> • ' +
+          '<span>FBB <strong>' + w.fbb + '%</strong> (≥90%)</span> • ' +
+          '<span>WE Pay <strong>' + w.wallet + '%</strong> (≥90%)</span>' +
+        '</div>' +
+        '<button onclick="exportMgrAnnualCriteriaExcel(this)" style="padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Annual Criteria</button>' +
+      '</div>';
+  }
+
+  // 2. Bell Curve Summary & Quick Filter Chips
+  var chipStyle = function (active, bg, clr) {
+    return 'padding:6px 12px;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;border:1.5px solid ' + (active ? clr : '#e5e7eb') + ';background:' + (active ? bg : 'white') + ';color:' + (active ? clr : '#4b5563') + ';transition:all .15s';
+  };
+  var summaryStripHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;padding:10px 14px;background:white;border:1px solid #e5e7eb;border-radius:12px">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'ALL\')" style="' + chipStyle(gf === 'ALL', '#f3e8ff', '#5E2D91') + '">All (' + t.total + ')</button>' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'A\')" style="' + chipStyle(gf === 'A', '#dcfce7', '#15803d') + '">🏆 Grade A: ' + t.A + ' (' + t.pctA.toFixed(0) + '%)</button>' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'B\')" style="' + chipStyle(gf === 'B', '#dbeafe', '#1d4ed8') + '">⭐ Grade B: ' + t.B + ' (' + t.pctB.toFixed(0) + '%)</button>' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'C\')" style="' + chipStyle(gf === 'C', '#fee2e2', '#b91c1c') + '">⚠️ Grade C: ' + t.C + ' (' + t.pctC.toFixed(0) + '%) · &lt;6M: ' + t.under6 + '</button>' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'GATE\')" style="' + chipStyle(gf === 'GATE', '#ecfdf5', '#047857') + '">🔓 Gate Passed (Mob &amp; Gold ≥100%): ' + t.gatePassed + '</button>' +
+        '<button onclick="setMgrCriteriaGradeFilter(\'MET4\')" style="' + chipStyle(gf === 'MET4', '#fef3c7', '#b45309') + '">✅ 4/4 Benchmarks Met: ' + t.met4 + '</button>' +
+      '</div>' +
+      '<div dir="rtl" style="font-size:10.5px;color:#6b7280;font-weight:700">🔒 <strong>Gate أساسي:</strong> Mobile ≥ 100% و WE Gold ≥ 100% (الأقل ينزل أسفل الترتيب) · Bell Curve لكل Regional: <strong>A 20%</strong> · <strong>B 60%</strong> · <strong>C 20%</strong></div>' +
+    '</div>';
+
+  // 3. Regional Bell Curve Mini-Cards (when > 1 Regional visible)
+  var regCardsHTML = '';
+  if (data.regionalSummaries.length > 1) {
+    regCardsHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:12px">' +
+      data.regionalSummaries.map(function (rs) {
+        return '<div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:8px 11px">' +
+          '<div style="font-size:11px;font-weight:800;color:#1f2937;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="fas fa-user-tie mr-1" style="color:#5E2D91"></i>' + mgrEsc(rs.regional) + ' <span style="color:#6b7280;font-weight:700">(' + rs.total + ')</span></div>' +
+          '<div style="display:flex;gap:5px;flex-wrap:wrap;font-size:10px;font-weight:800">' +
+            '<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:6px">A: ' + rs.countA + '</span>' +
+            '<span style="background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:6px">B: ' + rs.countB + '</span>' +
+            '<span style="background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:6px">C: ' + rs.countC + (rs.under6 ? ' (&lt;6M:' + rs.under6 + ')' : '') + '</span>' +
+            '<span style="background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:6px">4/4: ' + rs.met4 + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '</div>';
+  }
+
+  // 4. Main Ranking Table
+  var pctCell = function (pct, met, thVal) {
+    var clr = met ? '#15803d' : (pct >= thVal * 0.85 ? '#b45309' : '#b91c1c');
+    var bg = met ? '#f0fdf4' : 'transparent';
+    return '<td style="padding:8px 7px;text-align:center;font-size:11.5px;font-weight:800;color:' + clr + ';background:' + bg + ';border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
+      pct.toFixed(1) + '%' + (met ? ' <span style="font-size:9px">✓</span>' : '') +
+    '</td>';
+  };
+
+  var rowsHTML = filtered.map(function (x, idx) {
+    var bg = idx % 2 === 0 ? '#ffffff' : '#faf9fb';
+    var gStyle = x.grade === 'A'
+      ? 'background:#dcfce7;color:#15803d;border:1px solid #86efac'
+      : (x.grade === 'B'
+        ? 'background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd'
+        : 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5');
+    var metBadge = x.all4Met
+      ? '<span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;font-size:10px;font-weight:900;padding:2px 7px;border-radius:8px;white-space:nowrap">🌟 4/4 Met</span>'
+      : '<span style="background:#f3f4f6;color:#4b5563;font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px;white-space:nowrap">' + x.metCount + '/4</span>';
+    var evalCell = x.evalPct !== null
+      ? '<div style="font-size:11.5px;font-weight:800;color:#5E2D91">' + x.evalPct.toFixed(1) + '%</div>' +
+        '<div style="font-size:9.5px;color:#6b7280;font-weight:700">Eval #' + x.evalRank + (x.warnCount > 0 ? ' · <span style="color:#b91c1c">⚠️' + x.warnCount + '</span>' : '') + '</div>'
+      : '<span style="color:#9ca3af;font-size:10.5px">—</span>';
+    var oidBadge = (x.oracleId && x.oracleId !== '—')
+      ? '<span style="background:#f3e8ff;color:#5E2D91;font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;margin-right:4px">ID: ' + mgrEsc(x.oracleId) + '</span>'
+      : '';
+    var monthsBadge = x.isUnder6
+      ? '<span style="background:#fee2e2;color:#b91c1c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:5px">⏱ ' + x.monthsCount + ' شهور (&lt;6M)</span>'
+      : '<span style="font-size:9.5px;color:#6b7280;font-weight:700">📅 ' + x.monthsCount + ' شهور</span>';
+
+    return '<tr style="background:' + bg + ';border-bottom:1px solid #e5e7eb">' +
+      '<td style="padding:8px 6px;text-align:center;font-weight:900;font-size:11.5px;color:#5E2D91">' + x.globalRank + '</td>' +
+      '<td style="padding:8px 9px">' +
+        '<div style="font-size:12px;font-weight:800;color:#111827">' + mgrEsc(x.label) + '</div>' +
+        '<div style="margin-top:2px">' + oidBadge + monthsBadge + '</div>' +
+      '</td>' +
+      '<td style="padding:8px 8px">' +
+        '<div style="font-size:10.5px;font-weight:800;color:#374151">' + mgrEsc(x.regional) + '</div>' +
+        '<div style="font-size:9.5px;color:#6b7280">Reg Rank #' + x.regionalRank + '/' + x.regionalTotal + ' · ' + mgrEsc(x.areaManager) + '</div>' +
+      '</td>' +
+      pctCell(x.mobPct, x.metMob, 100) +
+      pctCell(x.goldPct, x.metGold, 100) +
+      pctCell(x.fbbPct, x.metFbb, 90) +
+      pctCell(x.payPct, x.metPay, 90) +
+      '<td style="padding:8px 7px;text-align:center;font-size:12px;font-weight:900;color:#1e1b4b;background:#f5f3ff;border-bottom:1px solid #e9d5ff">' + x.score.toFixed(1) + '%</td>' +
+      '<td style="padding:8px 7px;text-align:center">' + metBadge + (!x.gatePassed ? '<div style="margin-top:3px"><span style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:6px;white-space:nowrap">🔒 ' + mgrEsc(x.gateLabel) + '</span></div>' : '<div style="margin-top:3px;font-size:8.5px;font-weight:800;color:#047857">🔓 Gate OK</div>') + '</td>' +
+      '<td style="padding:8px 7px;text-align:center">' +
+        '<span style="display:inline-block;padding:3px 10px;border-radius:8px;font-size:11.5px;font-weight:900;' + gStyle + '">' + x.grade + '</span>' +
+        '<div style="font-size:8.5px;color:#6b7280;margin-top:2px;font-weight:700">' + mgrEsc(x.gradeReason) + '</div>' +
+      '</td>' +
+      '<td style="padding:8px 7px;text-align:center;background:#faf5ff;border-left:1.5px solid #e9d5ff">' + evalCell + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var thBase = 'padding:9px 7px;font-size:10.5px;font-weight:800;color:white;text-align:center;white-space:nowrap';
+  return renderPendingOctNoteBannerHTML(model) +
+    weightsBarHTML +
+    summaryStripHTML +
+    regCardsHTML +
+    '<div class="chart-card" style="padding:0;overflow:hidden">' +
+      '<div style="overflow-x:auto">' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:linear-gradient(135deg,#3b1863,#5E2D91)">' +
+            '<th style="' + thBase + '">#</th>' +
+            '<th style="' + thBase + ';text-align:left;padding-left:10px">Manager &amp; Months</th>' +
+            '<th style="' + thBase + ';text-align:left">Regional &amp; Area</th>' +
+            '<th style="' + thBase + '">1. Mobile %<div style="font-size:8.5px;opacity:.85">W:' + w.mobile + '% · ≥100%</div></th>' +
+            '<th style="' + thBase + '">2. WE Gold %<div style="font-size:8.5px;opacity:.85">W:' + w.gold + '% · ≥100%</div></th>' +
+            '<th style="' + thBase + '">3. FBB %<div style="font-size:8.5px;opacity:.85">W:' + w.fbb + '% · ≥90%</div></th>' +
+            '<th style="' + thBase + '">4. WE Pay %<div style="font-size:8.5px;opacity:.85">W:' + w.wallet + '% · ≥90%</div></th>' +
+            '<th style="' + thBase + ';background:#4c1d95">Criteria Score</th>' +
+            '<th style="' + thBase + '">4/4 Met</th>' +
+            '<th style="' + thBase + '">Bell Curve<div style="font-size:8.5px;opacity:.85">A/B/C</div></th>' +
+            '<th style="' + thBase + ';background:#6b21a8">Annual Eval %<div style="font-size:8.5px;opacity:.85">(Explanatory)</div></th>' +
+          '</tr></thead>' +
+          '<tbody>' + (rowsHTML || '<tr><td colspan="11" style="padding:28px;text-align:center;color:#6b7280;font-weight:700">لا توجد نتائج مطابقة لهذا الفلتر</td></tr>') + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+}
+
+async function exportMgrAnnualCriteriaExcel(btn) {
+  var model = MGR_LAST_MODEL || buildManagersModel();
+  var data = MGR_LAST_CRITERIA_DATA || (model ? computeMgrAnnualCriteria(model) : null);
+  if (!data || !data.items || !data.items.length) {
+    alert('⚠️ لا توجد بيانات للتصدير في العرض الحالي');
+    return;
+  }
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Exporting...'; }
+
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    wb.created = new Date();
+
+    function argb(hex) { return 'FF' + String(hex || '#FFFFFF').replace('#', '').toUpperCase(); }
+    function styleCell(cell, opts) {
+      var o = opts || {};
+      var bdClr = argb(o.bd || '#D1D5DB');
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(o.bg || '#FFFFFF') } };
+      cell.font = { name: 'Calibri', size: o.sz || 10.5, bold: !!o.b, color: { argb: argb(o.fg || '#1F2937') } };
+      cell.alignment = { horizontal: o.al || 'center', vertical: 'middle', wrapText: !!o.wrap };
+      cell.border = {
+        top: { style: 'thin', color: { argb: bdClr } },
+        bottom: { style: 'thin', color: { argb: bdClr } },
+        left: { style: 'thin', color: { argb: bdClr } },
+        right: { style: 'thin', color: { argb: bdClr } }
+      };
+      if (o.numFmt) cell.numFmt = o.numFmt;
+    }
+
+    function pctThresholdStyle(pct, thVal) {
+      if (pct >= thVal) return { bg: '#DCFCE7', fg: '#15803D' };
+      if (pct >= thVal * 0.85) return { bg: '#FEF3C7', fg: '#B45309' };
+      return { bg: '#FEE2E2', fg: '#B91C1C' };
+    }
+    function evalStyle(pct) {
+      if (pct === null || pct === undefined || isNaN(pct)) return { bg: '#F9FAFB', fg: '#9CA3AF' };
+      if (pct >= 90) return { bg: '#DCFCE7', fg: '#15803D' };
+      if (pct >= 75) return { bg: '#FEF3C7', fg: '#B45309' };
+      return { bg: '#FEE2E2', fg: '#B91C1C' };
+    }
+    function gradeStyle(g) {
+      if (g === 'A') return { bg: '#DCFCE7', fg: '#15803D' };
+      if (g === 'B') return { bg: '#DBEAFE', fg: '#1D4ED8' };
+      return { bg: '#FEE2E2', fg: '#B91C1C' };
+    }
+
+    // Gather live active filters exactly as displayed on screen
+    var getV = function (id) { var el = document.getElementById(id); return (el && el.value) ? el.value : ''; };
+    var activeFilters = [];
+    if (typeof MGR_LEVEL !== 'undefined') activeFilters.push('Level: ' + MGR_LEVEL);
+    if (typeof CURRENT_DATA_TYPE !== 'undefined') activeFilters.push('Data Type: ' + CURRENT_DATA_TYPE);
+    if (typeof MGR_DATA_SCOPE !== 'undefined') activeFilters.push('Scope: ' + MGR_DATA_SCOPE);
+    if (getV('mgr-select-region')) activeFilters.push('Region: ' + getV('mgr-select-region'));
+    if (getV('mgr-f-regMgr')) activeFilters.push('Regional Mgr: ' + getV('mgr-f-regMgr'));
+    if (getV('mgr-f-supervisor')) activeFilters.push('Supervisor: ' + getV('mgr-f-supervisor'));
+    if (getV('mgr-f-areaMgr')) activeFilters.push('Area Mgr: ' + getV('mgr-f-areaMgr'));
+    if (getV('mgr-f-partner')) activeFilters.push('Partner: ' + getV('mgr-f-partner'));
+    if (getV('mgr-f-class')) activeFilters.push('Class: ' + getV('mgr-f-class'));
+    if (getV('mgr-select-month')) activeFilters.push('Month: ' + getV('mgr-select-month'));
+    if (getV('mgr-search-input')) activeFilters.push('Search: "' + getV('mgr-search-input') + '"');
+    var gf = MGR_CRITERIA_GRADE_FILTER || 'ALL';
+    if (gf !== 'ALL') activeFilters.push('Criteria Filter: ' + gf);
+    var filterSummaryTxt = activeFilters.length ? activeFilters.join('  |  ') : 'All Managers (No Active Filters)';
+
+    var w = data.weights;
+    var t = data.totals;
+    var visibleItems = data.items.filter(function (x) {
+      if (gf === 'A') return x.grade === 'A';
+      if (gf === 'B') return x.grade === 'B';
+      if (gf === 'C') return x.grade === 'C';
+      if (gf === 'MET4') return x.all4Met;
+      if (gf === 'GATE') return x.gatePassed && !x.isUnder6;
+      return true;
+    });
+
+    var grand = (model && model.grandAgg) ? model.grandAgg : {};
+    var monthsCnt = (model && model.months) ? model.months.length : 0;
+    var recsCnt = (model && model.rows) ? model.rows.length : 0;
+    var avgEvalRatio = (grand.evalScore !== null && grand.evalScore !== undefined) ? grand.evalScore : null;
+    var mobTgt = Number(grand.mobileTarget) || 0;
+    var mobAch = Number(grand.mobileSubs) || 0;
+    var mobRatio = mobTgt > 0 ? (mobAch / mobTgt) : (grand.effMobPct ? grand.effMobPct / 100 : 0);
+    var mobGap = mobAch - mobTgt;
+    var transfersCnt = data.items.filter(function (x) { return x.movedAcrossYear; }).length;
+    var totalWarns = data.items.reduce(function (acc, x) { return acc + (x.warnCount || 0); }, 0);
+    var topPerf = data.items[0] || null;
+
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 1: Executive Summary (الملخص لايف وفقاً للفلاتر الحالية)
+    // ══════════════════════════════════════════════════════════════
+    var wsSum = wb.addWorksheet('Executive Summary (الملخص)');
+    wsSum.views = [{ showGridLines: false }];
+    wsSum.properties.tabColor = { argb: 'FF5E2D91' };
+    var sumCols = [26, 14, 14, 15, 14, 14, 14, 14, 14, 15];
+    sumCols.forEach(function (cw, i) { wsSum.getColumn(i + 1).width = cw; });
+
+    var r = 1;
+    wsSum.mergeCells(r, 1, r, 10);
+    styleCell(wsSum.getCell(r, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 14, al: 'left', bd: '#111827' });
+    wsSum.getCell(r, 1).value = 'FAKHARANY360 — Managers Annual Criteria & Bell Curve Summary (ملخص التقييم السنوي لايف)';
+    wsSum.getRow(r).height = 30;
+    r++;
+
+    wsSum.mergeCells(r, 1, r, 10);
+    for (var fc = 1; fc <= 10; fc++) styleCell(wsSum.getCell(r, fc), { bg: '#F5F3FF', fg: '#5E2D91', b: true, sz: 10, al: 'left', bd: '#DDD6FE', wrap: true });
+    wsSum.getCell(r, 1).value = '🔎 Active Filters: ' + filterSummaryTxt;
+    wsSum.getRow(r).height = 22;
+    r++;
+
+    wsSum.mergeCells(r, 1, r, 10);
+    for (var rc = 1; rc <= 10; rc++) styleCell(wsSum.getCell(r, rc), { bg: '#FAF5FF', fg: '#4C1D95', b: true, sz: 9.5, al: 'left', bd: '#E9D5FF' });
+    wsSum.getCell(r, 1).value = '⚖️ Criteria Rules: Mobile ' + w.mobile + '% (≥100%) · WE Gold ' + w.gold + '% (≥100%) · FBB ' + w.fbb + '% (≥90%) · WE Pay ' + w.wallet + '% (≥90%)  |  🔒 Dual Gate: Mobile & Gold ≥100%  |  Bell Curve per Regional: A 20% / B 60% / C 20% (<6M Auto-C inside C quota)' + (data.cap > 0 ? '  |  Cap: ' + data.cap + '%' : '');
+    wsSum.getRow(r).height = 20;
+    r += 2;
+
+    // Live KPI Cards Section (exact mirror of Managers Dashboard top KPIs)
+    wsSum.mergeCells(r, 1, r, 10);
+    for (var kc = 1; kc <= 10; kc++) styleCell(wsSum.getCell(r, kc), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#5E2D91' });
+    wsSum.getCell(r, 1).value = '📊 Live Managers KPIs Summary (ملخص كروت شاشة المديرين)';
+    wsSum.getRow(r).height = 24;
+    r++;
+
+    var kpiCards = [
+      { lbl: 'TOTAL MANAGERS', val: t.total + ' Managers', sub: monthsCnt + ' Months · ' + recsCnt + ' Records', bg: '#F5F3FF', fg: '#5E2D91' },
+      { lbl: 'AVG EVALUATION %', val: avgEvalRatio !== null ? (avgEvalRatio * 100).toFixed(1) + '%' : '—', sub: 'Official Annual Eval Avg', bg: '#DCFCE7', fg: '#15803D' },
+      { lbl: 'MOBILE ACHIEVEMENT', val: (mobRatio * 100).toFixed(1) + '%', sub: 'Ach: ' + Math.round(mobAch).toLocaleString() + ' / Tgt: ' + Math.round(mobTgt).toLocaleString() + ' (Gap: ' + (mobGap >= 0 ? '+' : '') + Math.round(mobGap).toLocaleString() + ')', bg: '#DBEAFE', fg: '#1D4ED8' },
+      { lbl: 'TOP CRITERIA #1', val: topPerf ? topPerf.label : '—', sub: topPerf ? ('Score: ' + topPerf.score.toFixed(1) + '% · Grade ' + topPerf.grade + (topPerf.evalPct !== null ? ' · Eval: ' + topPerf.evalPct.toFixed(1) + '%' : '')) : '', bg: '#FEF3C7', fg: '#B45309' },
+      { lbl: 'TRANSFERS & WARNINGS', val: transfersCnt + ' Transfers · ' + totalWarns + ' Warnings', sub: 'Gate Passed: ' + t.gatePassed + ' · 4/4 Met: ' + t.met4, bg: '#FCE7F3', fg: '#BE185D' }
+    ];
+    for (var ki = 0; ki < kpiCards.length; ki++) {
+      var colStart = ki * 2 + 1;
+      wsSum.mergeCells(r, colStart, r, colStart + 1);
+      wsSum.mergeCells(r + 1, colStart, r + 1, colStart + 1);
+      wsSum.mergeCells(r + 2, colStart, r + 2, colStart + 1);
+      for (var sc = colStart; sc <= colStart + 1; sc++) {
+        styleCell(wsSum.getCell(r, sc), { bg: '#1A1A2E', fg: '#FFFFFF', b: true, sz: 9, al: 'center', bd: '#374151' });
+        styleCell(wsSum.getCell(r + 1, sc), { bg: kpiCards[ki].bg, fg: kpiCards[ki].fg, b: true, sz: 12.5, al: 'center', bd: '#D1D5DB', wrap: true });
+        styleCell(wsSum.getCell(r + 2, sc), { bg: '#FFFFFF', fg: '#4B5563', b: false, sz: 8.5, al: 'center', bd: '#D1D5DB', wrap: true });
+      }
+      wsSum.getCell(r, colStart).value = kpiCards[ki].lbl;
+      wsSum.getCell(r + 1, colStart).value = kpiCards[ki].val;
+      wsSum.getCell(r + 2, colStart).value = kpiCards[ki].sub;
+    }
+    wsSum.getRow(r).height = 20;
+    wsSum.getRow(r + 1).height = 28;
+    wsSum.getRow(r + 2).height = 22;
+    r += 4;
+
+    // Overall Bell Curve Distribution Block
+    wsSum.mergeCells(r, 1, r, 10);
+    for (var bc = 1; bc <= 10; bc++) styleCell(wsSum.getCell(r, bc), { bg: '#0F766E', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#0F766E' });
+    wsSum.getCell(r, 1).value = '🔔 Overall Bell Curve & Gate Distribution (التوزيع العام)';
+    wsSum.getRow(r).height = 24;
+    r++;
+
+    var distHdrs = ['Category', 'Count', 'Share %', 'Rule / Meaning'];
+    wsSum.mergeCells(r, 4, r, 10);
+    styleCell(wsSum.getCell(r, 1), { bg: '#1A1A2E', fg: '#FFFFFF', b: true, sz: 10 });
+    styleCell(wsSum.getCell(r, 2), { bg: '#1A1A2E', fg: '#FFFFFF', b: true, sz: 10 });
+    styleCell(wsSum.getCell(r, 3), { bg: '#1A1A2E', fg: '#FFFFFF', b: true, sz: 10 });
+    for (var dc = 4; dc <= 10; dc++) styleCell(wsSum.getCell(r, dc), { bg: '#1A1A2E', fg: '#FFFFFF', b: true, sz: 10, al: 'left' });
+    wsSum.getCell(r, 1).value = distHdrs[0];
+    wsSum.getCell(r, 2).value = distHdrs[1];
+    wsSum.getCell(r, 3).value = distHdrs[2];
+    wsSum.getCell(r, 4).value = distHdrs[3];
+    wsSum.getRow(r).height = 22;
+    r++;
+
+    var distRows = [
+      { lbl: '🏆 Grade A', cnt: t.A, pct: t.pctA / 100, bg: '#DCFCE7', fg: '#15803D', desc: 'Top 20% per Regional Manager (Gate Passed Mobile & Gold ≥100% prioritized first)' },
+      { lbl: '⭐ Grade B', cnt: t.B, pct: t.pctB / 100, bg: '#DBEAFE', fg: '#1D4ED8', desc: 'Middle 60% per Regional Manager (Eligible ≥ 6 Months)' },
+      { lbl: '⚠️ Grade C (Total)', cnt: t.C, pct: t.pctC / 100, bg: '#FEE2E2', fg: '#B91C1C', desc: 'Bottom 20% per Regional Manager — includes ' + t.under6 + ' managers with < 6 Months (Auto-C)' },
+      { lbl: '🔓 Gate Passed (Mob & Gold ≥100%)', cnt: t.gatePassed, pct: t.total ? (t.gatePassed / t.total) : 0, bg: '#ECFDF5', fg: '#047857', desc: 'Eligible managers (≥6M) achieving both Mobile ≥100% AND WE Gold ≥100%' },
+      { lbl: '🌟 All 4/4 Benchmarks Met', cnt: t.met4, pct: t.total ? (t.met4 / t.total) : 0, bg: '#FEF3C7', fg: '#B45309', desc: 'Explanatory highlight: met Mobile ≥100%, Gold ≥100%, FBB ≥90%, and WE Pay ≥90%' }
+    ];
+    distRows.forEach(function (dr) {
+      wsSum.mergeCells(r, 4, r, 10);
+      styleCell(wsSum.getCell(r, 1), { bg: dr.bg, fg: dr.fg, b: true, sz: 10.5, al: 'left' });
+      styleCell(wsSum.getCell(r, 2), { bg: dr.bg, fg: dr.fg, b: true, sz: 11, numFmt: '#,##0' });
+      styleCell(wsSum.getCell(r, 3), { bg: dr.bg, fg: dr.fg, b: true, sz: 10.5, numFmt: '0.0%' });
+      for (var d2 = 4; d2 <= 10; d2++) styleCell(wsSum.getCell(r, d2), { bg: '#FFFFFF', fg: '#374151', sz: 9.5, al: 'left' });
+      wsSum.getCell(r, 1).value = dr.lbl;
+      wsSum.getCell(r, 2).value = dr.cnt;
+      wsSum.getCell(r, 3).value = dr.pct;
+      wsSum.getCell(r, 4).value = dr.desc;
+      wsSum.getRow(r).height = 22;
+      r++;
+    });
+    r++;
+
+    // Regional Bell Curve Breakdown Table
+    wsSum.mergeCells(r, 1, r, 10);
+    for (var rgc = 1; rgc <= 10; rgc++) styleCell(wsSum.getCell(r, rgc), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#5E2D91' });
+    wsSum.getCell(r, 1).value = '👔 Regional Bell Curve Breakdown (توزيع A / B / C لكل Regional Manager)';
+    wsSum.getRow(r).height = 24;
+    r++;
+
+    var regHdrs = ['Regional Manager', 'Total Mgrs', '<6M Auto-C', 'Grade A', 'A %', 'Grade B', 'B %', 'Grade C', 'C %', '4/4 Met'];
+    regHdrs.forEach(function (h, i) {
+      var hBg = i === 0 ? '#1A1A2E' : (i >= 3 && i <= 8 ? '#4C1D95' : '#0F766E');
+      styleCell(wsSum.getCell(r, i + 1), { bg: hBg, fg: '#FFFFFF', b: true, sz: 10, bd: '#374151' });
+      wsSum.getCell(r, i + 1).value = h;
+    });
+    wsSum.getRow(r).height = 23;
+    r++;
+
+    data.regionalSummaries.forEach(function (rs, idx) {
+      var bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      wsSum.getCell(r, 1).value = rs.regional; styleCell(wsSum.getCell(r, 1), { bg: bg, fg: '#5E2D91', b: true, al: 'left' });
+      wsSum.getCell(r, 2).value = rs.total; styleCell(wsSum.getCell(r, 2), { bg: bg, b: true, numFmt: '#,##0' });
+      wsSum.getCell(r, 3).value = rs.under6; styleCell(wsSum.getCell(r, 3), { bg: rs.under6 ? '#FEF2F2' : bg, fg: rs.under6 ? '#B91C1C' : '#6B7280', b: !!rs.under6, numFmt: '#,##0' });
+      wsSum.getCell(r, 4).value = rs.countA; styleCell(wsSum.getCell(r, 4), { bg: '#DCFCE7', fg: '#15803D', b: true, numFmt: '#,##0' });
+      wsSum.getCell(r, 5).value = rs.pctA / 100; styleCell(wsSum.getCell(r, 5), { bg: '#F0FDF4', fg: '#15803D', b: true, numFmt: '0.0%' });
+      wsSum.getCell(r, 6).value = rs.countB; styleCell(wsSum.getCell(r, 6), { bg: '#DBEAFE', fg: '#1D4ED8', b: true, numFmt: '#,##0' });
+      wsSum.getCell(r, 7).value = rs.pctB / 100; styleCell(wsSum.getCell(r, 7), { bg: '#EFF6FF', fg: '#1D4ED8', b: true, numFmt: '0.0%' });
+      wsSum.getCell(r, 8).value = rs.countC; styleCell(wsSum.getCell(r, 8), { bg: '#FEE2E2', fg: '#B91C1C', b: true, numFmt: '#,##0' });
+      wsSum.getCell(r, 9).value = rs.pctC / 100; styleCell(wsSum.getCell(r, 9), { bg: '#FEF2F2', fg: '#B91C1C', b: true, numFmt: '0.0%' });
+      wsSum.getCell(r, 10).value = rs.met4; styleCell(wsSum.getCell(r, 10), { bg: '#FEF3C7', fg: '#B45309', b: true, numFmt: '#,##0' });
+      wsSum.getRow(r).height = 21;
+      r++;
+    });
+
+    // Dark Purple TOTAL row on Regional table
+    var totVals = ['TOTAL (' + data.regionalSummaries.length + ' Regional)', t.total, t.under6, t.A, t.pctA / 100, t.B, t.pctB / 100, t.C, t.pctC / 100, t.met4];
+    totVals.forEach(function (v, i) {
+      var fmt = (i === 4 || i === 6 || i === 8) ? '0.0%' : (i > 0 ? '#,##0' : null);
+      wsSum.getCell(r, i + 1).value = v;
+      styleCell(wsSum.getCell(r, i + 1), { bg: '#3B1D63', fg: '#FFFFFF', b: true, al: i === 0 ? 'left' : 'center', numFmt: fmt, bd: '#5E2D91' });
+    });
+    wsSum.getRow(r).height = 24;
+
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 2: Annual Criteria Ranking (الجدول التفصيلي بالألوان الرسمية)
+    // ══════════════════════════════════════════════════════════════
+    var wsRank = wb.addWorksheet('Annual Criteria Ranking');
+    wsRank.views = [{ showGridLines: false, state: 'frozen', ySplit: 4 }];
+    wsRank.properties.tabColor = { argb: 'FF0F766E' };
+
+    var rankCols = [
+      { hdr: '#', w: 6, grp: 'id' },
+      { hdr: 'Manager Name', w: 28, grp: 'id' },
+      { hdr: 'Oracle ID', w: 12, grp: 'id' },
+      { hdr: 'Months', w: 9, grp: 'id' },
+      { hdr: 'Tenure', w: 15, grp: 'id' },
+      { hdr: 'Branches', w: 24, grp: 'id' },
+      { hdr: 'Regional Manager', w: 20, grp: 'id' },
+      { hdr: 'Reg Rank', w: 11, grp: 'id' },
+      { hdr: 'Supervisor', w: 18, grp: 'id' },
+      { hdr: 'Area Manager', w: 20, grp: 'id' },
+      { hdr: '1. Mobile %\n(W:' + w.mobile + '% · ≥100%)', w: 15, grp: 'crit' },
+      { hdr: '2. WE Gold %\n(W:' + w.gold + '% · ≥100%)', w: 15, grp: 'crit' },
+      { hdr: '3. FBB %\n(W:' + w.fbb + '% · ≥90%)', w: 14, grp: 'crit' },
+      { hdr: '4. WE Pay %\n(W:' + w.wallet + '% · ≥90%)', w: 14, grp: 'crit' },
+      { hdr: 'Criteria Score %', w: 15, grp: 'score' },
+      { hdr: 'Gate\n(Mob & Gold ≥100%)', w: 18, grp: 'eval' },
+      { hdr: '4/4 Met', w: 12, grp: 'eval' },
+      { hdr: 'Bell Curve\nGrade', w: 12, grp: 'eval' },
+      { hdr: 'Grade Rule', w: 20, grp: 'eval' },
+      { hdr: 'Annual Eval %\n(Explanatory)', w: 15, grp: 'eval' },
+      { hdr: 'Eval Rank', w: 11, grp: 'eval' },
+      { hdr: 'Warnings', w: 10, grp: 'eval' }
+    ];
+    rankCols.forEach(function (col, i) { wsRank.getColumn(i + 1).width = col.w; });
+    var NR = rankCols.length;
+
+    wsRank.mergeCells(1, 1, 1, NR);
+    styleCell(wsRank.getCell(1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
+    wsRank.getCell(1, 1).value = 'FAKHARANY360 — Annual Criteria & Bell Curve Ranking (' + visibleItems.length + ' Managers)  |  Filters: ' + filterSummaryTxt;
+    wsRank.getRow(1).height = 28;
+
+    wsRank.mergeCells(2, 1, 2, NR);
+    for (var sc2 = 1; sc2 <= NR; sc2++) styleCell(wsRank.getCell(2, sc2), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 10.5, al: 'left', bd: '#5E2D91' });
+    wsRank.getCell(2, 1).value = '🔒 Dual Gate: Mobile ≥100% & WE Gold ≥100%  ·  Weights: Mobile ' + w.mobile + '% / Gold ' + w.gold + '% / FBB ' + w.fbb + '% / WE Pay ' + w.wallet + '%  ·  Bell Curve per Regional: A 20% / B 60% / C 20% (<6M Auto-C)';
+    wsRank.getRow(2).height = 22;
+
+    wsRank.getRow(3).height = 6;
+
+    rankCols.forEach(function (col, ci) {
+      var hBg = col.grp === 'id' ? '#1A1A2E' : (col.grp === 'crit' ? '#4C1D95' : (col.grp === 'score' ? '#3B1D63' : '#0F766E'));
+      styleCell(wsRank.getCell(4, ci + 1), { bg: hBg, fg: '#FFFFFF', b: true, sz: 9.5, wrap: true, bd: '#374151' });
+      wsRank.getCell(4, ci + 1).value = col.hdr;
+    });
+    wsRank.getRow(4).height = 30;
+
+    function writeCriteriaRow(ws, rIdx, x, rowNum) {
+      var rowBg = rowNum % 2 === 1 ? '#FFFFFF' : '#F8FAFC';
+      var c = 1;
+      function put(val, opts) {
+        var cell = ws.getCell(rIdx, c++);
+        cell.value = (val === null || val === undefined) ? '—' : val;
+        styleCell(cell, Object.assign({ bg: rowBg, fg: '#1F2937' }, opts || {}));
+      }
+      put(x.globalRank, { b: true, fg: '#5E2D91' });
+      put(x.label, { al: 'left', b: true, fg: '#5E2D91' });
+      put(x.oracleId || '—');
+      put(x.monthsCount, { b: x.isUnder6, bg: x.isUnder6 ? '#FEE2E2' : rowBg, fg: x.isUnder6 ? '#B91C1C' : '#1F2937', numFmt: '#,##0' });
+      put(x.isUnder6 ? '< 6M (Auto C)' : '≥ 6 Months', { bg: x.isUnder6 ? '#FEF2F2' : rowBg, fg: x.isUnder6 ? '#B91C1C' : '#15803D', b: x.isUnder6 });
+      put(x.branchesTxt || '—', { al: 'left' });
+      put(x.regional, { al: 'left', b: true });
+      put('#' + x.regionalRank + ' / ' + x.regionalTotal);
+      put(x.supervisor, { al: 'left' });
+      put(x.areaManager, { al: 'left' });
+
+      var mS = pctThresholdStyle(x.mobPct, 100);
+      var gS = pctThresholdStyle(x.goldPct, 100);
+      var fS = pctThresholdStyle(x.fbbPct, 90);
+      var pS = pctThresholdStyle(x.payPct, 90);
+      put(x.mobPct / 100, { bg: mS.bg, fg: mS.fg, b: true, numFmt: '0.0%' });
+      put(x.goldPct / 100, { bg: gS.bg, fg: gS.fg, b: true, numFmt: '0.0%' });
+      put(x.fbbPct / 100, { bg: fS.bg, fg: fS.fg, b: true, numFmt: '0.0%' });
+      put(x.payPct / 100, { bg: pS.bg, fg: pS.fg, b: true, numFmt: '0.0%' });
+      put(x.score / 100, { bg: '#F5F3FF', fg: '#3B1D63', b: true, numFmt: '0.0%' });
+      put(x.gatePassed ? '🔓 PASSED' : '🔒 ' + x.gateLabel, { bg: x.gatePassed ? '#ECFDF5' : '#FEF2F2', fg: x.gatePassed ? '#047857' : '#B91C1C', b: true });
+      put(x.all4Met ? '🌟 4/4 MET' : x.metCount + ' / 4', { bg: x.all4Met ? '#FEF3C7' : rowBg, fg: x.all4Met ? '#92400E' : '#4B5563', b: x.all4Met });
+      var grS = gradeStyle(x.grade);
+      put(x.grade, { bg: grS.bg, fg: grS.fg, b: true, sz: 11 });
+      put(x.gradeReason, { al: 'left', sz: 9.5, fg: '#4B5563' });
+      var eS = evalStyle(x.evalPct);
+      put(x.evalPct !== null ? (x.evalPct / 100) : '—', { bg: eS.bg, fg: eS.fg, b: true, numFmt: x.evalPct !== null ? '0.0%' : null });
+      put(x.evalRank ? ('#' + x.evalRank) : '—', { fg: '#5E2D91', b: !!x.evalRank });
+      put(x.warnCount || 0, { bg: x.warnCount ? '#FEE2E2' : rowBg, fg: x.warnCount ? '#B91C1C' : '#6B7280', b: !!x.warnCount, numFmt: '#,##0' });
+      ws.getRow(rIdx).height = 22;
+    }
+
+    var rr = 5;
+    visibleItems.forEach(function (x, idx) {
+      writeCriteriaRow(wsRank, rr++, x, idx + 1);
+    });
+
+    // Dark purple AVG / TOTAL Footer Row on Sheet 2
+    if (visibleItems.length) {
+      var nV = visibleItems.length;
+      var avgFn = function (fn) { return visibleItems.reduce(function (a, b) { return a + fn(b); }, 0) / nV; };
+      var evList = visibleItems.filter(function (x) { return x.evalPct !== null; });
+      var avgEv = evList.length ? (evList.reduce(function (a, b) { return a + b.evalPct; }, 0) / evList.length / 100) : null;
+      var footVals = [
+        'AVG', 'Average / Summary (' + nV + ' Managers)', '—',
+        Number(avgFn(function (x) { return x.monthsCount; }).toFixed(1)), '—', '—', '—', '—', '—', '—',
+        avgFn(function (x) { return x.mobPct; }) / 100,
+        avgFn(function (x) { return x.goldPct; }) / 100,
+        avgFn(function (x) { return x.fbbPct; }) / 100,
+        avgFn(function (x) { return x.payPct; }) / 100,
+        avgFn(function (x) { return x.score; }) / 100,
+        visibleItems.filter(function (x) { return x.gatePassed; }).length + ' Passed',
+        visibleItems.filter(function (x) { return x.all4Met; }).length + ' (4/4)',
+        'A:' + visibleItems.filter(function (x) { return x.grade === 'A'; }).length + ' B:' + visibleItems.filter(function (x) { return x.grade === 'B'; }).length + ' C:' + visibleItems.filter(function (x) { return x.grade === 'C'; }).length,
+        'Bell Curve Summary',
+        avgEv !== null ? avgEv : '—',
+        '—',
+        visibleItems.reduce(function (a, b) { return a + (b.warnCount || 0); }, 0)
+      ];
+      footVals.forEach(function (fv, fi) {
+        var fmt = (fi >= 10 && fi <= 14) || (fi === 19 && avgEv !== null) ? '0.0%' : null;
+        wsRank.getCell(rr, fi + 1).value = fv;
+        styleCell(wsRank.getCell(rr, fi + 1), { bg: '#3B1D63', fg: '#FFFFFF', b: true, al: fi === 1 ? 'left' : 'center', numFmt: fmt, bd: '#5E2D91' });
+      });
+      wsRank.getRow(rr).height = 25;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SHEET 3: Regional Bell Curve (مقسّم تحت بعض لكل Regional Manager)
+    // ══════════════════════════════════════════════════════════════
+    var wsReg = wb.addWorksheet('By Regional (Bell Curve)');
+    wsReg.views = [{ showGridLines: false }];
+    wsReg.properties.tabColor = { argb: 'FF15803D' };
+    rankCols.forEach(function (col, i) { wsReg.getColumn(i + 1).width = col.w; });
+
+    var r3 = 1;
+    wsReg.mergeCells(r3, 1, r3, NR);
+    styleCell(wsReg.getCell(r3, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
+    wsReg.getCell(r3, 1).value = 'FAKHARANY360 — Regional Manager Bell Curve Breakdown (ترتيب كل Regional منفصل)';
+    wsReg.getRow(r3).height = 28;
+    r3 += 2;
+
+    data.regionalSummaries.forEach(function (rs) {
+      var regItems = visibleItems.filter(function (x) { return x.regional === rs.regional; })
+        .sort(function (a, b) { return a.regionalRank - b.regionalRank; });
+      if (!regItems.length) return;
+
+      wsReg.mergeCells(r3, 1, r3, NR);
+      for (var c3 = 1; c3 <= NR; c3++) styleCell(wsReg.getCell(r3, c3), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#5E2D91' });
+      wsReg.getCell(r3, 1).value = '👔 ' + rs.regional + ' — ' + rs.total + ' Managers  |  Grade A: ' + rs.countA + ' (' + rs.pctA.toFixed(0) + '%) · Grade B: ' + rs.countB + ' (' + rs.pctB.toFixed(0) + '%) · Grade C: ' + rs.countC + ' (' + rs.pctC.toFixed(0) + '% · <6M: ' + rs.under6 + ') · 4/4 Met: ' + rs.met4;
+      wsReg.getRow(r3).height = 25;
+      r3++;
+
+      rankCols.forEach(function (col, ci) {
+        var hBg = col.grp === 'id' ? '#1A1A2E' : (col.grp === 'crit' ? '#4C1D95' : (col.grp === 'score' ? '#3B1D63' : '#0F766E'));
+        styleCell(wsReg.getCell(r3, ci + 1), { bg: hBg, fg: '#FFFFFF', b: true, sz: 9.5, wrap: true, bd: '#374151' });
+        wsReg.getCell(r3, ci + 1).value = col.hdr;
+      });
+      wsReg.getRow(r3).height = 28;
+      r3++;
+
+      regItems.forEach(function (x, idx) {
+        writeCriteriaRow(wsReg, r3++, x, idx + 1);
+      });
+      r3++;
+    });
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_Annual_Criteria_BellCurve_' + stamp + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (err) {
+    console.error('Export Annual Criteria error:', err);
+    alert('⚠️ حصل خطأ أثناء تصدير الإكسل: ' + (err && err.message ? err.message : err));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+  }
+}
+
 function renderMgrSummaryTableHTML(model, effMode) {
   var hasRaw = model.hasRawProducts;
   var thead = buildMgrTableTheadHTML('Store Manager', 'Branches & Months', effMode, hasRaw);
