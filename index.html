@@ -1629,8 +1629,16 @@ document.addEventListener('DOMContentLoaded', function() {
               <i class="fas fa-sitemap mr-1"></i>Hierarchy
             </button>
             <button id="tp-view-flat" onclick="setTeamPivotView('flat')"
-              style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="كل الـ Area Managers مرتبين مع بعض من غير تقسيم السوبرفايزرز">
-              <i class="fas fa-sort-amount-down mr-1"></i>ترتيب الاريات
+              style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Area Managers by selected product">
+              <i class="fas fa-sort-amount-down mr-1"></i>Rank Areas
+            </button>
+            <button id="tp-view-supers" onclick="setTeamPivotView('supers')"
+              style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Supervisors by selected product">
+              <i class="fas fa-user-tie mr-1"></i>Rank Supers
+            </button>
+            <button id="tp-view-regional" onclick="setTeamPivotView('regional')"
+              style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Regional Managers by selected product">
+              <i class="fas fa-crown mr-1"></i>Rank Regional
             </button>
           </div>
           <select id="tp-sort-product" onchange="renderTeamPivot()" style="display:none;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:20px;font-size:11px;font-weight:700;font-family:'Inter',sans-serif;outline:none;color:#1a1a2e;background:white"></select>
@@ -1926,6 +1934,14 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
           <div id="rank-store" class="rank-list"></div>
         </div>
+      </div>
+
+      <!-- ANNUAL LEADERSHIP EVALUATION (Area Managers / Supervisors / Regional) -->
+      <div style="margin-top:26px">
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span><i class="fas fa-medal mr-2"></i>Annual Leadership Evaluation <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:none;letter-spacing:0;margin-left:6px;border:1px solid #d1d5db;padding:2px 9px;border-radius:20px">Area Managers · Supervisors · Regional</span></span>
+        </div>
+        <div id="annual-leadership-eval-container"></div>
       </div>
     </div>
 
@@ -2339,17 +2355,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 <i class="fas fa-sitemap mr-1"></i>Hierarchy
               </button>
               <button id="mtd-tp-view-flat" onclick="setMTDTeamPivotView('flat')"
-                style="padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:white;color:#6b7280;transition:all .2s" title="كل الـ Area Managers مرتبين مع بعض من غير تقسيم السوبرفايزرز">
-                <i class="fas fa-sort-amount-down mr-1"></i>ترتيب الاريات
+                style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Area Managers by selected product">
+                <i class="fas fa-sort-amount-down mr-1"></i>Rank Areas
+              </button>
+              <button id="mtd-tp-view-supers" onclick="setMTDTeamPivotView('supers')"
+                style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Supervisors by selected product">
+                <i class="fas fa-user-tie mr-1"></i>Rank Supers
+              </button>
+              <button id="mtd-tp-view-regional" onclick="setMTDTeamPivotView('regional')"
+                style="padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border:none;border-left:1px solid #e5e7eb;background:white;color:#6b7280;transition:all .2s" title="Rank Regional Managers by selected product">
+                <i class="fas fa-crown mr-1"></i>Rank Regional
               </button>
             </div>
             <select id="mtd-tp-sort-product" onchange="renderMTDTeamPivot()" style="display:none;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:20px;font-size:11px;font-weight:700;font-family:'Inter',sans-serif;outline:none;color:#1a1a2e;background:white">
-              <option value="mobile">رتّب حسب Mobile</option>
-              <option value="fbb">رتّب حسب FBB</option>
-              <option value="fixed">رتّب حسب Fixed</option>
-              <option value="fwa">رتّب حسب WE Air</option>
-              <option value="gold">رتّب حسب WE Gold</option>
-              <option value="wallet">رتّب حسب Wallet</option>
+              <option value="mobile">Sort by: Mobile</option>
+              <option value="fbb">Sort by: FBB</option>
+              <option value="fixed">Sort by: Fixed</option>
+              <option value="fwa">Sort by: WE Air</option>
+              <option value="gold">Sort by: WE Gold</option>
+              <option value="wallet">Sort by: Wallet</option>
             </select>
             <button onclick="exportMTDTeamPivot()"
               style="padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid #5E2D91;background:white;color:#5E2D91">
@@ -3160,22 +3184,28 @@ function toggleTeamPivotAM(key) {
   renderTeamPivot();
 }
 
+var TEAM_PIVOT_SV_EXPANDED = {};
+function toggleTeamPivotSV(key) {
+  TEAM_PIVOT_SV_EXPANDED[key] = !TEAM_PIVOT_SV_EXPANDED[key];
+  renderTeamPivot();
+}
 function setTeamPivotView(view) {
   TEAM_PIVOT_VIEW = view;
-  var tEl = document.getElementById('tp-view-tree'), fEl = document.getElementById('tp-view-flat');
+  ['tree', 'flat', 'supers', 'regional'].forEach(function(v){
+    var b = document.getElementById('tp-view-' + v);
+    if (b) { b.style.background = view===v ? '#5E2D91' : 'white'; b.style.color = view===v ? 'white' : '#6b7280'; }
+  });
   var sortSel = document.getElementById('tp-sort-product');
-  if (tEl) { tEl.style.background = view==='tree' ? '#5E2D91' : 'white'; tEl.style.color = view==='tree' ? 'white' : '#6b7280'; }
-  if (fEl) { fEl.style.background = view==='flat' ? '#5E2D91' : 'white'; fEl.style.color = view==='flat' ? 'white' : '#6b7280'; }
   if (sortSel) {
     if (!sortSel.dataset.filled) {
       PRODUCTS.forEach(function(p){
         var o = document.createElement('option');
-        o.value = p.tKey; o.textContent = 'رتّب حسب ' + p.label;
+        o.value = p.tKey; o.textContent = 'Sort by: ' + p.label;
         sortSel.appendChild(o);
       });
       sortSel.dataset.filled = '1';
     }
-    sortSel.style.display = view==='flat' ? '' : 'none';
+    sortSel.style.display = view !== 'tree' ? '' : 'none';
   }
   renderTeamPivot();
 }
@@ -3216,8 +3246,9 @@ function buildTeamPivotTree(rows) {
 function tpProductCellsHTML(k, valueColor) {
   return PRODUCTS.map(function(p){
     var t = k[p.tKey]||0, a = k[p.aKey]||0;
-    var pc = t>0 ? Math.round(a/t*100) : 0;
-    var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
+    var pcNum = t>0 ? (a/t*100) : 0;
+    var pc = t>0 ? pcNum.toFixed(1) : '0.0';
+    var pctColor = valueColor || (pcNum>=100 ? '#16a34a' : pcNum>=80 ? '#d97706' : '#dc2626');
     if (TEAM_PIVOT_MODE === 'details') {
       return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(t)+'</td>'+
              '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(a)+'</td>'+
@@ -3321,37 +3352,92 @@ function renderTeamPivot() {
     }).join('');
   }
 
-  rmNames.forEach(function(rm){
-    var rmData = tree[rm];
-    var rmExpanded = !TEAM_PIVOT_COLLAPSED[rm];
-    body += tpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
-    if (rmExpanded) {
-      if (TEAM_PIVOT_VIEW === 'flat') {
-        var flatList = flattenAreaManagersClosure(rmData, sortTKey);
-        flatList.forEach(function(item, idx){
-          var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-left:6px">#'+(idx+1)+'</span>';
-          var amKey = tpAmKey(rm, 'flat', item.am);
-          var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
-          body += tpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
-          if (amExpanded) body += storeRowsHTML(item.rows, 2);
-        });
-      } else {
-        var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return calcGroup(rmData.supervisors[b].rows).totalTarget - calcGroup(rmData.supervisors[a].rows).totalTarget; });
-        svNames.forEach(function(sv){
+  var sortProdObj = PRODUCTS.find(function(p){ return p.tKey === sortTKey; }) || PRODUCTS[0];
+  function tpSortScore(rows) {
+    var k = calcGroup(rows);
+    var t = k[sortProdObj.tKey]||0, a = k[sortProdObj.aKey]||0;
+    return t > 0 ? (a / t) : -1;
+  }
+
+  if (TEAM_PIVOT_VIEW === 'regional') {
+    var rmRanked = rmNames.slice().sort(function(a,b){ return tpSortScore(tree[b].rows) - tpSortScore(tree[a].rows); });
+    rmRanked.forEach(function(rm, idx){
+      var rmData = tree[rm];
+      var rmExpanded = !!TEAM_PIVOT_SV_EXPANDED['REG|' + rm];
+      var rankBadge = '<span style="display:inline-block;min-width:20px;text-align:center;background:#5E2D91;color:white;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 6px;margin-right:6px">#'+(idx+1)+'</span>';
+      body += tpRow(rankBadge + rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleTeamPivotSV(\'REG|'+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+      if (rmExpanded) {
+        var svList = Object.keys(rmData.supervisors).sort(function(a,b){ return tpSortScore(rmData.supervisors[b].rows) - tpSortScore(rmData.supervisors[a].rows); });
+        svList.forEach(function(sv, sIdx){
           var svData = rmData.supervisors[sv];
-          var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return calcGroup(svData.areaManagers[b]).totalTarget - calcGroup(svData.areaManagers[a]).totalTarget; });
-          amNames.forEach(function(am){
-            var amKey = tpAmKey(rm, sv, am);
-            var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
-            body += tpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
-            if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
-          });
-          body += tpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+          var svKey = 'REGSV|' + rm + '|' + sv;
+          var svExp = !!TEAM_PIVOT_SV_EXPANDED[svKey];
+          var svBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#dbeafe;color:#1e3a8a;border-radius:8px;font-size:9px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(sIdx+1)+'</span>';
+          body += tpRow(svBadge + sv, 1, svData.rows, { bg:svExp?'#eff6ff':'#f8fafc', color:'#1e3a8a', fw:700, fs:11.5, clickable:true, clickFn:'toggleTeamPivotSV(\''+svKey.replace(/'/g,"\\'")+'\')', expanded: svExp });
+          if (svExp) {
+            var amList = Object.keys(svData.areaManagers).sort(function(a,b){ return tpSortScore(svData.areaManagers[b]) - tpSortScore(svData.areaManagers[a]); });
+            amList.forEach(function(am){
+              var amKey = tpAmKey(rm, sv, am);
+              var amExp = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+              body += tpRow(am, 2, svData.areaManagers[am], { bg:amExp?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExp });
+              if (amExp) body += storeRowsHTML(svData.areaManagers[am], 3);
+            });
+          }
         });
       }
-    }
-    body += tpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
-  });
+    });
+  } else {
+    rmNames.forEach(function(rm){
+      var rmData = tree[rm];
+      var rmExpanded = !TEAM_PIVOT_COLLAPSED[rm];
+      body += tpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+      if (rmExpanded) {
+        if (TEAM_PIVOT_VIEW === 'flat') {
+          var flatList = flattenAreaManagersClosure(rmData, sortTKey);
+          flatList.forEach(function(item, idx){
+            var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(idx+1)+'</span>';
+            var amKey = tpAmKey(rm, 'flat', item.am);
+            var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+            body += tpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+            if (amExpanded) body += storeRowsHTML(item.rows, 2);
+          });
+        } else if (TEAM_PIVOT_VIEW === 'supers') {
+          var svRanked = Object.keys(rmData.supervisors).sort(function(a,b){ return tpSortScore(rmData.supervisors[b].rows) - tpSortScore(rmData.supervisors[a].rows); });
+          svRanked.forEach(function(sv, idx){
+            var svData = rmData.supervisors[sv];
+            var svKey = 'SV|' + rm + '|' + sv;
+            var svExp = !!TEAM_PIVOT_SV_EXPANDED[svKey];
+            var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#dbeafe;color:#1e3a8a;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(idx+1)+'</span>';
+            body += tpRow(rankBadge + sv, 1, svData.rows, { bg:svExp?'#eff6ff':'transparent', color:'#1e3a8a', fw:700, fs:11.5, clickable:true, clickFn:'toggleTeamPivotSV(\''+svKey.replace(/'/g,"\\'")+'\')', expanded: svExp });
+            if (svExp) {
+              var amList = Object.keys(svData.areaManagers).sort(function(a,b){ return tpSortScore(svData.areaManagers[b]) - tpSortScore(svData.areaManagers[a]); });
+              amList.forEach(function(am, aIdx){
+                var amKey = tpAmKey(rm, sv, am);
+                var amExp = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+                var aBadge = '<span style="display:inline-block;min-width:16px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:7px;font-size:9px;font-weight:800;padding:1px 4px;margin-right:5px">#'+(aIdx+1)+'</span>';
+                body += tpRow(aBadge + am, 2, svData.areaManagers[am], { bg:amExp?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExp });
+                if (amExp) body += storeRowsHTML(svData.areaManagers[am], 3);
+              });
+            }
+          });
+        } else {
+          var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return calcGroup(rmData.supervisors[b].rows).totalTarget - calcGroup(rmData.supervisors[a].rows).totalTarget; });
+          svNames.forEach(function(sv){
+            var svData = rmData.supervisors[sv];
+            var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return calcGroup(svData.areaManagers[b]).totalTarget - calcGroup(svData.areaManagers[a]).totalTarget; });
+            amNames.forEach(function(am){
+              var amKey = tpAmKey(rm, sv, am);
+              var amExpanded = !!TEAM_PIVOT_AM_EXPANDED[amKey];
+              body += tpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+              if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
+            });
+            body += tpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+          });
+        }
+      }
+      body += tpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
+    });
+  }
   body += tpRow('GRAND TOTAL', 0, filteredData, { bg:'#1a1a2e', color:'white', fw:900, fs:13, isLast:true });
 
   el.innerHTML = thead + body + '</tbody></table>';
@@ -3867,13 +3953,19 @@ function setMTDTeamPivotMode(mode) {
   renderMTDTeamPivot();
 }
 
+var MTD_TEAM_PIVOT_SV_EXPANDED = {};
+function toggleMTDTeamPivotSV(key) {
+  MTD_TEAM_PIVOT_SV_EXPANDED[key] = !MTD_TEAM_PIVOT_SV_EXPANDED[key];
+  renderMTDTeamPivot();
+}
 function setMTDTeamPivotView(view) {
   MTD_TEAM_PIVOT_VIEW = view;
-  var tEl = document.getElementById('mtd-tp-view-tree'), fEl = document.getElementById('mtd-tp-view-flat');
+  ['tree', 'flat', 'supers', 'regional'].forEach(function(v){
+    var b = document.getElementById('mtd-tp-view-' + v);
+    if (b) { b.style.background = view===v ? '#5E2D91' : 'white'; b.style.color = view===v ? 'white' : '#6b7280'; }
+  });
   var sortSel = document.getElementById('mtd-tp-sort-product');
-  if (tEl) { tEl.style.background = view==='tree' ? '#5E2D91' : 'white'; tEl.style.color = view==='tree' ? 'white' : '#6b7280'; }
-  if (fEl) { fEl.style.background = view==='flat' ? '#5E2D91' : 'white'; fEl.style.color = view==='flat' ? 'white' : '#6b7280'; }
-  if (sortSel) sortSel.style.display = view==='flat' ? '' : 'none';
+  if (sortSel) sortSel.style.display = view !== 'tree' ? '' : 'none';
   renderMTDTeamPivot();
 }
 
@@ -3926,8 +4018,9 @@ function mtdTpProductCellsHTML(k, valueColor) {
     var t = k[p.key].tgt||0;
     var actVal = k[p.key].act||0;
     var mainVal = isProj ? (k[p.key].proj||0) : actVal;
-    var pc = t>0 ? Math.round(mainVal/t*100) : 0;
-    var pctColor = valueColor || (pc>=100 ? '#16a34a' : pc>=80 ? '#d97706' : '#dc2626');
+    var pcNum = t>0 ? (mainVal/t*100) : 0;
+    var pc = t>0 ? pcNum.toFixed(1) : '0.0';
+    var pctColor = valueColor || (pcNum>=100 ? '#16a34a' : pcNum>=80 ? '#d97706' : '#dc2626');
     if (MTD_TEAM_PIVOT_MODE === 'details') {
       return '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#6b7280')+';white-space:nowrap">'+fmtN(Math.round(t))+'</td>'+
              '<td style="padding:8px 8px;text-align:right;font-size:11px;color:'+(valueColor||'#374151')+';font-weight:600;white-space:nowrap">'+fmtN(Math.round(actVal))+'</td>'+
@@ -4014,39 +4107,93 @@ function renderMTDTeamPivot() {
     }).join('');
   }
 
-  rmNames.forEach(function(rm){
-    var rmData = tree[rm];
-    var rmExpanded = !MTD_TEAM_PIVOT_COLLAPSED[rm];
-    body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleMTDTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
-    if (rmExpanded) {
-      if (MTD_TEAM_PIVOT_VIEW === 'flat') {
-        // Flat: every Area Manager under this RM, ranked together, no
-        // Supervisor grouping/subtotal rows in between.
-        var flatList = mtdFlattenAreaManagers(rmData, sortProdKey);
-        flatList.forEach(function(item, idx){
-          var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-left:6px">#'+(idx+1)+'</span>';
-          var amKey = mtdAmKey(rm, 'flat', item.am);
-          var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
-          body += mtdTpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
-          if (amExpanded) body += storeRowsHTML(item.rows, 2);
-        });
-      } else {
-        var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
-        svNames.forEach(function(sv){
+  function mtdTpSortScore(grpRows) {
+    var k = mtdQcCalcGroup(grpRows);
+    var p = k[sortProdKey] || k.mobile;
+    var t = p.tgt || 0;
+    var v = (MTD_TEAM_PIVOT_METRIC === 'proj') ? (p.proj || 0) : (p.act || 0);
+    return t > 0 ? (v / t) : -1;
+  }
+
+  if (MTD_TEAM_PIVOT_VIEW === 'regional') {
+    var rmRanked = rmNames.slice().sort(function(a,b){ return mtdTpSortScore(tree[b].rows) - mtdTpSortScore(tree[a].rows); });
+    rmRanked.forEach(function(rm, idx){
+      var rmData = tree[rm];
+      var rmExpanded = !!MTD_TEAM_PIVOT_SV_EXPANDED['REG|' + rm];
+      var rankBadge = '<span style="display:inline-block;min-width:20px;text-align:center;background:#5E2D91;color:white;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 6px;margin-right:6px">#'+(idx+1)+'</span>';
+      body += mtdTpRow(rankBadge + rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleMTDTeamPivotSV(\'REG|'+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+      if (rmExpanded) {
+        var svList = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdTpSortScore(rmData.supervisors[b].rows) - mtdTpSortScore(rmData.supervisors[a].rows); });
+        svList.forEach(function(sv, sIdx){
           var svData = rmData.supervisors[sv];
-          var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
-          amNames.forEach(function(am){
-            var amKey = mtdAmKey(rm, sv, am);
-            var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
-            body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
-            if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
-          });
-          body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+          var svKey = 'REGSV|' + rm + '|' + sv;
+          var svExp = !!MTD_TEAM_PIVOT_SV_EXPANDED[svKey];
+          var svBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#dbeafe;color:#1e3a8a;border-radius:8px;font-size:9px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(sIdx+1)+'</span>';
+          body += mtdTpRow(svBadge + sv, 1, svData.rows, { bg:svExp?'#eff6ff':'#f8fafc', color:'#1e3a8a', fw:700, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotSV(\''+svKey.replace(/'/g,"\\'")+'\')', expanded: svExp });
+          if (svExp) {
+            var amList = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdTpSortScore(svData.areaManagers[b]) - mtdTpSortScore(svData.areaManagers[a]); });
+            amList.forEach(function(am){
+              var amKey = mtdAmKey(rm, sv, am);
+              var amExp = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+              body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:amExp?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExp });
+              if (amExp) body += storeRowsHTML(svData.areaManagers[am], 3);
+            });
+          }
         });
       }
-    }
-    body += mtdTpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
-  });
+    });
+  } else {
+    rmNames.forEach(function(rm){
+      var rmData = tree[rm];
+      var rmExpanded = !MTD_TEAM_PIVOT_COLLAPSED[rm];
+      body += mtdTpRow(rm, 0, rmData.rows, { bg:'#f3e8ff', color:'#5E2D91', fw:800, fs:12.5, clickable:true, clickFn:'toggleMTDTeamPivotRM(\''+rm.replace(/'/g,"\\'")+'\')', expanded: rmExpanded });
+      if (rmExpanded) {
+        if (MTD_TEAM_PIVOT_VIEW === 'flat') {
+          var flatList = mtdFlattenAreaManagers(rmData, sortProdKey);
+          flatList.forEach(function(item, idx){
+            var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(idx+1)+'</span>';
+            var amKey = mtdAmKey(rm, 'flat', item.am);
+            var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+            body += mtdTpRow(rankBadge + item.am, 1, item.rows, { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+            if (amExpanded) body += storeRowsHTML(item.rows, 2);
+          });
+        } else if (MTD_TEAM_PIVOT_VIEW === 'supers') {
+          var svRanked = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdTpSortScore(rmData.supervisors[b].rows) - mtdTpSortScore(rmData.supervisors[a].rows); });
+          svRanked.forEach(function(sv, idx){
+            var svData = rmData.supervisors[sv];
+            var svKey = 'SV|' + rm + '|' + sv;
+            var svExp = !!MTD_TEAM_PIVOT_SV_EXPANDED[svKey];
+            var rankBadge = '<span style="display:inline-block;min-width:18px;text-align:center;background:#dbeafe;color:#1e3a8a;border-radius:8px;font-size:9.5px;font-weight:800;padding:1px 5px;margin-right:6px">#'+(idx+1)+'</span>';
+            body += mtdTpRow(rankBadge + sv, 1, svData.rows, { bg:svExp?'#eff6ff':'transparent', color:'#1e3a8a', fw:700, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotSV(\''+svKey.replace(/'/g,"\\'")+'\')', expanded: svExp });
+            if (svExp) {
+              var amList = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdTpSortScore(svData.areaManagers[b]) - mtdTpSortScore(svData.areaManagers[a]); });
+              amList.forEach(function(am, aIdx){
+                var amKey = mtdAmKey(rm, sv, am);
+                var amExp = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+                var aBadge = '<span style="display:inline-block;min-width:16px;text-align:center;background:#f3e8ff;color:#5E2D91;border-radius:7px;font-size:9px;font-weight:800;padding:1px 4px;margin-right:5px">#'+(aIdx+1)+'</span>';
+                body += mtdTpRow(aBadge + am, 2, svData.areaManagers[am], { bg:amExp?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExp });
+                if (amExp) body += storeRowsHTML(svData.areaManagers[am], 3);
+              });
+            }
+          });
+        } else {
+          var svNames = Object.keys(rmData.supervisors).sort(function(a,b){ return mtdQcCalcGroup(rmData.supervisors[b].rows).mobile.tgt - mtdQcCalcGroup(rmData.supervisors[a].rows).mobile.tgt; });
+          svNames.forEach(function(sv){
+            var svData = rmData.supervisors[sv];
+            var amNames = Object.keys(svData.areaManagers).sort(function(a,b){ return mtdQcCalcGroup(svData.areaManagers[b]).mobile.tgt - mtdQcCalcGroup(svData.areaManagers[a]).mobile.tgt; });
+            amNames.forEach(function(am){
+              var amKey = mtdAmKey(rm, sv, am);
+              var amExpanded = !!MTD_TEAM_PIVOT_AM_EXPANDED[amKey];
+              body += mtdTpRow(am, 2, svData.areaManagers[am], { bg:amExpanded?'#f9fafb':'transparent', color:'#374151', fw:500, fs:11.5, clickable:true, clickFn:'toggleMTDTeamPivotAM(\''+amKey.replace(/'/g,"\\'")+'\')', expanded: amExpanded });
+              if (amExpanded) body += storeRowsHTML(svData.areaManagers[am], 3);
+            });
+            body += mtdTpRow(sv + ' — Total', 1, svData.rows, { bg:'#dbeafe', color:'#1e3a8a', fw:700, fs:11.5, borderTop:'1px solid #bfdbfe' });
+          });
+        }
+      }
+      body += mtdTpRow(rm + ' — Total', 0, rmData.rows, { bg:'#5E2D91', color:'white', fw:800, fs:12.5 });
+    });
+  }
   body += mtdTpRow('GRAND TOTAL', 0, rows, { bg:'#1a1a2e', color:'white', fw:900, fs:13, isLast:true });
 
   el.innerHTML = thead + body + '</tbody></table>';
@@ -4459,6 +4606,992 @@ function renderAllRankings() {
   renderRankList('areaManager','areamgr','rank-areamgr');
   renderRankList('partner','partner','rank-partner');
   renderRankList('store','store','rank-store');
+  if (typeof renderAnnualLeadershipEval === 'function') renderAnnualLeadershipEval();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── ANNUAL LEADERSHIP EVALUATION (Area Managers / Supervisors / Regional) ───
+// ── Supports Summary/Details, Weighted vs Core5, Closed vs +MTD, Bell Curve ──
+// ══════════════════════════════════════════════════════════════════════════════
+var LEAD_EVAL_LEVEL = 'areaManager';       // 'areaManager' | 'supervisor' | 'regionalManager'
+var LEAD_EVAL_MODE  = 'core5';             // 'core5' (default) | 'weighted'
+var LEAD_EVAL_VIEW  = 'summary';           // 'summary' | 'details'
+var LEAD_EVAL_SCOPE = 'closed_plus_mtd';   // 'closed_only' | 'closed_plus_mtd'
+var LEAD_EVAL_MTD_METRIC = 'actual';       // 'actual' | 'proj'
+var LEAD_EVAL_FILTER = 'ALL';              // 'ALL' | 'A' | 'B' | 'C' | 'GATE' | 'MET4' | 'ACH5'
+var LEAD_EVAL_SHOW_EXCLUDED = true;        // show promoted Area Managers clearly marked as Excluded
+var LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+var LEAD_EVAL_THRESHOLDS = { mobile: 100, gold: 100, fbb: 90, wallet: 90 };
+var LEAD_EVAL_CAP = 0;
+var LEAD_EVAL_LAST_MODEL = null;
+var LEAD_EVAL_ACCESS_HASH = '04f59c99eca7b0830f1fb8628360d1f7a2052b8d364b0176bc6a068f1a3480f6';
+var LEAD_EVAL_UNLOCKED = (function () {
+  try { return sessionStorage.getItem('f360_lead_eval_unlocked') === '1'; } catch (e) { return false; }
+})();
+
+function openLeadEvalLockModal() {
+  var existing = document.getElementById('lead-eval-lock-modal');
+  if (existing) existing.remove();
+  var modal = document.createElement('div');
+  modal.id = 'lead-eval-lock-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(17,24,39,0.62);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Inter,Cairo,sans-serif';
+  modal.innerHTML =
+    '<div style="background:white;border-radius:18px;max-width:360px;width:100%;padding:24px 22px;box-shadow:0 24px 60px rgba(0,0,0,0.32);border:1.5px solid #e9d5ff;text-align:center">' +
+      '<div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#3b1863,#5E2D91);color:white;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px;box-shadow:0 6px 18px rgba(94,45,145,.3)"><i class="fas fa-lock"></i></div>' +
+      '<div style="font-size:16px;font-weight:900;color:#111827;margin-bottom:4px">Executive Access Required</div>' +
+      '<div style="font-size:12px;color:#6b7280;margin-bottom:16px">Enter your access password to view Annual Leadership Evaluation.</div>' +
+      '<input id="lead-eval-pw-input" type="password" placeholder="Enter access password..." autocomplete="off" onkeydown="if(event.key===\'Enter\')submitLeadEvalPassword()" style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #d8b4fe;border-radius:11px;font-size:14px;font-weight:700;text-align:center;outline:none;letter-spacing:2px;margin-bottom:8px" />' +
+      '<div id="lead-eval-pw-err" style="display:none;font-size:11.5px;font-weight:800;color:#dc2626;margin-bottom:10px"><i class="fas fa-times-circle mr-1"></i>Incorrect password. Access denied.</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px">' +
+        '<button onclick="closeLeadEvalLockModal()" style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid #e5e7eb;background:white;color:#4b5563;font-size:12px;font-weight:800;cursor:pointer">Cancel</button>' +
+        '<button onclick="submitLeadEvalPassword()" style="flex:1.4;padding:9px 12px;border-radius:10px;border:none;background:linear-gradient(135deg,#5E2D91,#e91e8c);color:white;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(94,45,145,.3)"><i class="fas fa-unlock-alt mr-1.5"></i>Unlock</button>' +
+      '</div>' +
+    '</div>';
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeLeadEvalLockModal(); });
+  document.body.appendChild(modal);
+  setTimeout(function () {
+    var inp = document.getElementById('lead-eval-pw-input');
+    if (inp) inp.focus();
+  }, 40);
+}
+
+function closeLeadEvalLockModal() {
+  var m = document.getElementById('lead-eval-lock-modal');
+  if (m) m.remove();
+}
+
+async function submitLeadEvalPassword() {
+  var inp = document.getElementById('lead-eval-pw-input');
+  var err = document.getElementById('lead-eval-pw-err');
+  if (!inp) return;
+  var val = String(inp.value || '').trim();
+  if (!val) {
+    if (err) { err.style.display = 'block'; }
+    inp.focus();
+    return;
+  }
+  var h = await sha256Hex(val);
+  if (h === LEAD_EVAL_ACCESS_HASH) {
+    LEAD_EVAL_UNLOCKED = true;
+    try { sessionStorage.setItem('f360_lead_eval_unlocked', '1'); } catch (e) {}
+    closeLeadEvalLockModal();
+    renderAnnualLeadershipEval();
+  } else {
+    if (err) { err.style.display = 'block'; }
+    inp.value = '';
+    inp.style.borderColor = '#ef4444';
+    inp.focus();
+  }
+}
+
+function lockLeadEvalSection() {
+  LEAD_EVAL_UNLOCKED = false;
+  try { sessionStorage.removeItem('f360_lead_eval_unlocked'); } catch (e) {}
+  renderAnnualLeadershipEval();
+}
+
+function setLeadEvalLevel(lvl) { LEAD_EVAL_LEVEL = lvl; LEAD_EVAL_FILTER = 'ALL'; renderAnnualLeadershipEval(); }
+function setLeadEvalMode(m)    { LEAD_EVAL_MODE = m; LEAD_EVAL_FILTER = 'ALL'; renderAnnualLeadershipEval(); }
+function setLeadEvalView(v)    { LEAD_EVAL_VIEW = v; renderAnnualLeadershipEval(); }
+function setLeadEvalScope(sc)  { LEAD_EVAL_SCOPE = sc; renderAnnualLeadershipEval(); }
+function setLeadEvalMtdMetric(m) { LEAD_EVAL_MTD_METRIC = m; renderAnnualLeadershipEval(); }
+function setLeadEvalFilter(f)  { LEAD_EVAL_FILTER = f; renderAnnualLeadershipEval(); }
+function toggleLeadEvalExcluded() { LEAD_EVAL_SHOW_EXCLUDED = !LEAD_EVAL_SHOW_EXCLUDED; renderAnnualLeadershipEval(); }
+
+function updateLeadEvalWeight(k, v) {
+  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
+  LEAD_EVAL_WEIGHTS[k] = Math.max(0, Math.min(100, Number(v) || 0));
+  renderAnnualLeadershipEval();
+}
+function updateLeadEvalCap(v) {
+  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
+  LEAD_EVAL_CAP = Number(v) || 0;
+  renderAnnualLeadershipEval();
+}
+function resetLeadEvalWeights() {
+  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
+  LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+  LEAD_EVAL_CAP = 0;
+  renderAnnualLeadershipEval();
+}
+
+function getLeadEvalFilteredMTD() {
+  var isSales = (typeof CURRENT_DATA_TYPE !== 'undefined' && CURRENT_DATA_TYPE === 'sales');
+  var src = (isSales && typeof MTD_SALES_DATA !== 'undefined' && MTD_SALES_DATA && MTD_SALES_DATA.length)
+    ? MTD_SALES_DATA
+    : ((typeof MTD_DATA !== 'undefined' && Array.isArray(MTD_DATA)) ? MTD_DATA : []);
+  if (!src.length) return [];
+
+  var getV = function (id) { var el = document.getElementById(id); return (el && el.value) ? el.value : ''; };
+  var fReg = getV('f-region'), fRm = getV('f-regMgr'), fSv = getV('f-supervisor'),
+      fAm = getV('f-areaMgr'), fPt = getV('f-partner');
+  var cls = (typeof activeClass !== 'undefined' && activeClass && activeClass !== 'all') ? activeClass : '';
+  var stSel = (typeof selectedStore !== 'undefined' && selectedStore) ? selectedStore : '';
+
+  return src.filter(function (r) {
+    if (fReg && r.region !== fReg) return false;
+    if (fRm && r.regionalManager !== fRm) return false;
+    if (fSv && r.supervisor !== fSv) return false;
+    if (fAm && r.areaManager !== fAm) return false;
+    if (fPt && r.partner !== fPt) return false;
+    if (cls && r.classification !== cls) return false;
+    if (stSel && r.store !== stSel && r.storeCode !== stSel) return false;
+    return true;
+  });
+}
+
+function getLeadEvalMtdMetaText() {
+  var mobDate = (typeof MTD_MOBILE_DATE_LABEL !== 'undefined' && MTD_MOBILE_DATE_LABEL) ? MTD_MOBILE_DATE_LABEL : '';
+  var walDate = (typeof MTD_WALLET_DATE_LABEL !== 'undefined' && MTD_WALLET_DATE_LABEL) ? MTD_WALLET_DATE_LABEL : '';
+  return { mobDate: mobDate, walDate: walDate };
+}
+
+// Detect the 3 Area Managers promoted to Supervisor after Month 1 (Fakharany, Saleh, Tazy — or any AM who also appears as Supervisor with <=2 AM months)
+function isPromotedAreaToSuper(name, amMonthsCount, allSupNamesNorm) {
+  var norm = String(name || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ').trim();
+  if (!norm) return false;
+  var knownPromoted = (
+    norm.indexOf('fakharany') !== -1 || norm.indexOf('fakhrany') !== -1 || norm.indexOf('فخراني') !== -1 ||
+    norm.indexOf('saleh') !== -1 || norm.indexOf('صالح') !== -1 ||
+    norm.indexOf('tazy') !== -1 || norm.indexOf('tazi') !== -1 || norm.indexOf('تازي') !== -1
+  );
+  if (knownPromoted && amMonthsCount <= 2) return true;
+  if (amMonthsCount <= 2 && allSupNamesNorm[norm]) return true;
+  return false;
+}
+
+function computeLeadershipLevelList(levelKey, closedRows, mtdRows, includeMtd, mtdMetric) {
+  var w = LEAD_EVAL_WEIGHTS;
+  var th = LEAD_EVAL_THRESHOLDS;
+  var cap = Number(LEAD_EVAL_CAP) || 0;
+  var wSum = (w.mobile + w.gold + w.fbb + w.wallet) || 100;
+  var isProj = (mtdMetric === 'proj');
+
+  // Build set of all Supervisor names + full-year AM month history + Store Manager names from Evaluation
+  var normNm = function (v) { return String(v || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ').trim(); };
+  var allSupNamesNorm = {};
+  var amFullMonthsMap = {};
+  var rawUniverse = (typeof RAW_DATA !== 'undefined' && Array.isArray(RAW_DATA) && RAW_DATA.length) ? RAW_DATA : (closedRows || []);
+  var universeHasJan = false;
+  rawUniverse.concat(mtdRows || []).forEach(function (r) {
+    if (r.month === '01-2026') universeHasJan = true;
+    if (r.supervisor) {
+      var sn = normNm(r.supervisor);
+      if (sn) allSupNamesNorm[sn] = true;
+    }
+    if (r.areaManager && r.month) {
+      var an = normNm(r.areaManager);
+      if (an) {
+        if (!amFullMonthsMap[an]) amFullMonthsMap[an] = {};
+        amFullMonthsMap[an][r.month] = true;
+      }
+    }
+  });
+  var evalStoreMgrNames = {};
+  var scanEval = function (arr) {
+    if (!Array.isArray(arr)) return;
+    arr.forEach(function (rec) {
+      if (rec && rec.storeManager) {
+        var sm = normNm(rec.storeManager);
+        if (sm) evalStoreMgrNames[sm] = true;
+      }
+    });
+  };
+  if (typeof EVAL_SUPABASE_DATA !== 'undefined') scanEval(EVAL_SUPABASE_DATA);
+  if (typeof EVAL_CUSTOM_DATA !== 'undefined') scanEval(EVAL_CUSTOM_DATA);
+
+  var closedMap = {};
+  (closedRows || []).forEach(function (r) {
+    var k = (r[levelKey] && String(r[levelKey]).trim()) ? String(r[levelKey]).trim() : 'Unassigned';
+    if (!closedMap[k]) closedMap[k] = [];
+    closedMap[k].push(r);
+  });
+
+  var mtdMap = {};
+  if (includeMtd && mtdRows && mtdRows.length) {
+    mtdRows.forEach(function (r) {
+      var k = (r[levelKey] && String(r[levelKey]).trim()) ? String(r[levelKey]).trim() : 'Unassigned';
+      if (!mtdMap[k]) mtdMap[k] = [];
+      mtdMap[k].push(r);
+    });
+  }
+
+  var allKeys = Array.from(new Set(Object.keys(closedMap).concat(Object.keys(mtdMap))))
+    .filter(function (k) { return k && k !== 'Unassigned'; });
+
+  var rawItems = allKeys.map(function (name) {
+    var cRows = closedMap[name] || [];
+    var mRows = mtdMap[name] || [];
+    var cg = cRows.length ? calcGroup(cRows) : {
+      mobileTarget:0, mobileSubs:0, goldTarget:0, goldSubs:0, fbbTarget:0, fbbSubs:0,
+      fixedTarget:0, fixedSubs:0, walletTarget:0, walletSales:0, fwaTarget:0, fwaSubs:0
+    };
+    var mg = (includeMtd && mRows.length && typeof mtdQcCalcGroup === 'function') ? mtdQcCalcGroup(mRows) : null;
+
+    var addProd = function (cT, cA, mObj) {
+      var mT = (mg && mObj) ? (Number(mObj.tgt) || 0) : 0;
+      var mA = (mg && mObj) ? (Number(isProj ? mObj.proj : mObj.act) || 0) : 0;
+      var totT = (Number(cT) || 0) + mT;
+      var totA = (Number(cA) || 0) + mA;
+      return {
+        closedTgt: Number(cT) || 0,
+        closedAch: Number(cA) || 0,
+        closedPct: (Number(cT) || 0) > 0 ? ((Number(cA) || 0) / (Number(cT) || 0) * 100) : 0,
+        mtdTgt: mT,
+        mtdAch: mA,
+        totTgt: totT,
+        totAch: totA,
+        pct: totT > 0 ? (totA / totT * 100) : 0
+      };
+    };
+
+    var mob = addProd(cg.mobileTarget, cg.mobileSubs, mg ? mg.mobile : null);
+    var gold = addProd(cg.goldTarget, cg.goldSubs, mg ? mg.gold : null);
+    var fbb = addProd(cg.fbbTarget, cg.fbbSubs, mg ? mg.fbb : null);
+    var pay = addProd(cg.walletTarget, cg.walletSales, mg ? mg.wallet : null);
+    var fixed = addProd(cg.fixedTarget, cg.fixedSubs, mg ? mg.fixed : null);
+    var fwa = addProd(cg.fwaTarget, cg.fwaSubs, mg ? mg.fwa : null);
+
+    var metMob = mob.pct >= th.mobile;
+    var metGold = gold.pct >= th.gold;
+    var metFbb = fbb.pct >= th.fbb;
+    var metPay = pay.pct >= th.wallet;
+    var metCount = (metMob ? 1 : 0) + (metGold ? 1 : 0) + (metFbb ? 1 : 0) + (metPay ? 1 : 0);
+    var gatePassed = metMob && metGold;
+    var gateLabel = gatePassed ? 'PASSED' : (!metMob && !metGold ? 'Missed Mob & Gold' : (!metMob ? 'Missed Mobile <100%' : 'Missed Gold <100%'));
+
+    var nMob = (mob.pct / th.mobile) * 100;
+    var nGold = (gold.pct / th.gold) * 100;
+    var nFbb = (fbb.pct / th.fbb) * 100;
+    var nPay = (pay.pct / th.wallet) * 100;
+    if (cap > 0) {
+      nMob = Math.min(nMob, cap); nGold = Math.min(nGold, cap);
+      nFbb = Math.min(nFbb, cap); nPay = Math.min(nPay, cap);
+    }
+    var score = (nMob * w.mobile + nGold * w.gold + nFbb * w.fbb + nPay * w.wallet) / wSum;
+
+    var cnMob = (mob.closedPct / th.mobile) * 100;
+    var cnGold = (gold.closedPct / th.gold) * 100;
+    var cnFbb = (fbb.closedPct / th.fbb) * 100;
+    var cnPay = (pay.closedPct / th.wallet) * 100;
+    if (cap > 0) {
+      cnMob = Math.min(cnMob, cap); cnGold = Math.min(cnGold, cap);
+      cnFbb = Math.min(cnFbb, cap); cnPay = Math.min(cnPay, cap);
+    }
+    var closedScore = (cnMob * w.mobile + cnGold * w.gold + cnFbb * w.fbb + cnPay * w.wallet) / wSum;
+
+    var sample = cRows[cRows.length - 1] || mRows[0] || {};
+    var branchSet = new Set();
+    var monthsSet = new Set();
+    cRows.forEach(function (r) {
+      if (r.storeCode || r.store) branchSet.add(r.storeCode || r.store);
+      if (r.month) monthsSet.add(r.month);
+    });
+    mRows.forEach(function (r) { if (r.storeCode || r.store) branchSet.add(r.storeCode || r.store); });
+
+    var monthsCount = monthsSet.size;
+    var amNorm = normNm(name);
+    var fullMoObj = amFullMonthsMap[amNorm] || {};
+    var fullMoCount = Object.keys(fullMoObj).length || monthsCount;
+    var excludedPromoted = (levelKey === 'areaManager') && isPromotedAreaToSuper(name, fullMoCount, allSupNamesNorm);
+    // Act As: Promoted from Store Manager to Area Manager in Feb (02-2026+) or appears as Store Manager in Evaluation
+    var startedAfterJan = universeHasJan && !fullMoObj['01-2026'] && fullMoCount > 0;
+    var isStoreMgrInEval = !!evalStoreMgrNames[amNorm];
+    var isActAs = (levelKey === 'areaManager') && !excludedPromoted && (startedAfterJan || isStoreMgrInEval);
+
+    return {
+      name: name,
+      regional: sample.regionalManager || '—',
+      supervisor: (sample.supervisor && sample.supervisor !== 'Unassigned') ? sample.supervisor : '—',
+      region: sample.region || '—',
+      branchCount: branchSet.size,
+      monthsCount: monthsCount,
+      excludedPromoted: excludedPromoted,
+      excludeReason: excludedPromoted ? 'Promoted to Supervisor (Month 1 Only)' : '',
+      isActAs: isActAs,
+      actAsReason: isActAs ? 'خارج التقييم (Act As — مدير فرع)' : '',
+      mob: mob, gold: gold, fbb: fbb, pay: pay, fixed: fixed, fwa: fwa,
+      metMob: metMob, metGold: metGold, metFbb: metFbb, metPay: metPay,
+      metCount: metCount,
+      all4Met: metCount === 4,
+      gatePassed: gatePassed,
+      gateLabel: gateLabel,
+      score: score,
+      closedScore: closedScore,
+      scoreDelta: includeMtd ? (score - closedScore) : 0,
+      achMob: mob.pct >= 100, achGold: gold.pct >= 100, achFbb: fbb.pct >= 100, achPay: pay.pct >= 100, achFixed: fixed.pct >= 100,
+      ach5Count: (mob.pct >= 100 ? 1 : 0) + (gold.pct >= 100 ? 1 : 0) + (fbb.pct >= 100 ? 1 : 0) + (pay.pct >= 100 ? 1 : 0) + (fixed.pct >= 100 ? 1 : 0),
+      priorityMask: (mob.pct >= 100 ? 16 : 0) + (gold.pct >= 100 ? 8 : 0) + (fbb.pct >= 100 ? 4 : 0) + (pay.pct >= 100 ? 2 : 0) + (fixed.pct >= 100 ? 1 : 0),
+      avg5: (mob.pct + gold.pct + fbb.pct + pay.pct + fixed.pct) / 5,
+      closedAvg5: (mob.closedPct + gold.closedPct + fbb.closedPct + pay.closedPct + fixed.closedPct) / 5,
+      avg5Delta: includeMtd ? (((mob.pct + gold.pct + fbb.pct + pay.pct + fixed.pct) / 5) - ((mob.closedPct + gold.closedPct + fbb.closedPct + pay.closedPct + fixed.closedPct) / 5)) : 0,
+      grade: excludedPromoted ? 'EXCL' : 'B',
+      gradeReason: excludedPromoted ? 'Excluded (Promoted → Super)' : '',
+      regionalRank: 0,
+      regionalTotal: 0,
+      rank: 0
+    };
+  });
+
+  var cmpFn = (LEAD_EVAL_MODE === 'core5')
+    ? function (a, b) {
+        if (b.ach5Count !== a.ach5Count) return b.ach5Count - a.ach5Count;
+        if (b.priorityMask !== a.priorityMask) return b.priorityMask - a.priorityMask;
+        // Strict product priority: Mobile % first, then WE Gold %, then FBB %, then Wallet %, then Fixed %
+        if (Math.abs(b.mob.pct - a.mob.pct) > 1e-6) return b.mob.pct - a.mob.pct;
+        if (Math.abs(b.gold.pct - a.gold.pct) > 1e-6) return b.gold.pct - a.gold.pct;
+        if (Math.abs(b.fbb.pct - a.fbb.pct) > 1e-6) return b.fbb.pct - a.fbb.pct;
+        if (Math.abs(b.pay.pct - a.pay.pct) > 1e-6) return b.pay.pct - a.pay.pct;
+        if (Math.abs(b.fixed.pct - a.fixed.pct) > 1e-6) return b.fixed.pct - a.fixed.pct;
+        return b.avg5 - a.avg5;
+      }
+    : function (a, b) {
+        if (a.gatePassed !== b.gatePassed) return a.gatePassed ? -1 : 1;
+        if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
+        if (Math.abs(b.mob.pct - a.mob.pct) > 1e-6) return b.mob.pct - a.mob.pct;
+        if (Math.abs(b.gold.pct - a.gold.pct) > 1e-6) return b.gold.pct - a.gold.pct;
+        if (Math.abs(b.fbb.pct - a.fbb.pct) > 1e-6) return b.fbb.pct - a.fbb.pct;
+        return b.pay.pct - a.pay.pct;
+      };
+
+  var eligible = rawItems.filter(function (x) { return !x.excludedPromoted; }).sort(cmpFn);
+  var excluded = rawItems.filter(function (x) { return x.excludedPromoted; }).sort(cmpFn);
+
+  eligible.forEach(function (x, i) { x.rank = i + 1; });
+  excluded.forEach(function (x) { x.rank = null; });
+
+  // Apply Bell Curve (A: 20% / B: 60% / C: 20%) per Regional Manager on OFFICIAL leaders only (excluding Act As from Bell Curve)
+  var byRegAll = {};
+  eligible.forEach(function (x) {
+    var rk = (levelKey === 'regionalManager') ? 'All Regionals' : (x.regional || 'Unassigned');
+    if (!byRegAll[rk]) byRegAll[rk] = [];
+    byRegAll[rk].push(x);
+  });
+
+  var regionalBell = [];
+  Object.keys(byRegAll).sort().forEach(function (rk) {
+    var allGrp = byRegAll[rk].slice().sort(cmpFn);
+    // Natural Regional Rank across all visible rows in that Regional
+    allGrp.forEach(function (x, idx) {
+      x.regionalRank = idx + 1;
+      x.regionalTotal = allGrp.length;
+    });
+
+    // Bell Curve strictly on non-ActAs official leaders
+    var evalGrp = allGrp.filter(function (x) { return !x.isActAs; });
+    var actAsGrp = allGrp.filter(function (x) { return x.isActAs; });
+    actAsGrp.forEach(function (x) {
+      x.grade = 'Act As';
+      x.gradeReason = 'خارج التقييم (Act As — مدير فرع)';
+    });
+
+    var N = evalGrp.length;
+    var cntA = Math.round(N * 0.20);
+    var cntC = Math.round(N * 0.20);
+    if (N >= 3 && cntA === 0) cntA = 1;
+    if (N >= 3 && cntC === 0) cntC = 1;
+    if (cntA + cntC > N) { cntC = Math.max(0, N - cntA); }
+    var cntB = Math.max(0, N - cntA - cntC);
+
+    evalGrp.forEach(function (x, idx) {
+      if (idx < cntA) { x.grade = 'A'; x.gradeReason = 'Top 20% Regional'; }
+      else if (idx < cntA + cntB) { x.grade = 'B'; x.gradeReason = 'Middle 60% Regional'; }
+      else { x.grade = 'C'; x.gradeReason = 'Bottom 20% Regional'; }
+    });
+
+    regionalBell.push({
+      regional: rk, total: N, actAsCount: actAsGrp.length,
+      countA: cntA, countB: cntB, countC: cntC,
+      pctA: N ? (cntA / N * 100) : 0,
+      pctB: N ? (cntB / N * 100) : 0,
+      pctC: N ? (cntC / N * 100) : 0
+    });
+  });
+
+  return { eligible: eligible, excluded: excluded, regionalBell: regionalBell };
+}
+
+function buildAnnualLeadershipModel() {
+  var closedRows = (typeof filteredData !== 'undefined' && Array.isArray(filteredData)) ? filteredData : [];
+  var mtdRows = getLeadEvalFilteredMTD();
+  var hasMtd = mtdRows.length > 0;
+  var includeMtd = (LEAD_EVAL_SCOPE === 'closed_plus_mtd') && hasMtd;
+  var closedMonths = Array.from(new Set(closedRows.map(function (r) { return r.month; }).filter(Boolean)))
+    .sort(function (a, b) { return MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b); });
+  var meta = getLeadEvalMtdMetaText();
+
+  var areaData = computeLeadershipLevelList('areaManager', closedRows, mtdRows, includeMtd, LEAD_EVAL_MTD_METRIC);
+  var supData  = computeLeadershipLevelList('supervisor', closedRows, mtdRows, includeMtd, LEAD_EVAL_MTD_METRIC);
+  var regData  = computeLeadershipLevelList('regionalManager', closedRows, mtdRows, includeMtd, LEAD_EVAL_MTD_METRIC);
+
+  var model = {
+    evalMode: LEAD_EVAL_MODE,
+    viewMode: LEAD_EVAL_VIEW,
+    hasMtd: hasMtd,
+    includeMtd: includeMtd,
+    mtdMetric: LEAD_EVAL_MTD_METRIC,
+    closedMonths: closedMonths,
+    mobDate: meta.mobDate,
+    walDate: meta.walDate,
+    weights: Object.assign({}, LEAD_EVAL_WEIGHTS),
+    weightSum: LEAD_EVAL_WEIGHTS.mobile + LEAD_EVAL_WEIGHTS.gold + LEAD_EVAL_WEIGHTS.fbb + LEAD_EVAL_WEIGHTS.wallet,
+    cap: LEAD_EVAL_CAP,
+    levels: {
+      areaManager: areaData,
+      supervisor: supData,
+      regionalManager: regData
+    },
+    lists: {
+      areaManager: areaData.eligible,
+      supervisor: supData.eligible,
+      regionalManager: regData.eligible
+    }
+  };
+  LEAD_EVAL_LAST_MODEL = model;
+  return model;
+}
+
+function renderAnnualLeadershipEval() {
+  var container = document.getElementById('annual-leadership-eval-container');
+  if (!container) return;
+
+  if (!LEAD_EVAL_UNLOCKED) {
+    var dummyRows = [1, 2, 3, 4, 5].map(function (i) {
+      return '<tr style="border-bottom:1px solid #e5e7eb">' +
+        '<td style="padding:10px 8px;text-align:center;font-weight:800;color:#5E2D91">#' + i + '</td>' +
+        '<td style="padding:10px 10px;font-weight:800;color:#111827">Confidential Leader Name ' + i + '</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">102.4%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">108.1%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#b45309;font-weight:800">94.5%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">96.0%</td>' +
+        '<td style="padding:10px 8px;text-align:center;font-weight:900;color:#3b1863">98.8%</td>' +
+        '<td style="padding:10px 8px;text-align:center"><span style="padding:2px 9px;border-radius:7px;background:#dcfce7;color:#15803d;font-weight:900">A</span></td>' +
+      '</tr>';
+    }).join('');
+    container.innerHTML =
+      '<div class="chart-card" style="position:relative;overflow:hidden;padding:0;min-height:270px;border:1.5px solid #e9d5ff">' +
+        '<div aria-hidden="true" style="filter:blur(10px);-webkit-filter:blur(10px);opacity:0.42;pointer-events:none;user-select:none;padding:14px">' +
+          '<div style="display:flex;gap:8px;margin-bottom:12px">' +
+            '<span style="padding:6px 16px;border-radius:16px;background:#5E2D91;color:white;font-size:11px;font-weight:800">Areas</span>' +
+            '<span style="padding:6px 16px;border-radius:16px;background:#be185d;color:white;font-size:11px;font-weight:800">Core 5</span>' +
+            '<span style="padding:6px 16px;border-radius:16px;background:#0f766e;color:white;font-size:11px;font-weight:800">Closed + MTD</span>' +
+          '</div>' +
+          '<table style="width:100%;border-collapse:collapse">' +
+            '<thead><tr style="background:#3b1863;color:white"><th style="padding:8px">#</th><th style="padding:8px;text-align:left">Leader</th><th style="padding:8px">Mob %</th><th style="padding:8px">Gold %</th><th style="padding:8px">FBB %</th><th style="padding:8px">Pay %</th><th style="padding:8px">Score</th><th style="padding:8px">Grade</th></tr></thead>' +
+            '<tbody>' + dummyRows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+        '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.52);backdrop-filter:blur(4px);padding:20px">' +
+          '<div style="background:white;border-radius:18px;padding:24px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 16px 42px rgba(94,45,145,0.18);border:1.5px solid #e9d5ff">' +
+            '<div style="width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,#3b1863,#5E2D91);color:white;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 12px;box-shadow:0 6px 16px rgba(94,45,145,.28)"><i class="fas fa-shield-alt"></i></div>' +
+            '<div style="font-size:15px;font-weight:900;color:#111827;margin-bottom:5px">Restricted Access Section</div>' +
+            '<div style="font-size:12px;color:#6b7280;margin-bottom:16px">Annual Leadership Evaluation &amp; Bell Curve data is confidential.</div>' +
+            '<button onclick="openLeadEvalLockModal()" style="padding:10px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,#5E2D91,#e91e8c);color:white;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(94,45,145,.32);transition:transform .15s"><i class="fas fa-key mr-2"></i>If you have access, press here</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  var model = buildAnnualLeadershipModel();
+  var isCore5 = (model.evalMode === 'core5');
+  var isDetails = (LEAD_EVAL_VIEW === 'details');
+  var lvlData = model.levels[LEAD_EVAL_LEVEL] || { eligible: [], excluded: [], regionalBell: [] };
+  var list = lvlData.eligible;
+  var exclList = lvlData.excluded;
+  var isAdmin = (typeof currentRole !== 'undefined' && currentRole === 'admin');
+  var w = model.weights;
+
+  var filtered = list.filter(function (x) {
+    if (LEAD_EVAL_FILTER === 'A') return x.grade === 'A';
+    if (LEAD_EVAL_FILTER === 'B') return x.grade === 'B';
+    if (LEAD_EVAL_FILTER === 'C') return x.grade === 'C';
+    if (LEAD_EVAL_FILTER === 'GATE') return x.gatePassed;
+    if (LEAD_EVAL_FILTER === 'MET4') return x.all4Met;
+    if (LEAD_EVAL_FILTER === 'ACH5') return x.ach5Count === 5;
+    if (LEAD_EVAL_FILTER === 'ACTAS') return x.isActAs;
+    return true;
+  });
+
+  var cntA = list.filter(function (x) { return x.grade === 'A'; }).length;
+  var cntB = list.filter(function (x) { return x.grade === 'B'; }).length;
+  var cntC = list.filter(function (x) { return x.grade === 'C'; }).length;
+  var cntActAs = list.filter(function (x) { return x.isActAs; }).length;
+  var gateCnt = list.filter(function (x) { return x.gatePassed; }).length;
+  var met4Cnt = list.filter(function (x) { return x.all4Met; }).length;
+  var ach5Cnt = list.filter(function (x) { return x.ach5Count === 5; }).length;
+  var top1 = list[0] || null;
+  var lvlLabels = { areaManager: 'Area Managers', supervisor: 'Supervisors', regionalManager: 'Regional Managers' };
+  var curLbl = lvlLabels[LEAD_EVAL_LEVEL] || 'Leaders';
+
+  var pillBtn = function (active, txt, onClick) {
+    return '<button onclick="' + onClick + '" style="padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (active ? '#5E2D91' : 'white') + ';color:' + (active ? 'white' : '#5E2D91') + ';transition:all .15s">' + txt + '</button>';
+  };
+
+  var moRangeTxt = model.closedMonths.length
+    ? ((MONTH_LABELS[model.closedMonths[0]] || model.closedMonths[0]) + ' – ' + (MONTH_LABELS[model.closedMonths[model.closedMonths.length - 1]] || model.closedMonths[model.closedMonths.length - 1]) + ' (' + model.closedMonths.length + ' Months)')
+    : 'No Closed Months';
+
+  // 1. Controls Toolbar (cleanly grouped)
+  var controlsHTML =
+    '<div class="chart-card" style="padding:12px 14px;margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<div style="display:inline-flex;border:1.5px solid #5E2D91;border-radius:18px;overflow:hidden">' +
+            pillBtn(LEAD_EVAL_LEVEL === 'areaManager', '<i class="fas fa-map-marker-alt mr-1"></i>Areas (' + model.lists.areaManager.length + ')', "setLeadEvalLevel('areaManager')") +
+            pillBtn(LEAD_EVAL_LEVEL === 'supervisor', '<i class="fas fa-user-tie mr-1"></i>Supers (' + model.lists.supervisor.length + ')', "setLeadEvalLevel('supervisor')") +
+            pillBtn(LEAD_EVAL_LEVEL === 'regionalManager', '<i class="fas fa-crown mr-1"></i>Regional (' + model.lists.regionalManager.length + ')', "setLeadEvalLevel('regionalManager')") +
+          '</div>' +
+          '<div style="display:inline-flex;border:1.5px solid #1e293b;border-radius:18px;overflow:hidden">' +
+            '<button onclick="setLeadEvalView(\'summary\')" style="padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (!isDetails ? '#1e293b' : 'white') + ';color:' + (!isDetails ? 'white' : '#1e293b') + '"><i class="fas fa-compress-alt mr-1"></i>Summary</button>' +
+            '<button onclick="setLeadEvalView(\'details\')" style="padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (isDetails ? '#1e293b' : 'white') + ';color:' + (isDetails ? 'white' : '#1e293b') + '"><i class="fas fa-table mr-1"></i>Details (TGT/ACH)</button>' +
+          '</div>' +
+          '<div style="display:inline-flex;border:1.5px solid #be185d;border-radius:18px;overflow:hidden">' +
+            '<button onclick="setLeadEvalMode(\'core5\')" style="padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (isCore5 ? '#be185d' : 'white') + ';color:' + (isCore5 ? 'white' : '#be185d') + '"><i class="fas fa-layer-group mr-1"></i>Core 5</button>' +
+            '<button onclick="setLeadEvalMode(\'weighted\')" style="padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (!isCore5 ? '#be185d' : 'white') + ';color:' + (!isCore5 ? 'white' : '#be185d') + '"><i class="fas fa-balance-scale mr-1"></i>Weighted</button>' +
+          '</div>' +
+          '<div style="display:inline-flex;border:1.5px solid #0f766e;border-radius:18px;overflow:hidden">' +
+            '<button onclick="setLeadEvalScope(\'closed_only\')" style="padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (LEAD_EVAL_SCOPE === 'closed_only' ? '#0f766e' : 'white') + ';color:' + (LEAD_EVAL_SCOPE === 'closed_only' ? 'white' : '#0f766e') + '">Closed Only</button>' +
+            '<button onclick="setLeadEvalScope(\'closed_plus_mtd\')" style="padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;border:none;background:' + (LEAD_EVAL_SCOPE === 'closed_plus_mtd' ? '#0f766e' : 'white') + ';color:' + (LEAD_EVAL_SCOPE === 'closed_plus_mtd' ? 'white' : '#0f766e') + '">Closed + MTD</button>' +
+          '</div>' +
+          (LEAD_EVAL_SCOPE === 'closed_plus_mtd' && model.hasMtd
+            ? '<div style="display:inline-flex;border:1.5px solid #d97706;border-radius:18px;overflow:hidden">' +
+                '<button onclick="setLeadEvalMtdMetric(\'actual\')" style="padding:5px 10px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:' + (LEAD_EVAL_MTD_METRIC === 'actual' ? '#d97706' : 'white') + ';color:' + (LEAD_EVAL_MTD_METRIC === 'actual' ? 'white' : '#b45309') + '">Actual</button>' +
+                '<button onclick="setLeadEvalMtdMetric(\'proj\')" style="padding:5px 10px;font-size:10.5px;font-weight:800;cursor:pointer;border:none;background:' + (LEAD_EVAL_MTD_METRIC === 'proj' ? '#d97706' : 'white') + ';color:' + (LEAD_EVAL_MTD_METRIC === 'proj' ? 'white' : '#b45309') + '">Projected</button>' +
+              '</div>'
+            : '') +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<button onclick="exportAnnualLeadershipExcel(this)" style="padding:7px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Excel</button>' +
+          '<button onclick="lockLeadEvalSection()" title="Lock Section" style="padding:7px 11px;border-radius:10px;border:1.5px solid #e5e7eb;background:white;color:#4b5563;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-lock mr-1"></i>Lock</button>' +
+        '</div>' +
+      '</div>';
+
+  // 2. Compact MTD Cutoff Notice
+  var noticeHTML = '';
+  if (LEAD_EVAL_SCOPE === 'closed_plus_mtd' && model.hasMtd) {
+    var mobTxt = model.mobDate ? ('حتى <strong>' + mgrEsc(model.mobDate) + '</strong>') : 'حتى آخر تحديث';
+    var walTxt = model.walDate ? ('وحتى <strong>' + mgrEsc(model.walDate) + '</strong> للـ Wallet') : '';
+    noticeHTML =
+      '<div dir="rtl" style="margin-top:8px;background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;padding:7px 12px;font-size:11px;color:#92400e;font-family:Cairo,Inter,sans-serif">' +
+        '<i class="fas fa-info-circle ml-1" style="color:#d97706"></i><strong>تنويه:</strong> يشمل الشهور المغلقة (' + mgrEsc(moRangeTxt) + ') + <strong>MTD</strong> للموبايل ' + mobTxt + ' ' + walTxt + ' (' + (LEAD_EVAL_MTD_METRIC === 'proj' ? 'Projected EOM' : 'Actual To Date') + ').' +
+      '</div>';
+  } else if (LEAD_EVAL_SCOPE === 'closed_only') {
+    noticeHTML =
+      '<div dir="rtl" style="margin-top:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:6px 12px;font-size:10.5px;color:#166534;font-family:Cairo,Inter,sans-serif">' +
+        '<i class="fas fa-check-circle ml-1"></i>الشهور المغلقة فقط: <strong>' + mgrEsc(moRangeTxt) + '</strong>' +
+      '</div>';
+  }
+
+  // 3. Admin Weights Bar (only in Weighted mode & Details, or compact strip)
+  var weightsHTML = '';
+  if (!isCore5 && isAdmin) {
+    var sumClr = model.weightSum === 100 ? '#15803d' : '#b91c1c';
+    var sumBg = model.weightSum === 100 ? '#dcfce7' : '#fee2e2';
+    weightsHTML =
+      '<div style="margin-top:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:9px;padding:6px 10px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10.5px">' +
+        '<span style="background:#5E2D91;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px">Admin Weights</span>' +
+        '<label style="font-weight:800;color:#374151">Mob <input type="number" min="0" max="100" value="' + w.mobile + '" onchange="updateLeadEvalWeight(\'mobile\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #c084fc;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<label style="font-weight:800;color:#374151">Gold <input type="number" min="0" max="100" value="' + w.gold + '" onchange="updateLeadEvalWeight(\'gold\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #f59e0b;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<label style="font-weight:800;color:#374151">FBB <input type="number" min="0" max="100" value="' + w.fbb + '" onchange="updateLeadEvalWeight(\'fbb\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #3b82f6;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<label style="font-weight:800;color:#374151">Pay <input type="number" min="0" max="100" value="' + w.wallet + '" onchange="updateLeadEvalWeight(\'wallet\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #ec4899;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<span style="background:' + sumBg + ';color:' + sumClr + ';font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:6px">' + model.weightSum + '%</span>' +
+        '<select onchange="updateLeadEvalCap(this.value)" style="padding:2px 5px;border:1px solid #d1d5db;border-radius:5px;font-size:9.5px;font-weight:700;background:white">' +
+          '<option value="0"' + (model.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
+          '<option value="120"' + (model.cap === 120 ? ' selected' : '') + '>120%</option>' +
+          '<option value="150"' + (model.cap === 150 ? ' selected' : '') + '>150%</option>' +
+        '</select>' +
+        '<button onclick="resetLeadEvalWeights()" style="padding:2px 7px;border-radius:5px;border:1px solid #d1d5db;background:white;font-size:9.5px;font-weight:800;cursor:pointer">Reset</button>' +
+      '</div>';
+  }
+  controlsHTML += noticeHTML + weightsHTML + '</div>';
+
+  // 4. Compact Bell Curve + Filter Chips Strip (single sleek row — zero clutter!)
+  var chipSty = function (active, bg, clr) {
+    return 'padding:5px 10px;border-radius:8px;font-size:10.5px;font-weight:800;cursor:pointer;border:1.5px solid ' + (active ? clr : '#e5e7eb') + ';background:' + (active ? bg : 'white') + ';color:' + (active ? clr : '#4b5563');
+  };
+  var filterBarHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding:8px 12px;background:white;border:1px solid #e5e7eb;border-radius:11px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+        '<button onclick="setLeadEvalFilter(\'ALL\')" style="' + chipSty(LEAD_EVAL_FILTER === 'ALL', '#f3e8ff', '#5E2D91') + '">All (' + list.length + ')</button>' +
+        '<button onclick="setLeadEvalFilter(\'A\')" style="' + chipSty(LEAD_EVAL_FILTER === 'A', '#dcfce7', '#15803d') + '">🏆 A: ' + cntA + '</button>' +
+        '<button onclick="setLeadEvalFilter(\'B\')" style="' + chipSty(LEAD_EVAL_FILTER === 'B', '#dbeafe', '#1d4ed8') + '">⭐ B: ' + cntB + '</button>' +
+        '<button onclick="setLeadEvalFilter(\'C\')" style="' + chipSty(LEAD_EVAL_FILTER === 'C', '#fee2e2', '#b91c1c') + '">⚠️ C: ' + cntC + '</button>' +
+        (cntActAs ? '<button onclick="setLeadEvalFilter(\'ACTAS\')" style="' + chipSty(LEAD_EVAL_FILTER === 'ACTAS', '#fef3c7', '#92400e') + '">🏷 Act As (خارج التقييم): ' + cntActAs + '</button>' : '') +
+        (isCore5
+          ? '<button onclick="setLeadEvalFilter(\'ACH5\')" style="' + chipSty(LEAD_EVAL_FILTER === 'ACH5', '#fef3c7', '#b45309') + '">5/5: ' + ach5Cnt + '</button>'
+          : '<button onclick="setLeadEvalFilter(\'GATE\')" style="' + chipSty(LEAD_EVAL_FILTER === 'GATE', '#ecfdf5', '#047857') + '">🔓 Gate: ' + gateCnt + '</button>' +
+            '<button onclick="setLeadEvalFilter(\'MET4\')" style="' + chipSty(LEAD_EVAL_FILTER === 'MET4', '#fef3c7', '#b45309') + '">🌟 4/4: ' + met4Cnt + '</button>') +
+        (exclList.length
+          ? '<button onclick="toggleLeadEvalExcluded()" style="padding:4px 9px;border-radius:8px;font-size:10px;font-weight:800;cursor:pointer;border:1px dashed #9ca3af;background:#f9fafb;color:#4b5563">' + (LEAD_EVAL_SHOW_EXCLUDED ? '👁 Hide' : '👁 Show') + ' Excluded (' + exclList.length + ')</button>'
+          : '') +
+      '</div>' +
+      '<div style="font-size:10px;color:#6b7280;font-weight:700">Bell Curve / Regional: <strong>A 20% · B 60% · C 20%</strong>' + (top1 ? ' · #1: <strong style="color:#5E2D91">' + mgrEsc(top1.name) + '</strong>' : '') + '</div>' +
+    '</div>';
+
+  // 5. Cell helpers (Summary = compact %, Details = % + ACH / TGT)
+  var fmtShort = function (n) { return Math.round(Number(n) || 0).toLocaleString(); };
+  var prodTd = function (pObj, met, thVal) {
+    var clr = met ? '#15803d' : (pObj.pct >= thVal * 0.85 ? '#b45309' : '#b91c1c');
+    var bg = met ? '#f0fdf4' : 'transparent';
+    var pad = isDetails ? '7px 6px' : '6px 5px';
+    var detailsSub = '';
+    if (isDetails) {
+      detailsSub = '<div style="font-size:9px;color:#4b5563;font-weight:700;margin-top:1px">' + fmtShort(pObj.totAch) + ' / ' + fmtShort(pObj.totTgt) + '</div>';
+      if (model.includeMtd && pObj.mtdTgt > 0) {
+        detailsSub += '<div style="font-size:8px;color:#9ca3af;font-weight:600">Cl: ' + pObj.closedPct.toFixed(0) + '%</div>';
+      }
+    }
+    return '<td style="padding:' + pad + ';text-align:center;font-size:11px;font-weight:800;color:' + clr + ';background:' + bg + ';border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
+      pObj.pct.toFixed(1) + '%' + (met ? '<span style="font-size:8.5px">✓</span>' : '') + detailsSub +
+    '</td>';
+  };
+
+  var gradePill = function (g) {
+    var st = g === 'A'
+      ? 'background:#dcfce7;color:#15803d;border:1px solid #86efac'
+      : (g === 'B'
+        ? 'background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd'
+        : (g === 'C'
+          ? 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5'
+          : (g === 'Act As'
+            ? 'background:#fef3c7;color:#92400e;border:1px dashed #f59e0b'
+            : 'background:#f3f4f6;color:#6b7280;border:1px dashed #9ca3af')));
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:7px;font-size:11px;font-weight:900;' + st + '">' + g + '</span>';
+  };
+
+  var buildRow = function (x, idx, isExcl) {
+    var bg = isExcl ? '#f9fafb' : (idx % 2 === 0 ? '#ffffff' : '#faf9fb');
+    var op = isExcl ? ';opacity:.78' : '';
+    var subTxt = isExcl
+      ? ('🚫 ' + x.excludeReason)
+      : (isDetails
+          ? ((LEAD_EVAL_LEVEL === 'areaManager' ? (x.supervisor + ' · ' + x.regional) : x.regional) + ' · ' + x.branchCount + ' Br · Reg #' + x.regionalRank + '/' + x.regionalTotal)
+          : (x.regional + ' · Reg #' + x.regionalRank));
+
+    var scoreVal = isCore5 ? x.avg5 : x.score;
+    var scoreDelta = isCore5 ? x.avg5Delta : x.scoreDelta;
+    var scoreSub = '';
+    if (isDetails && !isExcl && model.includeMtd) {
+      scoreSub = '<div style="font-size:8px;font-weight:800;color:' + (scoreDelta >= 0 ? '#15803d' : '#b91c1c') + '">' + (scoreDelta >= 0 ? '+' : '') + scoreDelta.toFixed(1) + '%</div>';
+    }
+    var badgeSub = '';
+    if (!isExcl) {
+      if (x.isActAs) {
+        badgeSub = '<div style="font-size:8px;font-weight:800;color:#92400e;margin-top:2px;white-space:nowrap">خارج التقييم (مدير فرع)</div>';
+      } else if (isCore5) {
+        badgeSub = '<div style="font-size:8.5px;font-weight:800;color:#4b5563;margin-top:2px">' + x.ach5Count + '/5 ≥100%</div>';
+      } else if (isDetails) {
+        badgeSub = '<div style="font-size:8px;font-weight:800;color:' + (x.gatePassed ? '#047857' : '#b91c1c') + ';margin-top:2px">' + (x.gatePassed ? '🔓 Gate' : '🔒 <100%') + (x.all4Met ? ' · 4/4' : '') + '</div>';
+      }
+    }
+
+    return '<tr style="background:' + bg + ';border-bottom:1px solid #e5e7eb' + op + '">' +
+      '<td style="padding:6px 4px;text-align:center;font-weight:900;font-size:11px;color:' + (isExcl ? '#9ca3af' : '#5E2D91') + '">' + (isExcl ? '—' : ('#' + x.rank)) + '</td>' +
+      '<td style="padding:6px 8px;max-width:170px">' +
+        '<div style="font-size:11.5px;font-weight:800;color:' + (isExcl ? '#6b7280' : '#111827') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + mgrEsc(x.name) + '</div>' +
+        '<div style="font-size:8.5px;color:' + (isExcl ? '#b45309' : '#6b7280') + ';font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + mgrEsc(subTxt) + '</div>' +
+      '</td>' +
+      prodTd(x.mob, isCore5 ? x.achMob : x.metMob, 100) +
+      prodTd(x.gold, isCore5 ? x.achGold : x.metGold, 100) +
+      prodTd(x.fbb, isCore5 ? x.achFbb : x.metFbb, isCore5 ? 100 : 90) +
+      prodTd(x.pay, isCore5 ? x.achPay : x.metPay, isCore5 ? 100 : 90) +
+      ((isDetails || isCore5) ? prodTd(x.fixed, x.achFixed, 100) : '') +
+      '<td style="padding:6px 6px;text-align:center;font-size:11.5px;font-weight:900;color:#3b1863;background:#f5f3ff;border-bottom:1px solid #e9d5ff">' + scoreVal.toFixed(1) + '%' + scoreSub + '</td>' +
+      '<td style="padding:6px 5px;text-align:center">' + gradePill(x.grade) + badgeSub + '</td>' +
+    '</tr>';
+  };
+
+  var rowsHTML = filtered.map(function (x, i) { return buildRow(x, i, false); }).join('');
+  var exclHTML = '';
+  if (LEAD_EVAL_SHOW_EXCLUDED && exclList.length && LEAD_EVAL_FILTER === 'ALL') {
+    var colSpan = (isDetails || isCore5) ? 9 : 8;
+    exclHTML =
+      '<tr style="background:#fef3c7;border-top:2px solid #f59e0b"><td colspan="' + colSpan + '" dir="rtl" style="padding:6px 12px;font-size:10.5px;font-weight:800;color:#92400e;font-family:Cairo,Inter,sans-serif">' +
+        '🚫 مستثنيون من تقييم الـ Area Managers والـ Bell Curve (اشتغلوا شهر 1 فقط كـ Area وتمت ترقيتهم لـ Supervisor): ' + exclList.length +
+      '</td></tr>' +
+      exclList.map(function (x, i) { return buildRow(x, i, true); }).join('');
+  }
+
+  var thBase = 'padding:8px 5px;font-size:10px;font-weight:800;color:white;text-align:center;white-space:nowrap';
+  container.innerHTML =
+    controlsHTML +
+    filterBarHTML +
+    '<div class="chart-card" style="padding:0;overflow:hidden">' +
+      '<div style="overflow-x:auto">' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:linear-gradient(135deg,#1a1a2e,#5E2D91)">' +
+            '<th style="' + thBase + '">#</th>' +
+            '<th style="' + thBase + ';text-align:left;padding-left:8px">' + curLbl.replace(/s$/, '') + '</th>' +
+            '<th style="' + thBase + '">Mob %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+            '<th style="' + thBase + '">Gold %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+            '<th style="' + thBase + '">FBB %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+            '<th style="' + thBase + '">Pay %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+            ((isDetails || isCore5) ? '<th style="' + thBase + '">Fixed %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' : '') +
+            '<th style="' + thBase + ';background:#4c1d95">' + (isCore5 ? 'Avg 5' : 'Score') + '</th>' +
+            '<th style="' + thBase + ';background:#0f766e">Grade<div style="font-size:8px;opacity:.8">A/B/C</div></th>' +
+          '</tr></thead>' +
+          '<tbody>' + (rowsHTML || '<tr><td colspan="9" style="padding:24px;text-align:center;color:#6b7280;font-weight:700">لا توجد بيانات مطابقة</td></tr>') + exclHTML + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+}
+
+// ── 4-Sheet Styled ExcelJS Export (Respects Active Filters, View Mode, Bell Curve & Excluded) ──
+async function exportAnnualLeadershipExcel(btn) {
+  var model = LEAD_EVAL_LAST_MODEL || buildAnnualLeadershipModel();
+  if (!model) { alert('⚠️ لا توجد بيانات للتصدير'); return; }
+  if (!(await mgrExportAuthWithWarning())) return;
+
+  var oldHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Exporting...'; }
+
+  try {
+    await mtdInsLoadExcelJS();
+    var wb = new ExcelJS.Workbook();
+    wb.creator = 'FAKHARANY360';
+    wb.created = new Date();
+
+    function argb(hex) { return 'FF' + String(hex || '#FFFFFF').replace('#', '').toUpperCase(); }
+    function styleCell(cell, opts) {
+      var o = opts || {};
+      var bdClr = argb(o.bd || '#D1D5DB');
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(o.bg || '#FFFFFF') } };
+      cell.font = { name: 'Calibri', size: o.sz || 10.5, bold: !!o.b, color: { argb: argb(o.fg || '#1F2937') } };
+      cell.alignment = { horizontal: o.al || 'center', vertical: 'middle', wrapText: !!o.wrap };
+      cell.border = {
+        top: { style: 'thin', color: { argb: bdClr } },
+        bottom: { style: 'thin', color: { argb: bdClr } },
+        left: { style: 'thin', color: { argb: bdClr } },
+        right: { style: 'thin', color: { argb: bdClr } }
+      };
+      if (o.numFmt) cell.numFmt = o.numFmt;
+    }
+    function pctSty(pct, thVal) {
+      if (pct >= thVal) return { bg: '#DCFCE7', fg: '#15803D' };
+      if (pct >= thVal * 0.85) return { bg: '#FEF3C7', fg: '#B45309' };
+      return { bg: '#FEE2E2', fg: '#B91C1C' };
+    }
+    function grSty(g) {
+      if (g === 'A') return { bg: '#DCFCE7', fg: '#15803D' };
+      if (g === 'B') return { bg: '#DBEAFE', fg: '#1D4ED8' };
+      if (g === 'C') return { bg: '#FEE2E2', fg: '#B91C1C' };
+      if (g === 'Act As') return { bg: '#FEF3C7', fg: '#92400E' };
+      return { bg: '#F3F4F6', fg: '#6B7280' };
+    }
+
+    var isCore5 = (model.evalMode === 'core5');
+    var isDetails = (LEAD_EVAL_VIEW === 'details');
+    var w = model.weights;
+    var moRange = model.closedMonths.length
+      ? ((MONTH_LABELS[model.closedMonths[0]] || model.closedMonths[0]) + ' – ' + (MONTH_LABELS[model.closedMonths[model.closedMonths.length - 1]] || model.closedMonths[model.closedMonths.length - 1]) + ' (' + model.closedMonths.length + ' Months)')
+      : 'No Closed Months';
+    var scopeDesc = model.includeMtd
+      ? ('Closed (' + moRange + ') + Current MTD (' + (model.mtdMetric === 'proj' ? 'Projected EOM' : 'Actual To Date') + ') | Mobile as of: ' + (model.mobDate || 'Latest') + ' · WE Pay as of: ' + (model.walDate || 'Latest'))
+      : ('Closed Months Only (Overview): ' + moRange);
+
+    var getV = function (id) { var el = document.getElementById(id); return (el && el.value) ? el.value : ''; };
+    var fltParts = [];
+    if (getV('f-region')) fltParts.push('Region: ' + getV('f-region'));
+    if (getV('f-regMgr')) fltParts.push('Regional: ' + getV('f-regMgr'));
+    if (getV('f-supervisor')) fltParts.push('Supervisor: ' + getV('f-supervisor'));
+    if (getV('f-areaMgr')) fltParts.push('Area: ' + getV('f-areaMgr'));
+    if (LEAD_EVAL_FILTER !== 'ALL') fltParts.push('Grade/Filter: ' + LEAD_EVAL_FILTER);
+    var fltTxt = fltParts.length ? fltParts.join(' | ') : 'All Dashboard Scope';
+
+    // ── SHEET 1: Executive Summary (الملخص) ──
+    var wsSum = wb.addWorksheet('Executive Summary (الملخص)');
+    wsSum.views = [{ showGridLines: false }];
+    wsSum.properties.tabColor = { argb: 'FF5E2D91' };
+    [24, 12, 11, 11, 11, 12, 24, 14, 14].forEach(function (cw, i) { wsSum.getColumn(i + 1).width = cw; });
+
+    wsSum.mergeCells(1, 1, 1, 9);
+    styleCell(wsSum.getCell(1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 14, al: 'left', bd: '#111827' });
+    wsSum.getCell(1, 1).value = 'FAKHARANY360 — Annual Leadership Evaluation & Bell Curve Summary';
+    wsSum.getRow(1).height = 30;
+
+    wsSum.mergeCells(2, 1, 2, 9);
+    for (var c2 = 1; c2 <= 9; c2++) styleCell(wsSum.getCell(2, c2), { bg: '#FFFBEB', fg: '#92400E', b: true, sz: 10, al: 'left', bd: '#FCD34D', wrap: true });
+    wsSum.getCell(2, 1).value = '📌 Scope & MTD Notice: ' + scopeDesc + '  |  Filters: ' + fltTxt;
+    wsSum.getRow(2).height = 24;
+
+    wsSum.mergeCells(3, 1, 3, 9);
+    for (var c3 = 1; c3 <= 9; c3++) styleCell(wsSum.getCell(3, c3), { bg: '#F5F3FF', fg: '#4C1D95', b: true, sz: 9.5, al: 'left', bd: '#DDD6FE' });
+    wsSum.getCell(3, 1).value = (isCore5
+      ? '🎯 Mode: Core 5 Products (Most ≥100% first, then Mobile % > WE Gold % > FBB % > Wallet % > Fixed %)'
+      : ('🔒 Mode: Weighted Criteria (' + w.mobile + '/' + w.gold + '/' + w.fbb + '/' + w.wallet + ') + Dual Gate Mob & Gold ≥100%')) +
+      '  |  Bell Curve / Regional: A 20% / B 60% / C 20%  |  View: ' + (isDetails ? 'Details (with TGT/ACH)' : 'Summary');
+    wsSum.getRow(3).height = 21;
+
+    wsSum.mergeCells(5, 1, 5, 9);
+    for (var c5 = 1; c5 <= 9; c5++) styleCell(wsSum.getCell(5, c5), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 11.5, al: 'left', bd: '#5E2D91' });
+    wsSum.getCell(5, 1).value = '🏆 Leadership Levels Bell Curve Overview';
+    wsSum.getRow(5).height = 24;
+
+    ['Leadership Level', 'Evaluated', 'Grade A', 'Grade B', 'Grade C', 'Excluded', 'Top #1 Leader', 'Top #1 Score', 'Top #1 Mob %'].forEach(function (h, i) {
+      styleCell(wsSum.getCell(6, i + 1), { bg: i < 2 ? '#1A1A2E' : (i < 6 ? '#4C1D95' : '#0F766E'), fg: '#FFFFFF', b: true, sz: 10, bd: '#374151' });
+      wsSum.getCell(6, i + 1).value = h;
+    });
+    wsSum.getRow(6).height = 23;
+
+    [
+      { key: 'regionalManager', title: 'Regional Managers' },
+      { key: 'supervisor',      title: 'Supervisors' },
+      { key: 'areaManager',     title: 'Area Managers' }
+    ].forEach(function (ld, idx) {
+      var lv = model.levels[ld.key] || { eligible: [], excluded: [] };
+      var arr = lv.eligible;
+      var top = arr[0] || null;
+      var rIdx = 7 + idx;
+      var bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+      wsSum.getCell(rIdx, 1).value = ld.title; styleCell(wsSum.getCell(rIdx, 1), { bg: bg, fg: '#5E2D91', b: true, al: 'left' });
+      var evalOnlyCnt = arr.filter(function (x) { return !x.isActAs; }).length;
+      wsSum.getCell(rIdx, 2).value = evalOnlyCnt; styleCell(wsSum.getCell(rIdx, 2), { bg: bg, b: true, numFmt: '#,##0' });
+      wsSum.getCell(rIdx, 3).value = arr.filter(function (x) { return x.grade === 'A'; }).length; styleCell(wsSum.getCell(rIdx, 3), { bg: '#DCFCE7', fg: '#15803D', b: true, numFmt: '#,##0' });
+      wsSum.getCell(rIdx, 4).value = arr.filter(function (x) { return x.grade === 'B'; }).length; styleCell(wsSum.getCell(rIdx, 4), { bg: '#DBEAFE', fg: '#1D4ED8', b: true, numFmt: '#,##0' });
+      wsSum.getCell(rIdx, 5).value = arr.filter(function (x) { return x.grade === 'C'; }).length; styleCell(wsSum.getCell(rIdx, 5), { bg: '#FEE2E2', fg: '#B91C1C', b: true, numFmt: '#,##0' });
+      var actAsCntSum = arr.filter(function (x) { return x.isActAs; }).length;
+      var totalOutSum = lv.excluded.length + actAsCntSum;
+      wsSum.getCell(rIdx, 6).value = totalOutSum ? (actAsCntSum + ' Act As / ' + lv.excluded.length + ' Super') : 0; styleCell(wsSum.getCell(rIdx, 6), { bg: totalOutSum ? '#FEF3C7' : bg, fg: totalOutSum ? '#92400E' : '#9CA3AF', b: !!totalOutSum, sz: 9 });
+      wsSum.getCell(rIdx, 7).value = top ? top.name : '—'; styleCell(wsSum.getCell(rIdx, 7), { bg: bg, fg: '#111827', b: true, al: 'left' });
+      wsSum.getCell(rIdx, 8).value = top ? ((isCore5 ? top.avg5 : top.score) / 100) : '—'; styleCell(wsSum.getCell(rIdx, 8), { bg: '#F5F3FF', fg: '#3B1D63', b: true, numFmt: top ? '0.0%' : null });
+      wsSum.getCell(rIdx, 9).value = top ? (top.mob.pct / 100) : '—'; styleCell(wsSum.getCell(rIdx, 9), { bg: '#DCFCE7', fg: '#15803D', b: true, numFmt: top ? '0.0%' : null });
+      wsSum.getRow(rIdx).height = 23;
+    });
+
+    // ── SHEETS 2, 3, 4: Area Managers / Supervisors / Regional Managers ──
+    [
+      { key: 'areaManager',     title: 'Area Managers',     sheet: 'Area Managers Ranking',     tabClr: 'FF15803D' },
+      { key: 'supervisor',      title: 'Supervisors',       sheet: 'Supervisors Ranking',       tabClr: 'FF0F766E' },
+      { key: 'regionalManager', title: 'Regional Managers', sheet: 'Regional Managers Ranking', tabClr: 'FF4C1D95' }
+    ].forEach(function (ld) {
+      var lv = model.levels[ld.key] || { eligible: [], excluded: [] };
+      var arr = lv.eligible.filter(function (x) {
+        if (LEAD_EVAL_FILTER === 'A') return x.grade === 'A';
+        if (LEAD_EVAL_FILTER === 'B') return x.grade === 'B';
+        if (LEAD_EVAL_FILTER === 'C') return x.grade === 'C';
+        if (LEAD_EVAL_FILTER === 'GATE') return x.gatePassed;
+        if (LEAD_EVAL_FILTER === 'MET4') return x.all4Met;
+        if (LEAD_EVAL_FILTER === 'ACH5') return x.ach5Count === 5;
+        if (LEAD_EVAL_FILTER === 'ACTAS') return x.isActAs;
+        return true;
+      });
+      var ws = wb.addWorksheet(ld.sheet);
+      ws.views = [{ showGridLines: false, state: 'frozen', ySplit: 4 }];
+      ws.properties.tabColor = { argb: ld.tabClr };
+
+      var cols = [
+        { hdr: 'Rank', w: 7, g: 'id' },
+        { hdr: ld.title.replace(/s$/, '') + ' Name', w: 26, g: 'id' },
+        { hdr: 'Regional Manager', w: 19, g: 'id' },
+        { hdr: 'Reg Rank', w: 10, g: 'id' },
+        { hdr: 'Branches', w: 9, g: 'id' }
+      ];
+      var prodDefs = [
+        { key: 'mob',   lbl: 'Mobile',  th: 100 },
+        { key: 'gold',  lbl: 'WE Gold', th: 100 },
+        { key: 'fbb',   lbl: 'FBB',     th: isCore5 ? 100 : 90 },
+        { key: 'pay',   lbl: 'Wallet',  th: isCore5 ? 100 : 90 },
+        { key: 'fixed', lbl: 'Fixed',   th: 100 }
+      ];
+      prodDefs.forEach(function (pd) {
+        if (isDetails) {
+          cols.push({ hdr: pd.lbl + '\nTGT', w: 11, g: 'c' });
+          cols.push({ hdr: pd.lbl + '\nACH', w: 11, g: 'c' });
+        }
+        cols.push({ hdr: pd.lbl + ' %', w: 11, g: 'c' });
+      });
+      cols.push({ hdr: isCore5 ? '5-Prod Avg %' : 'Criteria Score %', w: 14, g: 's' });
+      cols.push({ hdr: isCore5 ? 'Products ≥100%' : 'Gate & 4/4', w: 17, g: 'e' });
+      cols.push({ hdr: 'Bell Curve\nGrade', w: 11, g: 'e' });
+      cols.push({ hdr: 'Grade Rule', w: 20, g: 'e' });
+
+      cols.forEach(function (c, i) { ws.getColumn(i + 1).width = c.w; });
+      var NC = cols.length;
+
+      ws.mergeCells(1, 1, 1, NC);
+      styleCell(ws.getCell(1, 1), { bg: '#111827', fg: '#FFFFFF', b: true, sz: 13, al: 'left', bd: '#111827' });
+      ws.getCell(1, 1).value = 'FAKHARANY360 — ' + ld.title + ' Evaluation (' + arr.length + ' Evaluated) · ' + (isDetails ? 'Details (TGT/ACH)' : 'Summary');
+      ws.getRow(1).height = 28;
+
+      ws.mergeCells(2, 1, 2, NC);
+      for (var k2 = 1; k2 <= NC; k2++) styleCell(ws.getCell(2, k2), { bg: '#5E2D91', fg: '#FFFFFF', b: true, sz: 10, al: 'left', bd: '#5E2D91' });
+      ws.getCell(2, 1).value = '📌 ' + scopeDesc + '  |  Filters: ' + fltTxt;
+      ws.getRow(2).height = 22;
+      ws.getRow(3).height = 6;
+
+      cols.forEach(function (col, ci) {
+        var hBg = col.g === 'id' ? '#1A1A2E' : (col.g === 'c' ? '#4C1D95' : (col.g === 's' ? '#3B1D63' : '#0F766E'));
+        styleCell(ws.getCell(4, ci + 1), { bg: hBg, fg: '#FFFFFF', b: true, sz: 9.5, wrap: true, bd: '#374151' });
+        ws.getCell(4, ci + 1).value = col.hdr;
+      });
+      ws.getRow(4).height = 28;
+
+      var r = 5;
+      var writeRow = function (x, idx, isExcl) {
+        var bg = isExcl ? '#F3F4F6' : (idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC');
+        var c = 1;
+        function put(v, o) {
+          var cell = ws.getCell(r, c++);
+          cell.value = (v === null || v === undefined) ? '—' : v;
+          styleCell(cell, Object.assign({ bg: bg, fg: isExcl ? '#6B7280' : '#1F2937' }, o || {}));
+        }
+        put(isExcl ? 'EXCL' : x.rank, { b: true, fg: isExcl ? '#9CA3AF' : '#5E2D91' });
+        put(x.name, { al: 'left', b: true, fg: isExcl ? '#6B7280' : '#5E2D91' });
+        put(x.regional, { al: 'left' });
+        put(isExcl ? '—' : ('#' + x.regionalRank + '/' + x.regionalTotal));
+        put(x.branchCount, { numFmt: '#,##0' });
+        prodDefs.forEach(function (pd) {
+          var pObj = x[pd.key];
+          if (isDetails) {
+            put(Math.round(pObj.totTgt), { numFmt: '#,##0', fg: '#6B7280' });
+            put(Math.round(pObj.totAch), { numFmt: '#,##0', b: true });
+          }
+          var ps = pctSty(pObj.pct, pd.th);
+          put(pObj.pct / 100, { bg: isExcl ? bg : ps.bg, fg: isExcl ? '#6B7280' : ps.fg, b: true, numFmt: '0.0%' });
+        });
+        put((isCore5 ? x.avg5 : x.score) / 100, { bg: isExcl ? bg : '#F5F3FF', fg: isExcl ? '#6B7280' : '#3B1D63', b: true, numFmt: '0.0%' });
+        put(isExcl ? 'Promoted → Super' : (isCore5 ? (x.ach5Count + ' / 5 ≥100%') : (x.gatePassed ? '🔓 Gate OK (' + x.metCount + '/4)' : '🔒 ' + x.gateLabel)), {
+          bg: isExcl ? '#FEF3C7' : (isCore5 ? bg : (x.gatePassed ? '#ECFDF5' : '#FEF2F2')),
+          fg: isExcl ? '#92400E' : (isCore5 ? '#374151' : (x.gatePassed ? '#047857' : '#B91C1C')),
+          b: true
+        });
+        var gs = grSty(x.grade);
+        put(x.grade, { bg: gs.bg, fg: gs.fg, b: true, sz: 11 });
+        put(x.gradeReason, { al: 'left', sz: 9.5, fg: '#4B5563' });
+        ws.getRow(r).height = 22;
+        r++;
+      };
+
+      arr.forEach(function (x, i) { writeRow(x, i, false); });
+
+      if (lv.excluded && lv.excluded.length && LEAD_EVAL_FILTER === 'ALL') {
+        r++;
+        ws.mergeCells(r, 1, r, NC);
+        for (var ec = 1; ec <= NC; ec++) styleCell(ws.getCell(r, ec), { bg: '#FEF3C7', fg: '#92400E', b: true, sz: 10, al: 'left', bd: '#F59E0B' });
+        ws.getCell(r, 1).value = '🚫 Excluded from Area Manager Bell Curve (Promoted to Supervisor after Month 1): ' + lv.excluded.length;
+        ws.getRow(r).height = 23;
+        r++;
+        lv.excluded.forEach(function (x, i) { writeRow(x, i, true); });
+      }
+    });
+
+    var buf = await wb.xlsx.writeBuffer();
+    var now = new Date();
+    var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+    var tag = (model.includeMtd ? 'YTD_MTD' : 'Closed') + '_' + (isCore5 ? 'Core5' : 'Weighted') + '_' + (isDetails ? 'Details' : 'Summary');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = 'FAKHARANY360_Leadership_Eval_' + tag + '_' + stamp + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (err) {
+    console.error('Export Leadership Eval error:', err);
+    alert('⚠️ حصل خطأ أثناء تصدير الإكسل: ' + (err && err.message ? err.message : err));
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+  }
 }
 
 function renderRankList(dataKey, rankKey, containerId) {
@@ -15173,6 +16306,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
     alert('⚠️ لا توجد بيانات للتصدير في العرض الحالي');
     return;
   }
+  if (!(await mgrExportAuthWithWarning())) return;
 
   var oldHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>Exporting...'; }
