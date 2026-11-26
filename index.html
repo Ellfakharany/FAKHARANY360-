@@ -4620,9 +4620,42 @@ var LEAD_EVAL_SCOPE = 'closed_plus_mtd';   // 'closed_only' | 'closed_plus_mtd'
 var LEAD_EVAL_MTD_METRIC = 'actual';       // 'actual' | 'proj'
 var LEAD_EVAL_FILTER = 'ALL';              // 'ALL' | 'A' | 'B' | 'C' | 'GATE' | 'MET4' | 'ACH5'
 var LEAD_EVAL_SHOW_EXCLUDED = true;        // show promoted Area Managers clearly marked as Excluded
-var LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+var LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 20, fbb: 20, wallet: 10, quality: 10 };
 var LEAD_EVAL_THRESHOLDS = { mobile: 100, gold: 100, fbb: 90, wallet: 90 };
-var LEAD_EVAL_CAP = 0;
+var LEAD_EVAL_CAP = 100;
+var LEAD_QUALITY_SCORES = (function () {
+  try { return JSON.parse(localStorage.getItem('f360_lead_quality_scores_v1') || '{}') || {}; }
+  catch (e) { return {}; }
+})();
+function getLeadQualityKey(levelKey, name) {
+  return String(levelKey || '') + '|' + String(name || '').trim().toLowerCase();
+}
+function calcAutoLeadQualityScore(goldPct) {
+  var gPct = Number(goldPct) || 0;
+  if (gPct >= 100) return 10;
+  return Math.max(0, Math.min(10, Math.round(10 - (100 - gPct))));
+}
+function getLeadQualityScore(qKey, goldPct) {
+  var v = LEAD_QUALITY_SCORES[qKey];
+  if (v !== undefined && v !== null && v !== '' && !isNaN(Number(v))) {
+    return Math.max(0, Math.min(10, Math.round(Number(v))));
+  }
+  return calcAutoLeadQualityScore(goldPct);
+}
+function setLeadQualityScore(qKey, val) {
+  if (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !LEAD_EVAL_UNLOCKED) return;
+  var raw = String(val === undefined || val === null ? '' : val).trim();
+  if (raw === '') delete LEAD_QUALITY_SCORES[qKey];
+  else LEAD_QUALITY_SCORES[qKey] = Math.max(0, Math.min(10, Math.round(Number(raw) || 0)));
+  try { localStorage.setItem('f360_lead_quality_scores_v1', JSON.stringify(LEAD_QUALITY_SCORES)); } catch (e) {}
+  renderAnnualLeadershipEval();
+}
+function resetLeadQualityScores() {
+  if (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !LEAD_EVAL_UNLOCKED) return;
+  LEAD_QUALITY_SCORES = {};
+  try { localStorage.removeItem('f360_lead_quality_scores_v1'); } catch (e) {}
+  renderAnnualLeadershipEval();
+}
 var LEAD_EVAL_LAST_MODEL = null;
 var LEAD_EVAL_ACCESS_HASH = '04f59c99eca7b0830f1fb8628360d1f7a2052b8d364b0176bc6a068f1a3480f6';
 var LEAD_EVAL_UNLOCKED = (function () {
@@ -4701,19 +4734,19 @@ function setLeadEvalFilter(f)  { LEAD_EVAL_FILTER = f; renderAnnualLeadershipEva
 function toggleLeadEvalExcluded() { LEAD_EVAL_SHOW_EXCLUDED = !LEAD_EVAL_SHOW_EXCLUDED; renderAnnualLeadershipEval(); }
 
 function updateLeadEvalWeight(k, v) {
-  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
+  if (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !LEAD_EVAL_UNLOCKED) return;
   LEAD_EVAL_WEIGHTS[k] = Math.max(0, Math.min(100, Number(v) || 0));
   renderAnnualLeadershipEval();
 }
 function updateLeadEvalCap(v) {
-  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
+  if (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !LEAD_EVAL_UNLOCKED) return;
   LEAD_EVAL_CAP = Number(v) || 0;
   renderAnnualLeadershipEval();
 }
 function resetLeadEvalWeights() {
-  if (!(typeof currentRole !== 'undefined' && currentRole === 'admin')) return;
-  LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
-  LEAD_EVAL_CAP = 0;
+  if (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !LEAD_EVAL_UNLOCKED) return;
+  LEAD_EVAL_WEIGHTS = { mobile: 40, gold: 20, fbb: 20, wallet: 10, quality: 10 };
+  LEAD_EVAL_CAP = 100;
   renderAnnualLeadershipEval();
 }
 
@@ -4766,7 +4799,7 @@ function computeLeadershipLevelList(levelKey, closedRows, mtdRows, includeMtd, m
   var w = LEAD_EVAL_WEIGHTS;
   var th = LEAD_EVAL_THRESHOLDS;
   var cap = Number(LEAD_EVAL_CAP) || 0;
-  var wSum = (w.mobile + w.gold + w.fbb + w.wallet) || 100;
+  var wSum = (w.mobile + w.gold + w.fbb + (w.wallet || 0) + (w.quality || 0)) || 100;
   var isProj = (mtdMetric === 'proj');
 
   // Build set of all Supervisor names + full-year AM month history + Store Manager names from Evaluation
@@ -4857,30 +4890,44 @@ function computeLeadershipLevelList(levelKey, closedRows, mtdRows, includeMtd, m
     var metMob = mob.pct >= th.mobile;
     var metGold = gold.pct >= th.gold;
     var metFbb = fbb.pct >= th.fbb;
-    var metPay = pay.pct >= th.wallet;
+    var metPay = pay.pct >= (th.wallet || 90);
     var metCount = (metMob ? 1 : 0) + (metGold ? 1 : 0) + (metFbb ? 1 : 0) + (metPay ? 1 : 0);
     var gatePassed = metMob && metGold;
     var gateLabel = gatePassed ? 'PASSED' : (!metMob && !metGold ? 'Missed Mob & Gold' : (!metMob ? 'Missed Mobile <100%' : 'Missed Gold <100%'));
 
-    var nMob = (mob.pct / th.mobile) * 100;
-    var nGold = (gold.pct / th.gold) * 100;
-    var nFbb = (fbb.pct / th.fbb) * 100;
-    var nPay = (pay.pct / th.wallet) * 100;
+    var nMob  = (mob.pct  / th.mobile) * 100;
+    var nGold = (gold.pct / th.gold)   * 100;
+    var nFbb  = (fbb.pct  / th.fbb)    * 100;
+    var nPay  = (pay.pct  / (th.wallet || 90)) * 100;
     if (cap > 0) {
       nMob = Math.min(nMob, cap); nGold = Math.min(nGold, cap);
-      nFbb = Math.min(nFbb, cap); nPay = Math.min(nPay, cap);
+      nFbb = Math.min(nFbb, cap); nPay  = Math.min(nPay, cap);
     }
-    var score = (nMob * w.mobile + nGold * w.gold + nFbb * w.fbb + nPay * w.wallet) / wSum;
+    var qKey = getLeadQualityKey(levelKey, name);
+    var qIsManual = (LEAD_QUALITY_SCORES[qKey] !== undefined && LEAD_QUALITY_SCORES[qKey] !== null && LEAD_QUALITY_SCORES[qKey] !== '');
+    var qVal = getLeadQualityScore(qKey, gold.pct);
+    var qPct = (qVal / 10) * 100;
 
-    var cnMob = (mob.closedPct / th.mobile) * 100;
-    var cnGold = (gold.closedPct / th.gold) * 100;
-    var cnFbb = (fbb.closedPct / th.fbb) * 100;
-    var cnPay = (pay.closedPct / th.wallet) * 100;
+    var mobBelow100Pen = 0;
+    var ptsMob  = (nMob * w.mobile) / wSum;
+    var ptsGold = (nGold * w.gold) / wSum;
+    var ptsFbb  = (nFbb  * w.fbb)  / wSum;
+    var ptsPay  = (nPay  * (w.wallet || 0)) / wSum;
+    var ptsQ    = (qPct  * (w.quality || 0)) / wSum;
+    var score   = ptsMob + ptsGold + ptsFbb + ptsPay + ptsQ;
+    if (cap === 100) score = Math.min(100, score);
+
+    var cnMob  = (mob.closedPct  / th.mobile) * 100;
+    var cnGold = (gold.closedPct / th.gold)   * 100;
+    var cnFbb  = (fbb.closedPct  / th.fbb)    * 100;
+    var cnPay  = (pay.closedPct  / (th.wallet || 90)) * 100;
     if (cap > 0) {
       cnMob = Math.min(cnMob, cap); cnGold = Math.min(cnGold, cap);
-      cnFbb = Math.min(cnFbb, cap); cnPay = Math.min(cnPay, cap);
+      cnFbb = Math.min(cnFbb, cap); cnPay  = Math.min(cnPay, cap);
     }
-    var closedScore = (cnMob * w.mobile + cnGold * w.gold + cnFbb * w.fbb + cnPay * w.wallet) / wSum;
+    var cPtsMob = (cnMob * w.mobile) / wSum;
+    var closedScore = cPtsMob + (cnGold * w.gold + cnFbb * w.fbb + cnPay * (w.wallet || 0) + qPct * (w.quality || 0)) / wSum;
+    if (cap === 100) closedScore = Math.min(100, closedScore);
 
     var sample = cRows[cRows.length - 1] || mRows[0] || {};
     var branchSet = new Set();
@@ -4918,6 +4965,9 @@ function computeLeadershipLevelList(levelKey, closedRows, mtdRows, includeMtd, m
       all4Met: metCount === 4,
       gatePassed: gatePassed,
       gateLabel: gateLabel,
+      qKey: qKey, qIsManual: qIsManual, qVal: qVal, qPct: qPct,
+      mobBelow100Pen: mobBelow100Pen,
+      ptsMob: ptsMob, ptsGold: ptsGold, ptsFbb: ptsFbb, ptsPay: ptsPay, ptsQ: ptsQ,
       score: score,
       closedScore: closedScore,
       scoreDelta: includeMtd ? (score - closedScore) : 0,
@@ -4949,11 +4999,12 @@ function computeLeadershipLevelList(levelKey, closedRows, mtdRows, includeMtd, m
       }
     : function (a, b) {
         if (a.gatePassed !== b.gatePassed) return a.gatePassed ? -1 : 1;
-        if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
+        if (Math.abs(b.ptsMob - a.ptsMob) > 1e-6) return b.ptsMob - a.ptsMob;
         if (Math.abs(b.mob.pct - a.mob.pct) > 1e-6) return b.mob.pct - a.mob.pct;
         if (Math.abs(b.gold.pct - a.gold.pct) > 1e-6) return b.gold.pct - a.gold.pct;
         if (Math.abs(b.fbb.pct - a.fbb.pct) > 1e-6) return b.fbb.pct - a.fbb.pct;
-        return b.pay.pct - a.pay.pct;
+        if (Math.abs(b.pay.pct - a.pay.pct) > 1e-6) return b.pay.pct - a.pay.pct;
+        return b.score - a.score;
       };
 
   var eligible = rawItems.filter(function (x) { return !x.excludedPromoted; }).sort(cmpFn);
@@ -5036,7 +5087,7 @@ function buildAnnualLeadershipModel() {
     mobDate: meta.mobDate,
     walDate: meta.walDate,
     weights: Object.assign({}, LEAD_EVAL_WEIGHTS),
-    weightSum: LEAD_EVAL_WEIGHTS.mobile + LEAD_EVAL_WEIGHTS.gold + LEAD_EVAL_WEIGHTS.fbb + LEAD_EVAL_WEIGHTS.wallet,
+    weightSum: LEAD_EVAL_WEIGHTS.mobile + LEAD_EVAL_WEIGHTS.gold + LEAD_EVAL_WEIGHTS.fbb + (LEAD_EVAL_WEIGHTS.wallet || 0) + (LEAD_EVAL_WEIGHTS.quality || 0),
     cap: LEAD_EVAL_CAP,
     levels: {
       areaManager: areaData,
@@ -5185,24 +5236,27 @@ function renderAnnualLeadershipEval() {
       '</div>';
   }
 
-  // 3. Admin Weights Bar (only in Weighted mode & Details, or compact strip)
+  // 3. Live Weights Bar (Weighted mode — editable by anyone who unlocked #84127#)
   var weightsHTML = '';
-  if (!isCore5 && isAdmin) {
+  if (!isCore5) {
     var sumClr = model.weightSum === 100 ? '#15803d' : '#b91c1c';
     var sumBg = model.weightSum === 100 ? '#dcfce7' : '#fee2e2';
     weightsHTML =
       '<div style="margin-top:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:9px;padding:6px 10px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10.5px">' +
-        '<span style="background:#5E2D91;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px">Admin Weights</span>' +
+        '<span style="background:#5E2D91;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:6px">Live Weights</span>' +
         '<label style="font-weight:800;color:#374151">Mob <input type="number" min="0" max="100" value="' + w.mobile + '" onchange="updateLeadEvalWeight(\'mobile\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #c084fc;border-radius:5px;text-align:center;font-weight:800">%</label>' +
         '<label style="font-weight:800;color:#374151">Gold <input type="number" min="0" max="100" value="' + w.gold + '" onchange="updateLeadEvalWeight(\'gold\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #f59e0b;border-radius:5px;text-align:center;font-weight:800">%</label>' +
         '<label style="font-weight:800;color:#374151">FBB <input type="number" min="0" max="100" value="' + w.fbb + '" onchange="updateLeadEvalWeight(\'fbb\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #3b82f6;border-radius:5px;text-align:center;font-weight:800">%</label>' +
-        '<label style="font-weight:800;color:#374151">Pay <input type="number" min="0" max="100" value="' + w.wallet + '" onchange="updateLeadEvalWeight(\'wallet\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #ec4899;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<label style="font-weight:800;color:#374151">WE Pay <input type="number" min="0" max="100" value="' + (w.wallet || 0) + '" onchange="updateLeadEvalWeight(\'wallet\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #0891b2;border-radius:5px;text-align:center;font-weight:800">%</label>' +
+        '<label style="font-weight:800;color:#374151">Q &amp; FB <input type="number" min="0" max="100" value="' + (w.quality || 0) + '" onchange="updateLeadEvalWeight(\'quality\', this.value)" style="width:40px;padding:1px 3px;border:1px solid #0f766e;border-radius:5px;text-align:center;font-weight:800">%</label>' +
         '<span style="background:' + sumBg + ';color:' + sumClr + ';font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:6px">' + model.weightSum + '%</span>' +
         '<select onchange="updateLeadEvalCap(this.value)" style="padding:2px 5px;border:1px solid #d1d5db;border-radius:5px;font-size:9.5px;font-weight:700;background:white">' +
-          '<option value="0"' + (model.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
+          '<option value="100"' + (model.cap === 100 ? ' selected' : '') + '>100% (Max)</option>' +
           '<option value="120"' + (model.cap === 120 ? ' selected' : '') + '>120%</option>' +
           '<option value="150"' + (model.cap === 150 ? ' selected' : '') + '>150%</option>' +
+          '<option value="0"' + (model.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
         '</select>' +
+        '<button onclick="resetLeadQualityScores()" style="padding:2px 7px;border-radius:5px;border:1px solid #99f6e4;background:#f0fdfa;color:#0f766e;font-size:9.5px;font-weight:800;cursor:pointer">Reset Q</button>' +
         '<button onclick="resetLeadEvalWeights()" style="padding:2px 7px;border-radius:5px;border:1px solid #d1d5db;background:white;font-size:9.5px;font-weight:800;cursor:pointer">Reset</button>' +
       '</div>';
   }
@@ -5297,8 +5351,18 @@ function renderAnnualLeadershipEval() {
       prodTd(x.mob, isCore5 ? x.achMob : x.metMob, 100) +
       prodTd(x.gold, isCore5 ? x.achGold : x.metGold, 100) +
       prodTd(x.fbb, isCore5 ? x.achFbb : x.metFbb, isCore5 ? 100 : 90) +
-      prodTd(x.pay, isCore5 ? x.achPay : x.metPay, isCore5 ? 100 : 90) +
-      ((isDetails || isCore5) ? prodTd(x.fixed, x.achFixed, 100) : '') +
+      (isCore5
+        ? prodTd(x.pay, x.achPay, 100) + prodTd(x.fixed, x.achFixed, 100)
+        : prodTd(x.pay, x.metPay, 90) +
+          (function () {
+            var opts = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map(function (n) {
+              return '<option value="' + n + '"' + (Math.round(x.qVal) === n ? ' selected' : '') + '>' + n + '/10</option>';
+            }).join('');
+            return '<td style="padding:5px 4px;text-align:center;background:#f0fdfa;border-bottom:1px solid #ccfbf1;white-space:nowrap">' +
+              '<select onchange="setLeadQualityScore(\'' + x.qKey.replace(/'/g, "\\'") + '\', this.value)" style="padding:2px 4px;border:1px solid #14b8a6;border-radius:6px;font-size:10.5px;font-weight:800;color:#0f766e;background:white;cursor:pointer">' + opts + '</select>' +
+              (x.qIsManual ? '<div style="font-size:7.5px;color:#5E2D91;font-weight:800;margin-top:1px">✎ Manual</div>' : '') +
+            '</td>';
+          })()) +
       '<td style="padding:6px 6px;text-align:center;font-size:11.5px;font-weight:900;color:#3b1863;background:#f5f3ff;border-bottom:1px solid #e9d5ff">' + scoreVal.toFixed(1) + '%' + scoreSub + '</td>' +
       '<td style="padding:6px 5px;text-align:center">' + gradePill(x.grade) + badgeSub + '</td>' +
     '</tr>';
@@ -5307,7 +5371,7 @@ function renderAnnualLeadershipEval() {
   var rowsHTML = filtered.map(function (x, i) { return buildRow(x, i, false); }).join('');
   var exclHTML = '';
   if (LEAD_EVAL_SHOW_EXCLUDED && exclList.length && LEAD_EVAL_FILTER === 'ALL') {
-    var colSpan = (isDetails || isCore5) ? 9 : 8;
+    var colSpan = 9;
     exclHTML =
       '<tr style="background:#fef3c7;border-top:2px solid #f59e0b"><td colspan="' + colSpan + '" dir="rtl" style="padding:6px 12px;font-size:10.5px;font-weight:800;color:#92400e;font-family:Cairo,Inter,sans-serif">' +
         '🚫 مستثنيون من تقييم الـ Area Managers والـ Bell Curve (اشتغلوا شهر 1 فقط كـ Area وتمت ترقيتهم لـ Supervisor): ' + exclList.length +
@@ -5328,8 +5392,11 @@ function renderAnnualLeadershipEval() {
             '<th style="' + thBase + '">Mob %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
             '<th style="' + thBase + '">Gold %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
             '<th style="' + thBase + '">FBB %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
-            '<th style="' + thBase + '">Pay %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
-            ((isDetails || isCore5) ? '<th style="' + thBase + '">Fixed %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' : '') +
+            (isCore5
+              ? '<th style="' + thBase + '">Pay %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+                '<th style="' + thBase + '">Fixed %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>'
+              : '<th style="' + thBase + '">WE Pay %' + (isDetails ? '<div style="font-size:8px;opacity:.8">ACH/TGT</div>' : '') + '</th>' +
+                '<th style="' + thBase + ';background:#0f766e">Q &amp; FB<div style="font-size:8px;opacity:.8">/10</div></th>') +
             '<th style="' + thBase + ';background:#4c1d95">' + (isCore5 ? 'Avg 5' : 'Score') + '</th>' +
             '<th style="' + thBase + ';background:#0f766e">Grade<div style="font-size:8px;opacity:.8">A/B/C</div></th>' +
           '</tr></thead>' +
@@ -5421,7 +5488,7 @@ async function exportAnnualLeadershipExcel(btn) {
     for (var c3 = 1; c3 <= 9; c3++) styleCell(wsSum.getCell(3, c3), { bg: '#F5F3FF', fg: '#4C1D95', b: true, sz: 9.5, al: 'left', bd: '#DDD6FE' });
     wsSum.getCell(3, 1).value = (isCore5
       ? '🎯 Mode: Core 5 Products (Most ≥100% first, then Mobile % > WE Gold % > FBB % > Wallet % > Fixed %)'
-      : ('🔒 Mode: Weighted Criteria (' + w.mobile + '/' + w.gold + '/' + w.fbb + '/' + w.wallet + ') + Dual Gate Mob & Gold ≥100%')) +
+      : ('🔒 Mode: Weighted Criteria (Mob ' + w.mobile + ' / Gold ' + w.gold + ' / FBB ' + w.fbb + ' / WE Pay ' + (w.wallet||0) + ' / Q&FB ' + (w.quality||0) + ') + Cap 100% + Dual Gate')) +
       '  |  Bell Curve / Regional: A 20% / B 60% / C 20%  |  View: ' + (isDetails ? 'Details (with TGT/ACH)' : 'Summary');
     wsSum.getRow(3).height = 21;
 
@@ -5489,13 +5556,20 @@ async function exportAnnualLeadershipExcel(btn) {
         { hdr: 'Reg Rank', w: 10, g: 'id' },
         { hdr: 'Branches', w: 9, g: 'id' }
       ];
-      var prodDefs = [
-        { key: 'mob',   lbl: 'Mobile',  th: 100 },
-        { key: 'gold',  lbl: 'WE Gold', th: 100 },
-        { key: 'fbb',   lbl: 'FBB',     th: isCore5 ? 100 : 90 },
-        { key: 'pay',   lbl: 'Wallet',  th: isCore5 ? 100 : 90 },
-        { key: 'fixed', lbl: 'Fixed',   th: 100 }
-      ];
+      var prodDefs = isCore5
+        ? [
+            { key: 'mob',   lbl: 'Mobile',  th: 100 },
+            { key: 'gold',  lbl: 'WE Gold', th: 100 },
+            { key: 'fbb',   lbl: 'FBB',     th: 100 },
+            { key: 'pay',   lbl: 'Wallet',  th: 100 },
+            { key: 'fixed', lbl: 'Fixed',   th: 100 }
+          ]
+        : [
+            { key: 'mob',   lbl: 'Mobile',  th: 100 },
+            { key: 'gold',  lbl: 'WE Gold', th: 100 },
+            { key: 'fbb',   lbl: 'FBB',     th: 90 },
+            { key: 'pay',   lbl: 'WE Pay',  th: 90 }
+          ];
       prodDefs.forEach(function (pd) {
         if (isDetails) {
           cols.push({ hdr: pd.lbl + '\nTGT', w: 11, g: 'c' });
@@ -5503,6 +5577,7 @@ async function exportAnnualLeadershipExcel(btn) {
         }
         cols.push({ hdr: pd.lbl + ' %', w: 11, g: 'c' });
       });
+      if (!isCore5) cols.push({ hdr: 'Quality & FB\n(/10)', w: 13, g: 'c' });
       cols.push({ hdr: isCore5 ? '5-Prod Avg %' : 'Criteria Score %', w: 14, g: 's' });
       cols.push({ hdr: isCore5 ? 'Products ≥100%' : 'Gate & 4/4', w: 17, g: 'e' });
       cols.push({ hdr: 'Bell Curve\nGrade', w: 11, g: 'e' });
@@ -5552,6 +5627,7 @@ async function exportAnnualLeadershipExcel(btn) {
           var ps = pctSty(pObj.pct, pd.th);
           put(pObj.pct / 100, { bg: isExcl ? bg : ps.bg, fg: isExcl ? '#6B7280' : ps.fg, b: true, numFmt: '0.0%' });
         });
+        if (!isCore5) put(Math.round(x.qVal), { bg: isExcl ? bg : '#F0FDFA', fg: isExcl ? '#6B7280' : '#0F766E', b: true, numFmt: '0' });
         put((isCore5 ? x.avg5 : x.score) / 100, { bg: isExcl ? bg : '#F5F3FF', fg: isExcl ? '#6B7280' : '#3B1D63', b: true, numFmt: '0.0%' });
         put(isExcl ? 'Promoted → Super' : (isCore5 ? (x.ach5Count + ' / 5 ≥100%') : (x.gatePassed ? '🔓 Gate OK (' + x.metCount + '/4)' : '🔒 ' + x.gateLabel)), {
           bg: isExcl ? '#FEF3C7' : (isCore5 ? bg : (x.gatePassed ? '#ECFDF5' : '#FEF2F2')),
