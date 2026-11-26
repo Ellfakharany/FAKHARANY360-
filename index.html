@@ -4675,7 +4675,8 @@ async function submitLeadEvalPassword() {
     LEAD_EVAL_UNLOCKED = true;
     try { sessionStorage.setItem('f360_lead_eval_unlocked', '1'); } catch (e) {}
     closeLeadEvalLockModal();
-    renderAnnualLeadershipEval();
+    if (typeof renderAnnualLeadershipEval === 'function') renderAnnualLeadershipEval();
+    if (typeof MGR_VIEW_MODE !== 'undefined' && MGR_VIEW_MODE === 'criteria' && typeof renderManagersPerf === 'function') renderManagersPerf();
   } else {
     if (err) { err.style.display = 'block'; }
     inp.value = '';
@@ -4687,7 +4688,8 @@ async function submitLeadEvalPassword() {
 function lockLeadEvalSection() {
   LEAD_EVAL_UNLOCKED = false;
   try { sessionStorage.removeItem('f360_lead_eval_unlocked'); } catch (e) {}
-  renderAnnualLeadershipEval();
+  if (typeof renderAnnualLeadershipEval === 'function') renderAnnualLeadershipEval();
+  if (typeof MGR_VIEW_MODE !== 'undefined' && MGR_VIEW_MODE === 'criteria' && typeof renderManagersPerf === 'function') renderManagersPerf();
 }
 
 function setLeadEvalLevel(lvl) { LEAD_EVAL_LEVEL = lvl; LEAD_EVAL_FILTER = 'ALL'; renderAnnualLeadershipEval(); }
@@ -15904,15 +15906,68 @@ function renderMgrByManagerStackedHTML(model, effMode) {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── VIEW 4: ANNUAL CRITERIA & REGIONAL BELL CURVE (A:20% / B:60% / C:20%) ──
 // ══════════════════════════════════════════════════════════════════════════════
-var MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
+var MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 20, fbb: 20, wallet: 10, quality: 10 };
 var MGR_CRITERIA_THRESHOLDS = { mobile: 100, gold: 100, fbb: 90, wallet: 90 };
-var MGR_CRITERIA_CAP = 0; // 0 = No Cap, 120 or 150 optional (Admin)
+var MGR_CRITERIA_CAP = 100; // Default 100% cap (Criteria Score max = 100%: 40+20+20+10+10)
+var MGR_QUALITY_SCORES = (function () {
+  try { return JSON.parse(localStorage.getItem('f360_mgr_quality_scores_v1') || '{}') || {}; }
+  catch (e) { return {}; }
+})();
+
+function getMgrQualityKey(mgr) {
+  var oid = (mgr && mgr.oracleId && String(mgr.oracleId).trim() && mgr.oracleId !== '—') ? String(mgr.oracleId).trim() : '';
+  return oid ? ('ID:' + oid) : ('KEY:' + String((mgr && mgr.key) || ''));
+}
+
+function calcAutoMgrQualityScore(warnCount, goldPct) {
+  // Every 1% below 100% Gold deducts 1 point out of 10 (strict integer 0..10); Warning now deducts 10 from Mobile weight instead
+  var gPct = Number(goldPct) || 0;
+  if (gPct >= 100) return 10;
+  var deficit = 100 - gPct;
+  return Math.max(0, Math.min(10, Math.round(10 - deficit)));
+}
+
+function getMgrQualityScore(qKey, warnCount, goldPct) {
+  var v = MGR_QUALITY_SCORES[qKey];
+  if (v !== undefined && v !== null && v !== '' && !isNaN(Number(v))) {
+    return Math.max(0, Math.min(10, Math.round(Number(v))));
+  }
+  return calcAutoMgrQualityScore(warnCount, goldPct);
+}
+
+function setMgrQualityScore(qKey, val) {
+  if (!isMgrCriteriaAdmin()) return;
+  var raw = String(val === undefined || val === null ? '' : val).trim();
+  if (raw === '') {
+    delete MGR_QUALITY_SCORES[qKey];
+  } else {
+    var num = Math.max(0, Math.min(10, Number(raw) || 0));
+    MGR_QUALITY_SCORES[qKey] = num;
+  }
+  try { localStorage.setItem('f360_mgr_quality_scores_v1', JSON.stringify(MGR_QUALITY_SCORES)); } catch (e) {}
+  renderManagersPerf();
+}
+
+function bulkSetMgrQualityScore(val) {
+  if (!isMgrCriteriaAdmin()) return;
+  var data = MGR_LAST_CRITERIA_DATA;
+  if (!data || !data.items) return;
+  if (val === null) {
+    if (!confirm('مسح جميع درجات الـ Quality & Manager Feedback المدخلة يدوياً؟')) return;
+    data.items.forEach(function (x) { delete MGR_QUALITY_SCORES[x.qKey]; });
+  } else {
+    var num = Math.max(0, Math.min(10, Number(val) || 0));
+    data.items.forEach(function (x) { MGR_QUALITY_SCORES[x.qKey] = num; });
+  }
+  try { localStorage.setItem('f360_mgr_quality_scores_v1', JSON.stringify(MGR_QUALITY_SCORES)); } catch (e) {}
+  renderManagersPerf();
+}
 var MGR_CRITERIA_MIN_MONTHS = 6; // < 6 months => auto C (Option A: counted inside 20% C quota)
 var MGR_CRITERIA_GRADE_FILTER = 'ALL'; // 'ALL' | 'A' | 'B' | 'C' | 'MET4'
 var MGR_LAST_CRITERIA_DATA = null;
 
 function isMgrCriteriaAdmin() {
-  return (typeof currentRole !== 'undefined' && currentRole === 'admin');
+  return (typeof LEAD_EVAL_UNLOCKED !== 'undefined' && !!LEAD_EVAL_UNLOCKED);
 }
 
 function updateMgrCriteriaWeight(key, val) {
@@ -15930,8 +15985,8 @@ function updateMgrCriteriaCap(val) {
 
 function resetMgrCriteriaWeights() {
   if (!isMgrCriteriaAdmin()) return;
-  MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 30, fbb: 20, wallet: 10 };
-  MGR_CRITERIA_CAP = 0;
+  MGR_CRITERIA_WEIGHTS = { mobile: 40, gold: 20, fbb: 20, wallet: 10, quality: 10 };
+  MGR_CRITERIA_CAP = 100;
   renderManagersPerf();
 }
 
@@ -15944,7 +15999,8 @@ function computeMgrAnnualCriteria(model) {
   var w = MGR_CRITERIA_WEIGHTS;
   var th = MGR_CRITERIA_THRESHOLDS;
   var cap = Number(MGR_CRITERIA_CAP) || 0;
-  var wSum = (w.mobile + w.gold + w.fbb + w.wallet) || 100;
+  var wSum = (w.mobile + w.gold + w.fbb + w.wallet + (w.quality || 0)) || 100;
+  var totalYearMonths = Math.max(10, (model && model.months && model.months.length) ? model.months.length : 10);
 
   var rawList = (model && model.byManager ? model.byManager : []).map(function (mgr) {
     var agg = mgr.agg || {};
@@ -15976,9 +16032,28 @@ function computeMgrAnnualCriteria(model) {
       nPay = Math.min(nPay, cap);
     }
 
-    var score = (nMob * w.mobile + nGold * w.gold + nFbb * w.fbb + nPay * w.wallet) / wSum;
     var monthsCount = (mgr.monthEntries || []).length;
     var isUnder6 = monthsCount < MGR_CRITERIA_MIN_MONTHS;
+    var hasWarn = (agg.warnCount || 0) > 0;
+    // Rule 1: <6 months gets proportional Mobile max weight (e.g. 5/10 = 50% -> 20/40, 4/10 -> 16/40, etc.)
+    var tenureFactor = isUnder6 ? Math.min(0.50, monthsCount / totalYearMonths) : 1;
+    var mobMaxAfterTenure = w.mobile * tenureFactor;
+    // Rule 3: Warning deducts 10 points from Mobile effective max (e.g. 40 -> 30)
+    var effMobMax = Math.max(0, mobMaxAfterTenure - (hasWarn ? 10 : 0));
+
+    var qKey = getMgrQualityKey(mgr);
+    var qIsManual = (MGR_QUALITY_SCORES[qKey] !== undefined && MGR_QUALITY_SCORES[qKey] !== null && MGR_QUALITY_SCORES[qKey] !== '');
+    var qVal = getMgrQualityScore(qKey, agg.warnCount || 0, goldPct);
+    var qPct = (qVal / 10) * 100;
+
+    var mobBelow100Pen = (mobPct < 100) ? 10 : 0;
+    var ptsMob  = Math.max(0, ((nMob  * effMobMax) / wSum) - mobBelow100Pen);
+    var ptsGold = (nGold * w.gold)    / wSum;
+    var ptsFbb  = (nFbb  * w.fbb)     / wSum;
+    var ptsPay  = (nPay  * w.wallet)  / wSum;
+    var ptsQ    = (qPct  * (w.quality || 0)) / wSum;
+    var score   = ptsMob + ptsGold + ptsFbb + ptsPay + ptsQ;
+    if (cap === 100) score = Math.min(100, score);
     var s = mgr.sample || {};
     var regional = (s.regionalManager && String(s.regionalManager).trim()) ? String(s.regionalManager).trim() : 'Unassigned';
     var evalPct = (agg.evalScore !== null && agg.evalScore !== undefined && !isNaN(agg.evalScore)) ? (agg.evalScore * 100) : null;
@@ -16004,6 +16079,11 @@ function computeMgrAnnualCriteria(model) {
       all4Met: metCount === 4,
       gatePassed: (metMob && metGold),
       gateLabel: (metMob && metGold) ? 'Passed' : (!metMob && !metGold ? 'Missed Mob & Gold' : (!metMob ? 'Missed Mobile <100%' : 'Missed Gold <100%')),
+      qKey: qKey,
+      qIsManual: qIsManual,
+      qVal: qVal,
+      qPct: qPct,
+      effMobMax: effMobMax, tenureFactor: tenureFactor, mobBelow100Pen: mobBelow100Pen, ptsMob: ptsMob, ptsGold: ptsGold, ptsFbb: ptsFbb, ptsPay: ptsPay, ptsQ: ptsQ,
       score: score,
       evalPct: evalPct,
       warnCount: agg.warnCount || 0,
@@ -16022,13 +16102,16 @@ function computeMgrAnnualCriteria(model) {
   withEval.forEach(function (x, i) { x.evalRank = i + 1; });
 
   var cmpPerf = function (a, b) {
-    // Hard Dual Gate: Mobile >= 100% AND WE Gold >= 100% always ranks above those who missed either gate
+    // 1. Hard Dual Gate: Mobile >= 100% AND WE Gold >= 100% always ranks above those who missed either gate
     if (a.gatePassed !== b.gatePassed) return a.gatePassed ? -1 : 1;
-    if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
+    // 2. Effective Mobile Points (preserves Warning -10, <6M proportional, and <100% -10 rules!)
+    if (Math.abs(b.ptsMob - a.ptsMob) > 1e-6) return b.ptsMob - a.ptsMob;
+    // 3. Mobile % Priority FIRST, then WE Gold %, then FBB %, then WE Pay %, then Criteria Score
     if (Math.abs(b.mobPct - a.mobPct) > 1e-6) return b.mobPct - a.mobPct;
     if (Math.abs(b.goldPct - a.goldPct) > 1e-6) return b.goldPct - a.goldPct;
     if (Math.abs(b.fbbPct - a.fbbPct) > 1e-6) return b.fbbPct - a.fbbPct;
-    return b.payPct - a.payPct;
+    if (Math.abs(b.payPct - a.payPct) > 1e-6) return b.payPct - a.payPct;
+    return b.score - a.score;
   };
 
   // Group by Regional Manager for Bell Curve (Option A: 20% A / 60% B / 20% C, <6M inside 20% C quota)
@@ -16045,39 +16128,27 @@ function computeMgrAnnualCriteria(model) {
     var quotaA = Math.round(N * 0.20);
     var quotaC = Math.round(N * 0.20);
 
-    var under6 = grp.filter(function (x) { return x.isUnder6; }).sort(cmpPerf);
-    var eligible = grp.filter(function (x) { return !x.isUnder6; }).sort(cmpPerf);
+    // Rule 2: No automatic C for <6M — everyone competes by Criteria Score (with proportional Mobile weight for <6M)
+    var orderedReg = grp.slice().sort(cmpPerf);
+    var under6 = orderedReg.filter(function (x) { return x.isUnder6; });
+    var countA = Math.min(quotaA, N);
+    var totalC = Math.min(quotaC, Math.max(0, N - countA));
+    var countB = Math.max(0, N - countA - totalC);
 
-    under6.forEach(function (x) {
-      x.grade = 'C';
-      x.gradeReason = '< 6 شهور (C تلقائي)';
-    });
-
-    var countA = Math.min(quotaA, eligible.length);
-    var remainingC = Math.max(0, quotaC - under6.length);
-    var eligibleC = Math.min(remainingC, Math.max(0, eligible.length - countA));
-    var countB = Math.max(0, eligible.length - countA - eligibleC);
-
-    for (var i = 0; i < eligible.length; i++) {
+    for (var i = 0; i < N; i++) {
+      orderedReg[i].regionalRank = i + 1;
+      orderedReg[i].regionalTotal = N;
       if (i < countA) {
-        eligible[i].grade = 'A';
-        eligible[i].gradeReason = 'Top 20% Regional';
+        orderedReg[i].grade = 'A';
+        orderedReg[i].gradeReason = 'Top 20% Regional';
       } else if (i < countA + countB) {
-        eligible[i].grade = 'B';
-        eligible[i].gradeReason = 'Middle 60% Regional';
+        orderedReg[i].grade = 'B';
+        orderedReg[i].gradeReason = 'Middle 60% Regional';
       } else {
-        eligible[i].grade = 'C';
-        eligible[i].gradeReason = 'Bottom 20% Regional';
+        orderedReg[i].grade = 'C';
+        orderedReg[i].gradeReason = 'Bottom 20% Regional';
       }
     }
-
-    var orderedReg = eligible.concat(under6);
-    orderedReg.forEach(function (x, idx) {
-      x.regionalRank = idx + 1;
-      x.regionalTotal = N;
-    });
-
-    var totalC = eligibleC + under6.length;
     regionalSummaries.push({
       regional: regName,
       total: N,
@@ -16092,11 +16163,8 @@ function computeMgrAnnualCriteria(model) {
     });
   });
 
-  // Sort overall display list: eligible (>=6M) first by score desc, then <6M by score desc
-  var sortedAll = rawList.slice().sort(function (a, b) {
-    if (a.isUnder6 !== b.isUnder6) return a.isUnder6 ? 1 : -1;
-    return cmpPerf(a, b);
-  });
+  // Sort overall display list purely by Criteria Score & Gate (no forced bottom placement for <6M)
+  var sortedAll = rawList.slice().sort(cmpPerf);
   sortedAll.forEach(function (x, i) { x.globalRank = i + 1; });
 
   var tot = sortedAll.length;
@@ -16121,7 +16189,7 @@ function computeMgrAnnualCriteria(model) {
       gatePassed: totGate
     },
     weights: Object.assign({}, w),
-    weightSum: w.mobile + w.gold + w.fbb + w.wallet,
+    weightSum: w.mobile + w.gold + w.fbb + w.wallet + (w.quality || 0),
     cap: cap
   };
   MGR_LAST_CRITERIA_DATA = result;
@@ -16129,6 +16197,38 @@ function computeMgrAnnualCriteria(model) {
 }
 
 function renderMgrAnnualCriteriaHTML(model) {
+  if (typeof LEAD_EVAL_UNLOCKED === 'undefined' || !LEAD_EVAL_UNLOCKED) {
+    var dummyRows = [1, 2, 3, 4, 5].map(function (i) {
+      return '<tr style="border-bottom:1px solid #e5e7eb">' +
+        '<td style="padding:10px 8px;text-align:center;font-weight:800;color:#5E2D91">#' + i + '</td>' +
+        '<td style="padding:10px 10px;font-weight:800;color:#111827">Confidential Store Manager ' + i + '</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">103.2%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">112.5%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">96.0%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#15803d;font-weight:800">94.8%</td>' +
+        '<td style="padding:10px 8px;text-align:center;color:#0f766e;font-weight:800">10 / 10</td>' +
+        '<td style="padding:10px 8px;text-align:center;font-weight:900;color:#3b1863">98.5%</td>' +
+        '<td style="padding:10px 8px;text-align:center"><span style="padding:2px 9px;border-radius:7px;background:#dcfce7;color:#15803d;font-weight:900">A</span></td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="chart-card" style="position:relative;overflow:hidden;padding:0;min-height:280px;border:1.5px solid #e9d5ff">' +
+      '<div aria-hidden="true" style="filter:blur(10px);-webkit-filter:blur(10px);opacity:0.42;pointer-events:none;user-select:none;padding:14px">' +
+        '<table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:#3b1863;color:white"><th style="padding:8px">#</th><th style="padding:8px;text-align:left">Manager</th><th style="padding:8px">Mob %</th><th style="padding:8px">Gold %</th><th style="padding:8px">FBB %</th><th style="padding:8px">Pay %</th><th style="padding:8px">Q/FB</th><th style="padding:8px">Score</th><th style="padding:8px">Grade</th></tr></thead>' +
+          '<tbody>' + dummyRows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.52);backdrop-filter:blur(4px);padding:20px">' +
+        '<div style="background:white;border-radius:18px;padding:24px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 16px 42px rgba(94,45,145,0.18);border:1.5px solid #e9d5ff">' +
+          '<div style="width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,#3b1863,#5E2D91);color:white;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 12px;box-shadow:0 6px 16px rgba(94,45,145,.28)"><i class="fas fa-shield-alt"></i></div>' +
+          '<div style="font-size:15px;font-weight:900;color:#111827;margin-bottom:5px">Restricted Access Section</div>' +
+          '<div style="font-size:12px;color:#6b7280;margin-bottom:16px">Annual Criteria &amp; Bell Curve evaluation is confidential.</div>' +
+          '<button onclick="openLeadEvalLockModal()" style="padding:10px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,#5E2D91,#e91e8c);color:white;font-size:12.5px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(94,45,145,.32)"><i class="fas fa-key mr-2"></i>If you have access, press here</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   var data = computeMgrAnnualCriteria(model);
   var isAdmin = isMgrCriteriaAdmin();
   var w = data.weights;
@@ -16153,20 +16253,26 @@ function renderMgrAnnualCriteriaHTML(model) {
     weightsBarHTML =
       '<div style="background:#faf5ff;border:1.5px solid #d8b4fe;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-          '<span style="background:#5E2D91;color:white;font-size:10px;font-weight:800;padding:3px 9px;border-radius:8px"><i class="fas fa-sliders-h mr-1"></i>Admin Live Weights</span>' +
+          '<span style="background:#5E2D91;color:white;font-size:10px;font-weight:800;padding:3px 9px;border-radius:8px"><i class="fas fa-sliders-h mr-1"></i>Live Weights</span>' +
           '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">Mobile <input type="number" min="0" max="100" value="' + w.mobile + '" onchange="updateMgrCriteriaWeight(\'mobile\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #c084fc;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
           '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">WE Gold <input type="number" min="0" max="100" value="' + w.gold + '" onchange="updateMgrCriteriaWeight(\'gold\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #f59e0b;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
           '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">FBB <input type="number" min="0" max="100" value="' + w.fbb + '" onchange="updateMgrCriteriaWeight(\'fbb\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #3b82f6;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
-          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">WE Pay <input type="number" min="0" max="100" value="' + w.wallet + '" onchange="updateMgrCriteriaWeight(\'wallet\', this.value)" style="width:48px;padding:3px 5px;border:1.5px solid #ec4899;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">WE Pay <input type="number" min="0" max="100" value="' + w.wallet + '" onchange="updateMgrCriteriaWeight(\'wallet\', this.value)" style="width:46px;padding:3px 5px;border:1.5px solid #ec4899;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
+          '<label style="font-size:11px;font-weight:800;color:#374151;display:inline-flex;align-items:center;gap:4px">Quality &amp; FB <input type="number" min="0" max="100" value="' + (w.quality || 0) + '" onchange="updateMgrCriteriaWeight(\'quality\', this.value)" style="width:46px;padding:3px 5px;border:1.5px solid #0f766e;border-radius:6px;text-align:center;font-weight:800;font-size:11px;background:white">%</label>' +
           '<span style="background:' + sumBg + ';color:' + sumColor + ';font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:8px">Sum: ' + wSum + '%' + (wSum === 100 ? ' ✓' : ' ⚠️') + '</span>' +
+          '<button onclick="bulkSetMgrQualityScore(null)" title="Reset Quality & Feedback back to default (10/10 clean, 0/10 warning)" style="padding:4px 9px;border-radius:7px;border:1px solid #99f6e4;background:#f0fdfa;color:#0f766e;font-size:10px;font-weight:800;cursor:pointer">Reset Q</button>' +
           '<label style="font-size:10.5px;font-weight:700;color:#4b5563;display:inline-flex;align-items:center;gap:4px">Cap: <select onchange="updateMgrCriteriaCap(this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:10.5px;font-weight:700;background:white">' +
-            '<option value="0"' + (data.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
+            '<option value="100"' + (data.cap === 100 ? ' selected' : '') + '>100% (Max)</option>' +
             '<option value="120"' + (data.cap === 120 ? ' selected' : '') + '>120%</option>' +
             '<option value="150"' + (data.cap === 150 ? ' selected' : '') + '>150%</option>' +
+            '<option value="0"' + (data.cap === 0 ? ' selected' : '') + '>No Cap</option>' +
           '</select></label>' +
           '<button onclick="resetMgrCriteriaWeights()" style="padding:4px 9px;border-radius:7px;border:1px solid #d1d5db;background:white;color:#374151;font-size:10.5px;font-weight:800;cursor:pointer"><i class="fas fa-undo mr-1"></i>Reset</button>' +
         '</div>' +
-        '<button onclick="exportMgrAnnualCriteriaExcel(this)" style="padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Annual Criteria</button>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<button onclick="exportMgrAnnualCriteriaExcel(this)" style="padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Annual Criteria</button>' +
+          '<button onclick="lockLeadEvalSection()" title="Lock Section" style="padding:7px 11px;border-radius:9px;border:1.5px solid #e5e7eb;background:white;color:#4b5563;font-size:11px;font-weight:800;cursor:pointer"><i class="fas fa-lock mr-1"></i>Lock</button>' +
+        '</div>' +
       '</div>';
   } else {
     weightsBarHTML =
@@ -16176,7 +16282,8 @@ function renderMgrAnnualCriteriaHTML(model) {
           '<span>Mobile <strong>' + w.mobile + '%</strong> (≥100%)</span> • ' +
           '<span>WE Gold <strong>' + w.gold + '%</strong> (≥100%)</span> • ' +
           '<span>FBB <strong>' + w.fbb + '%</strong> (≥90%)</span> • ' +
-          '<span>WE Pay <strong>' + w.wallet + '%</strong> (≥90%)</span>' +
+          '<span>WE Pay <strong>' + w.wallet + '%</strong> (≥90%)</span> • ' +
+          '<span>Quality &amp; Manager Feedback <strong>' + (w.quality || 0) + '%</strong> (Manual /10)</span>' +
         '</div>' +
         '<button onclick="exportMgrAnnualCriteriaExcel(this)" style="padding:7px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#15803d,#16a34a);color:white;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(22,163,74,.25)"><i class="fas fa-file-excel mr-1.5"></i>Export Annual Criteria</button>' +
       '</div>';
@@ -16219,11 +16326,17 @@ function renderMgrAnnualCriteriaHTML(model) {
   }
 
   // 4. Main Ranking Table
-  var pctCell = function (pct, met, thVal) {
+  var pctCell = function (pct, met, thVal, pts, maxW, extraTag) {
     var clr = met ? '#15803d' : (pct >= thVal * 0.85 ? '#b45309' : '#b91c1c');
     var bg = met ? '#f0fdf4' : 'transparent';
-    return '<td style="padding:8px 7px;text-align:center;font-size:11.5px;font-weight:800;color:' + clr + ';background:' + bg + ';border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
-      pct.toFixed(1) + '%' + (met ? ' <span style="font-size:9px">✓</span>' : '') +
+    var ptsSub = (pts !== undefined && maxW !== undefined)
+      ? '<div style="font-size:8.5px;color:#6b7280;font-weight:700;margin-top:1px">' + pts.toFixed(1) + ' / ' + maxW + '</div>'
+      : '';
+    var tagSub = extraTag
+      ? '<div style="font-size:7.5px;color:#b91c1c;font-weight:800;margin-top:1px">' + extraTag + '</div>'
+      : '';
+    return '<td style="padding:7px 7px;text-align:center;font-size:11.5px;font-weight:800;color:' + clr + ';background:' + bg + ';border-bottom:1px solid #f1f5f9;white-space:nowrap">' +
+      pct.toFixed(1) + '%' + (met ? ' <span style="font-size:9px">✓</span>' : '') + ptsSub + tagSub +
     '</td>';
   };
 
@@ -16244,9 +16357,12 @@ function renderMgrAnnualCriteriaHTML(model) {
     var oidBadge = (x.oracleId && x.oracleId !== '—')
       ? '<span style="background:#f3e8ff;color:#5E2D91;font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;margin-right:4px">ID: ' + mgrEsc(x.oracleId) + '</span>'
       : '';
-    var monthsBadge = x.isUnder6
-      ? '<span style="background:#fee2e2;color:#b91c1c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:5px">⏱ ' + x.monthsCount + ' شهور (&lt;6M)</span>'
-      : '<span style="font-size:9.5px;color:#6b7280;font-weight:700">📅 ' + x.monthsCount + ' شهور</span>';
+    var warnNameBadge = x.warnCount > 0
+      ? ' <span style="background:#fee2e2;color:#b91c1c;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:5px">⚠️ Warning (' + x.warnCount + ')</span>'
+      : '';
+    var monthsBadge = (x.isUnder6
+      ? '<span style="background:#fef3c7;color:#92400e;font-size:9px;font-weight:800;padding:1px 6px;border-radius:5px">⏱ ' + x.monthsCount + ' شهور (&lt;6M)</span>'
+      : '<span style="font-size:9.5px;color:#6b7280;font-weight:700">📅 ' + x.monthsCount + ' شهور</span>') + warnNameBadge;
 
     return '<tr style="background:' + bg + ';border-bottom:1px solid #e5e7eb">' +
       '<td style="padding:8px 6px;text-align:center;font-weight:900;font-size:11.5px;color:#5E2D91">' + x.globalRank + '</td>' +
@@ -16258,10 +16374,30 @@ function renderMgrAnnualCriteriaHTML(model) {
         '<div style="font-size:10.5px;font-weight:800;color:#374151">' + mgrEsc(x.regional) + '</div>' +
         '<div style="font-size:9.5px;color:#6b7280">Reg Rank #' + x.regionalRank + '/' + x.regionalTotal + ' · ' + mgrEsc(x.areaManager) + '</div>' +
       '</td>' +
-      pctCell(x.mobPct, x.metMob, 100) +
-      pctCell(x.goldPct, x.metGold, 100) +
-      pctCell(x.fbbPct, x.metFbb, 90) +
-      pctCell(x.payPct, x.metPay, 90) +
+      pctCell(x.mobPct, x.metMob, 100, x.ptsMob, Number(x.effMobMax.toFixed(1)), [x.mobBelow100Pen ? '<100% (-10)' : '', x.warnCount > 0 ? '⚠️ Warn -10' : '', x.isUnder6 ? ('⏱ <6M (' + Math.round(x.tenureFactor*100) + '%)') : ''].filter(Boolean).join(' · ')) +
+      pctCell(x.goldPct, x.metGold, 100, x.ptsGold, w.gold) +
+      pctCell(x.fbbPct, x.metFbb, 90, x.ptsFbb, w.fbb) +
+      pctCell(x.payPct, x.metPay, 90, x.ptsPay, w.wallet) +
+      (function () {
+        var qBg = x.qVal === 0 ? '#fef2f2' : '#f0fdfa';
+        var qClr = x.qVal === 0 ? '#b91c1c' : '#0f766e';
+        var qSub = x.qIsManual
+          ? '<div style="font-size:8px;color:#5E2D91;font-weight:800;margin-top:2px">✎ Manual</div>'
+          : '';
+        if (isAdmin) {
+          var opts = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map(function (n) {
+            return '<option value="' + n + '"' + (Math.round(x.qVal) === n ? ' selected' : '') + '>' + n + ' / 10</option>';
+          }).join('');
+          return '<td style="padding:6px 6px;text-align:center;background:' + qBg + ';border-bottom:1px solid #ccfbf1;white-space:nowrap">' +
+            '<select onchange="setMgrQualityScore(\'' + x.qKey.replace(/'/g, "\\'") + '\', this.value)" style="padding:3px 6px;border:1.5px solid ' + (x.qVal === 0 ? '#fca5a5' : '#14b8a6') + ';border-radius:7px;font-size:11px;font-weight:800;color:' + qClr + ';background:white;cursor:pointer">' + opts + '</select>' +
+            qSub +
+          '</td>';
+        }
+        return '<td style="padding:6px 6px;text-align:center;background:' + qBg + ';border-bottom:1px solid #ccfbf1;white-space:nowrap">' +
+          '<div style="font-size:11.5px;font-weight:800;color:' + qClr + '">' + Math.round(x.qVal) + ' / 10</div>' +
+          qSub +
+        '</td>';
+      })() +
       '<td style="padding:8px 7px;text-align:center;font-size:12px;font-weight:900;color:#1e1b4b;background:#f5f3ff;border-bottom:1px solid #e9d5ff">' + x.score.toFixed(1) + '%</td>' +
       '<td style="padding:8px 7px;text-align:center">' + metBadge + (!x.gatePassed ? '<div style="margin-top:3px"><span style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:6px;white-space:nowrap">🔒 ' + mgrEsc(x.gateLabel) + '</span></div>' : '<div style="margin-top:3px;font-size:8.5px;font-weight:800;color:#047857">🔓 Gate OK</div>') + '</td>' +
       '<td style="padding:8px 7px;text-align:center">' +
@@ -16288,12 +16424,13 @@ function renderMgrAnnualCriteriaHTML(model) {
             '<th style="' + thBase + '">2. WE Gold %<div style="font-size:8.5px;opacity:.85">W:' + w.gold + '% · ≥100%</div></th>' +
             '<th style="' + thBase + '">3. FBB %<div style="font-size:8.5px;opacity:.85">W:' + w.fbb + '% · ≥90%</div></th>' +
             '<th style="' + thBase + '">4. WE Pay %<div style="font-size:8.5px;opacity:.85">W:' + w.wallet + '% · ≥90%</div></th>' +
+            '<th style="' + thBase + ';background:#0f766e">5. Quality &amp; FB<div style="font-size:8.5px;opacity:.85">W:' + (w.quality || 0) + '% · Manual /10</div></th>' +
             '<th style="' + thBase + ';background:#4c1d95">Criteria Score</th>' +
             '<th style="' + thBase + '">4/4 Met</th>' +
             '<th style="' + thBase + '">Bell Curve<div style="font-size:8.5px;opacity:.85">A/B/C</div></th>' +
             '<th style="' + thBase + ';background:#6b21a8">Annual Eval %<div style="font-size:8.5px;opacity:.85">(Explanatory)</div></th>' +
           '</tr></thead>' +
-          '<tbody>' + (rowsHTML || '<tr><td colspan="11" style="padding:28px;text-align:center;color:#6b7280;font-weight:700">لا توجد نتائج مطابقة لهذا الفلتر</td></tr>') + '</tbody>' +
+          '<tbody>' + (rowsHTML || '<tr><td colspan="12" style="padding:28px;text-align:center;color:#6b7280;font-weight:700">لا توجد نتائج مطابقة لهذا الفلتر</td></tr>') + '</tbody>' +
         '</table>' +
       '</div>' +
     '</div>';
@@ -16415,7 +16552,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
 
     wsSum.mergeCells(r, 1, r, 10);
     for (var rc = 1; rc <= 10; rc++) styleCell(wsSum.getCell(r, rc), { bg: '#FAF5FF', fg: '#4C1D95', b: true, sz: 9.5, al: 'left', bd: '#E9D5FF' });
-    wsSum.getCell(r, 1).value = '⚖️ Criteria Rules: Mobile ' + w.mobile + '% (≥100%) · WE Gold ' + w.gold + '% (≥100%) · FBB ' + w.fbb + '% (≥90%) · WE Pay ' + w.wallet + '% (≥90%)  |  🔒 Dual Gate: Mobile & Gold ≥100%  |  Bell Curve per Regional: A 20% / B 60% / C 20% (<6M Auto-C inside C quota)' + (data.cap > 0 ? '  |  Cap: ' + data.cap + '%' : '');
+    wsSum.getCell(r, 1).value = '⚖️ Criteria Rules: Mobile ' + w.mobile + '% (≥100%) · WE Gold ' + w.gold + '% (≥100%) · FBB ' + w.fbb + '% (≥90%) · WE Pay ' + w.wallet + '% (≥90%) · Quality & Manager Feedback ' + (w.quality || 0) + '% (Manual /10)  |  🔒 Dual Gate: Mobile & Gold ≥100%  |  Bell Curve: A 20% / B 60% / C 20%' + (data.cap > 0 ? '  |  Cap: ' + data.cap + '%' : '');
     wsSum.getRow(r).height = 20;
     r += 2;
 
@@ -16557,6 +16694,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
       { hdr: '2. WE Gold %\n(W:' + w.gold + '% · ≥100%)', w: 15, grp: 'crit' },
       { hdr: '3. FBB %\n(W:' + w.fbb + '% · ≥90%)', w: 14, grp: 'crit' },
       { hdr: '4. WE Pay %\n(W:' + w.wallet + '% · ≥90%)', w: 14, grp: 'crit' },
+      { hdr: '5. Quality & FB\n(W:' + (w.quality || 0) + '% · /10)', w: 15, grp: 'crit' },
       { hdr: 'Criteria Score %', w: 15, grp: 'score' },
       { hdr: 'Gate\n(Mob & Gold ≥100%)', w: 18, grp: 'eval' },
       { hdr: '4/4 Met', w: 12, grp: 'eval' },
@@ -16600,7 +16738,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
       put(x.label, { al: 'left', b: true, fg: '#5E2D91' });
       put(x.oracleId || '—');
       put(x.monthsCount, { b: x.isUnder6, bg: x.isUnder6 ? '#FEE2E2' : rowBg, fg: x.isUnder6 ? '#B91C1C' : '#1F2937', numFmt: '#,##0' });
-      put(x.isUnder6 ? '< 6M (Auto C)' : '≥ 6 Months', { bg: x.isUnder6 ? '#FEF2F2' : rowBg, fg: x.isUnder6 ? '#B91C1C' : '#15803D', b: x.isUnder6 });
+      put(x.isUnder6 ? '< 6M (Proportional Mob)' : '≥ 6 Months', { bg: x.isUnder6 ? '#FEF2F2' : rowBg, fg: x.isUnder6 ? '#B91C1C' : '#15803D', b: x.isUnder6 });
       put(x.branchesTxt || '—', { al: 'left' });
       put(x.regional, { al: 'left', b: true });
       put('#' + x.regionalRank + ' / ' + x.regionalTotal);
@@ -16615,6 +16753,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
       put(x.goldPct / 100, { bg: gS.bg, fg: gS.fg, b: true, numFmt: '0.0%' });
       put(x.fbbPct / 100, { bg: fS.bg, fg: fS.fg, b: true, numFmt: '0.0%' });
       put(x.payPct / 100, { bg: pS.bg, fg: pS.fg, b: true, numFmt: '0.0%' });
+      put(x.qVal !== null ? Math.round(x.qVal) : '—', { bg: '#F0FDFA', fg: x.qVal !== null ? '#0F766E' : '#9CA3AF', b: x.qVal !== null, numFmt: x.qVal !== null ? '0' : null });
       put(x.score / 100, { bg: '#F5F3FF', fg: '#3B1D63', b: true, numFmt: '0.0%' });
       put(x.gatePassed ? '🔓 PASSED' : '🔒 ' + x.gateLabel, { bg: x.gatePassed ? '#ECFDF5' : '#FEF2F2', fg: x.gatePassed ? '#047857' : '#B91C1C', b: true });
       put(x.all4Met ? '🌟 4/4 MET' : x.metCount + ' / 4', { bg: x.all4Met ? '#FEF3C7' : rowBg, fg: x.all4Met ? '#92400E' : '#4B5563', b: x.all4Met });
@@ -16646,6 +16785,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
         avgFn(function (x) { return x.goldPct; }) / 100,
         avgFn(function (x) { return x.fbbPct; }) / 100,
         avgFn(function (x) { return x.payPct; }) / 100,
+        Number(avgFn(function (x) { return x.qVal !== null ? x.qVal : 0; }).toFixed(1)),
         avgFn(function (x) { return x.score; }) / 100,
         visibleItems.filter(function (x) { return x.gatePassed; }).length + ' Passed',
         visibleItems.filter(function (x) { return x.all4Met; }).length + ' (4/4)',
@@ -16656,7 +16796,7 @@ async function exportMgrAnnualCriteriaExcel(btn) {
         visibleItems.reduce(function (a, b) { return a + (b.warnCount || 0); }, 0)
       ];
       footVals.forEach(function (fv, fi) {
-        var fmt = (fi >= 10 && fi <= 14) || (fi === 19 && avgEv !== null) ? '0.0%' : null;
+        var fmt = ((fi >= 10 && fi <= 13) || fi === 15 || (fi === 20 && avgEv !== null)) ? '0.0%' : (fi === 14 ? '0.0' : null);
         wsRank.getCell(rr, fi + 1).value = fv;
         styleCell(wsRank.getCell(rr, fi + 1), { bg: '#3B1D63', fg: '#FFFFFF', b: true, al: fi === 1 ? 'left' : 'center', numFmt: fmt, bd: '#5E2D91' });
       });
